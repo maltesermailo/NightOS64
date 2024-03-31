@@ -1,0 +1,285 @@
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <limits.h>
+#include "multiboot.h"
+#include "memmgr.h"
+#include "gdt.h"
+
+/* Hardware text mode color constants. */
+enum vga_color {
+	VGA_COLOR_BLACK = 0,
+	VGA_COLOR_BLUE = 1,
+	VGA_COLOR_GREEN = 2,
+	VGA_COLOR_CYAN = 3,
+	VGA_COLOR_RED = 4,
+	VGA_COLOR_MAGENTA = 5,
+	VGA_COLOR_BROWN = 6,
+	VGA_COLOR_LIGHT_GREY = 7,
+	VGA_COLOR_DARK_GREY = 8,
+	VGA_COLOR_LIGHT_BLUE = 9,
+	VGA_COLOR_LIGHT_GREEN = 10,
+	VGA_COLOR_LIGHT_CYAN = 11,
+	VGA_COLOR_LIGHT_RED = 12,
+	VGA_COLOR_LIGHT_MAGENTA = 13,
+	VGA_COLOR_LIGHT_BROWN = 14,
+	VGA_COLOR_WHITE = 15,
+};
+
+static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg)
+{
+	return fg | bg << 4;
+}
+
+static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
+{
+	return (uint16_t)uc | (uint16_t)color << 8;
+}
+
+char* raw_itoa(int i) {
+    static char buf[21];
+    char *p = buf + 20;
+
+    if(i >= 0) {
+        do {
+            *--p = '0' + (i % 10);
+            i /= 10;
+        } while(i != 0);
+        return p;
+    } else {
+        do {
+            *--p = '0' - (i % 10);
+            i /= 10;
+        } while(i != 0);
+        *--p = '-';
+        return p;
+    }
+}
+
+size_t strlen(const char* str)
+{
+	size_t len = 0;
+	while (str[len])
+		len++;
+	return len;
+}
+
+static const size_t VGA_WIDTH = 80;
+static const size_t VGA_HEIGHT = 25;
+
+size_t terminal_row;
+size_t terminal_column;
+uint8_t terminal_color;
+uint16_t* terminal_buffer;
+
+void terminal_initialize(void)
+{
+	terminal_row = 0;
+	terminal_column = 0;
+	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	terminal_buffer = (uint16_t*)0xB8000;
+
+}
+
+void terminal_setcolor(uint8_t color)
+{
+	terminal_color = color;
+}
+
+void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
+{
+	const size_t index = y * VGA_WIDTH + x;
+	terminal_buffer[index] = vga_entry(c, color);
+}
+
+void terminal_rollover() {
+    for (size_t y = 1; y < VGA_HEIGHT; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = y * VGA_WIDTH + x;
+            const size_t new_index = (y-1) * VGA_WIDTH + x;
+
+            terminal_buffer[new_index] = terminal_buffer[index];
+        }
+    }
+
+    for(int x = 0; x < VGA_WIDTH; x++) {
+        const size_t index = 24 * VGA_WIDTH + x;
+
+        terminal_buffer[index] = vga_entry(' ', terminal_color);
+    }
+}
+
+void terminal_putchar(char c)
+{
+	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+
+	if (++terminal_column == VGA_WIDTH || c == '\n') {
+		terminal_column = 0;
+		if (++terminal_row == VGA_HEIGHT) {
+            //Instead of moving up we a
+            terminal_rollover();
+            terminal_row = VGA_HEIGHT - 1;
+        }
+	}
+}
+
+void terminal_write(const char* data, size_t size)
+{
+	for (size_t i = 0; i < size; i++)
+		terminal_putchar(data[i]);
+}
+
+void terminal_writestring(const char* data)
+{
+	terminal_write(data, strlen(data));
+}
+
+static void
+itoa (char *buf, int base, long d)
+{
+    char *p = buf;
+    char *p1, *p2;
+    unsigned long ud = d;
+    int divisor = 10;
+
+    /* If %d is specified and D is minus, put ‘-’ in the head. */
+    if (base == 'd' && d < 0)
+    {
+        *p++ = '-';
+        buf++;
+        ud = -d;
+    }
+    else if (base == 'x')
+        divisor = 16;
+
+    /* Divide UD by DIVISOR until UD == 0. */
+    do
+    {
+        int remainder = ud % divisor;
+
+        *p++ = (remainder < 10) ? remainder + '0' : remainder + 'a' - 10;
+    }
+    while (ud /= divisor);
+
+    /* Terminate BUF. */
+    *p = 0;
+
+    /* Reverse BUF. */
+    p1 = buf;
+    p2 = p - 1;
+    while (p1 < p2)
+    {
+        char tmp = *p1;
+        *p1 = *p2;
+        *p2 = tmp;
+        p1++;
+        p2--;
+    }
+}
+
+static bool print(const char* data, size_t length) {
+    const unsigned char* bytes = (const unsigned char*) data;
+    for (size_t i = 0; i < length; i++)
+        terminal_putchar(bytes[i]);
+    return true;
+}
+
+int printf(const char* restrict format, ...) {
+    va_list parameters;
+    va_start(parameters, format);
+
+    int written = 0;
+
+    while (*format != '\0') {
+        size_t maxrem = INT_MAX - written;
+
+        if (format[0] != '%' || format[1] == '%') {
+            if (format[0] == '%')
+                format++;
+            size_t amount = 1;
+            while (format[amount] && format[amount] != '%')
+                amount++;
+            if (maxrem < amount) {
+                // TODO: Set errno to EOVERFLOW.
+                return -1;
+            }
+            if (!print(format, amount))
+                return -1;
+            format += amount;
+            written += amount;
+            continue;
+        }
+
+        const char* format_begun_at = format++;
+
+        if (*format == 'c') {
+            format++;
+            char c = (char) va_arg(parameters, int /* char promotes to int */);
+            if (!maxrem) {
+                // TODO: Set errno to EOVERFLOW.
+                return -1;
+            }
+            if (!print(&c, sizeof(c)))
+                return -1;
+            written++;
+        } else if (*format == 's') {
+            format++;
+            const char* str = va_arg(parameters, const char*);
+            size_t len = strlen(str);
+            if (maxrem < len) {
+                // TODO: Set errno to EOVERFLOW.
+                return -1;
+            }
+            if (!print(str, len))
+                return -1;
+            written += len;
+        } else if(*format == 'd' || *format == 'x' || *format == 'u') {
+            long i = va_arg(parameters, long);
+            if(!maxrem) {
+                return -1;
+            }
+            char buf[255];
+
+            itoa(buf, *format, i);
+            format++;
+
+            if(!print(buf, strlen(buf)))
+                return -1;
+            written += strlen(buf);
+        } else {
+            format = format_begun_at;
+            size_t len = strlen(format);
+            if (maxrem < len) {
+                // TODO: Set errno to EOVERFLOW.
+                return -1;
+            }
+            if (!print(format, len))
+                return -1;
+            written += len;
+            format += len;
+        }
+    }
+
+    va_end(parameters);
+    return written;
+}
+
+void kernel_main(multiboot_info_t* info)
+{
+	/* Initialize terminal interface */
+	terminal_initialize();
+
+    printf("info loc: 0x%x\n", info);
+
+    gdt_install();
+    memmgr_init(info);
+
+    void* test = malloc(4096);
+    printf("new space: 0x%x", test);
+    free(test);
+
+	/* Newline support is left as an exercise. */
+	terminal_writestring("Hello Kernel\n");
+    terminal_writestring("Test");
+}
