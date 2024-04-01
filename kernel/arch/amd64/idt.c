@@ -27,10 +27,12 @@ static idtr_t idtr;
 
 extern void* isr_stub_table[];
 
-void exception_handler() {
-    __asm__ volatile ("cli"); // Completely hangs the computer
+void exception_handler(regs_t regs) {
+    __asm__ volatile ("cli");
 
-    printf("exception :(");
+    printf("exception :(\n");
+    printf("no: %x\n", regs.int_no);
+    printf("err: %x\n", regs.err_code);
 
     __asm__ volatile("hlt");
 }
@@ -51,7 +53,7 @@ void idt_install() {
     idtr.base = (uintptr_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
 
-    for (uint8_t vector = 0; vector < 32; vector++) {
+    for (uint8_t vector = 0; vector < 35; vector++) {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 

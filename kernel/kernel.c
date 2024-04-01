@@ -281,14 +281,16 @@ void kernel_main(multiboot_info_t* info)
 
     //Setup interrupts
     idt_install();
+    pic_setup();
 
     void* test = malloc(4096);
     printf("new space: 0x%x\n", test);
     free(test);
 
-    uint64_t * page = 0x500000;
-    (*page) = 0;
-
 	/* Newline support is left as an exercise. */
 	terminal_writestring("Hello Kernel\n");
+
+    while(1) {
+
+    }
 }
