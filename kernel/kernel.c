@@ -6,6 +6,7 @@
 #include "multiboot.h"
 #include "memmgr.h"
 #include "gdt.h"
+#include "idt.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -270,16 +271,24 @@ void kernel_main(multiboot_info_t* info)
 	/* Initialize terminal interface */
 	terminal_initialize();
 
-    printf("info loc: 0x%x\n", info);
+    printf("Colonel version 0.0.0 starting up...\n");
 
+    //Setup GDT and TSS
     gdt_install();
+
+    //Setup Memory Management
     memmgr_init(info);
 
+    //Setup interrupts
+    idt_install();
+
     void* test = malloc(4096);
-    printf("new space: 0x%x", test);
+    printf("new space: 0x%x\n", test);
     free(test);
+
+    uint64_t * page = 0x500000;
+    (*page) = 0;
 
 	/* Newline support is left as an exercise. */
 	terminal_writestring("Hello Kernel\n");
-    terminal_writestring("Test");
 }

@@ -298,6 +298,10 @@ void memmgr_delete_page(uintptr_t virtualAddr) {
         return;
     }
 
+    uintptr_t frame = pageTable[INDEX_PT];
+
+    kfree_frame(frame);
+
     pageTable[INDEX_PT] = 0;
 }
 
