@@ -6,7 +6,7 @@
 
 #define LIBALLOC_MAGIC	0xc001c0de
 #define MAXCOMPLETE		5
-#define MAXEXP	32
+#define MAXEXP	48
 #define MINEXP	8
 
 #define MODE_BEST			0
@@ -41,7 +41,7 @@ static int l_pageCount = 16;			//< Minimum number of pages to allocate.
  *
  *  Returns n where  2^n <= size < 2^(n+1)
  */
-static inline int getexp( unsigned int size )
+static inline int getexp( unsigned long long size )
 {
     if ( size < (1<<MINEXP) )
     {
@@ -107,7 +107,7 @@ static void* 	liballoc_memcpy(void* s1, const void* s2, size_t n)
 #ifdef DEBUG
 static void dump_array()
 {
-	int i = 0;
+	long long i = 0;
 	struct boundary_tag *tag = NULL;
 
 	printf("------ Free pages array ---------\n");
@@ -140,7 +140,7 @@ static void dump_array()
 
 static inline void insert_tag( struct boundary_tag *tag, int index )
 {
-    int realIndex;
+    long long realIndex;
 
     if ( index < 0 )
     {
@@ -234,10 +234,10 @@ static inline struct boundary_tag* split_tag( struct boundary_tag* tag )
 
 
 
-static struct boundary_tag* allocate_new_tag( unsigned int size )
+static struct boundary_tag* allocate_new_tag( unsigned long long size )
 {
-    unsigned int pages;
-    unsigned int usage;
+    unsigned long long pages;
+    unsigned long long usage;
     struct boundary_tag *tag;
 
     // This is how much space is required.
@@ -350,11 +350,11 @@ void *malloc(size_t size)
     printf("Found tag with %d bytes available (requested %d bytes, leaving %d), which has exponent: %d (%d bytes)\n", tag->real_size - sizeof(struct boundary_tag), size, tag->real_size - size - sizeof(struct boundary_tag), index, 1<<index );
 #endif
 
-    unsigned int remainder = tag->real_size - size - sizeof( struct boundary_tag ) * 2; // Support a new tag + remainder
+    unsigned long long remainder = tag->real_size - size - sizeof( struct boundary_tag ) * 2; // Support a new tag + remainder
 
-    if ( ((int)(remainder) > 0) /*&& ( (tag->real_size - remainder) >= (1<<MINEXP))*/ )
+    if ( ((long long)(remainder) > 0) /*&& ( (tag->real_size - remainder) >= (1<<MINEXP))*/ )
     {
-        int childIndex = getexp( remainder );
+        long long childIndex = getexp( remainder );
 
         if ( childIndex >= 0 )
         {
@@ -374,7 +374,7 @@ void *malloc(size_t size)
 
 
 
-    ptr = (void*)((unsigned int)tag + sizeof( struct boundary_tag ) );
+    ptr = (void*)((unsigned long long)tag + sizeof( struct boundary_tag ) );
 
 
 
@@ -395,7 +395,7 @@ void *malloc(size_t size)
 
 void free(void *ptr)
 {
-    int index;
+    long long index;
     struct boundary_tag *tag;
 
     if ( ptr == NULL ) return;
@@ -490,7 +490,7 @@ void free(void *ptr)
 
 void* calloc(size_t nobj, size_t size)
 {
-    int real_size;
+    long long real_size;
     void *p;
 
     real_size = nobj * size;

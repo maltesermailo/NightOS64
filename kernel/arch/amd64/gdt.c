@@ -8,6 +8,7 @@ static gdt_pointer_t pointer;
 static tss_entry_t tss;
 
 extern void* stack_top;
+extern void reloadSegments();
 
 void gdt_install() {
     __asm__("sgdt %0" : "=m"(pointer) : : "memory");
@@ -28,8 +29,10 @@ void gdt_install() {
 
     asm volatile("lgdt %0" : : "m"(pointer));
     asm volatile("ltr %%ax" : : "a" (0x28));
+
+    reloadSegments();
 }
 
 void set_stack_pointer(uintptr_t stack) {
-
+    tss.rsp[0] = stack;
 }

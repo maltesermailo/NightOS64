@@ -28,7 +28,7 @@
 #define ICW4_BUF_MASTER	0x0C		/* Buffered mode/master */
 #define ICW4_SFNM	0x10		/* Special fully nested (not) */
 
-void PIC_sendEOI(uint8_t irq)
+void pic_sendEOI(uint8_t irq)
 {
     if(irq >= 8)
         outb(PIC2_COMMAND,PIC_EOI);
@@ -60,5 +60,5 @@ void pic_setup() {
     outb(PIC2_DATA, ICW4_8086);
     io_wait();
 
-    outb(PIC1_DATA, 0xfd);   //Enable keyboard
+    outb(PIC1_DATA, 0xfc);   //Enable keyboard and pit
 }

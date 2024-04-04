@@ -18,6 +18,7 @@ KERNEL_OBJS=\
 $(KERNEL_ARCH_OBJS) \
 kernel/kernel.o \
 kernel/alloc/liballoc.o \
+kernel/proc/process.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

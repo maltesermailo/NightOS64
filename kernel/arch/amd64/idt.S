@@ -14,7 +14,6 @@ isr_stub_%+%1:
 extern exception_handler
 
 isr_common:
-    swapgs
     push rax
     push rbx
     push rcx
@@ -31,6 +30,7 @@ isr_common:
     push r14
     push r15
 
+    mov rdi, rsp
     call exception_handler
 
     pop r15
@@ -48,7 +48,8 @@ isr_common:
     pop rcx
     pop rbx
     pop rax
-    swapgs
+
+    add rsp, 16
 
     iretq
 
@@ -88,11 +89,24 @@ isr_no_err_stub 31
 isr_no_err_stub 32
 isr_no_err_stub 33
 isr_no_err_stub 34
+isr_no_err_stub 35
+isr_no_err_stub 36
+isr_no_err_stub 37
+isr_no_err_stub 38
+isr_no_err_stub 39
+isr_no_err_stub 40
+isr_no_err_stub 41
+isr_no_err_stub 42
+isr_no_err_stub 43
+isr_no_err_stub 44
+isr_no_err_stub 45
+isr_no_err_stub 46
+isr_no_err_stub 47
 
 global isr_stub_table
 isr_stub_table:
 %assign i 0
-%rep    35
+%rep    48
     dq isr_stub_%+i ; use DQ instead if targeting 64-bit
 %assign i i+1
 %endrep

@@ -7,6 +7,9 @@
 #include "memmgr.h"
 #include "gdt.h"
 #include "idt.h"
+#include "keyboard.h"
+#include "timer.h"
+#include "proc/process.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -38,26 +41,6 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 	return (uint16_t)uc | (uint16_t)color << 8;
 }
 
-char* raw_itoa(int i) {
-    static char buf[21];
-    char *p = buf + 20;
-
-    if(i >= 0) {
-        do {
-            *--p = '0' + (i % 10);
-            i /= 10;
-        } while(i != 0);
-        return p;
-    } else {
-        do {
-            *--p = '0' - (i % 10);
-            i /= 10;
-        } while(i != 0);
-        *--p = '-';
-        return p;
-    }
-}
-
 size_t strlen(const char* str)
 {
 	size_t len = 0;
@@ -81,6 +64,12 @@ void terminal_initialize(void)
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	terminal_buffer = (uint16_t*)0xB8000;
 
+    for (size_t y = 0; y < VGA_HEIGHT; y++) {
+        for (size_t x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = y * VGA_WIDTH + x;
+            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        }
+    }
 }
 
 void terminal_setcolor(uint8_t color)
@@ -134,6 +123,16 @@ void terminal_write(const char* data, size_t size)
 void terminal_writestring(const char* data)
 {
 	terminal_write(data, strlen(data));
+}
+
+void terminal_resetline() {
+    terminal_column = 0;
+
+    for(int x = 0; x < VGA_WIDTH; x++) {
+        const size_t index = terminal_row * VGA_WIDTH + x;
+
+        terminal_buffer[index] = vga_entry(' ', terminal_color);
+    }
 }
 
 static void
@@ -266,6 +265,31 @@ int printf(const char* restrict format, ...) {
     return written;
 }
 
+char commandline[64];
+
+void key_event(key_event_t* event) {
+    if(event->keyCode == 0x8) {
+        for(int i = 0; i < 64; i++) {
+            if(!commandline[i] && event->isDown) {
+                commandline[i-1] = 0;
+                return;
+            }
+        }
+        return;
+    }
+
+    for(int i = 0; i < 64; i++) {
+        if(!commandline[i] && event->isDown) {
+            commandline[i] = event->keyCode;
+            return;
+        }
+    }
+}
+
+void test_task() {
+    while(1);
+}
+
 void kernel_main(multiboot_info_t* info)
 {
 	/* Initialize terminal interface */
@@ -282,15 +306,47 @@ void kernel_main(multiboot_info_t* info)
     //Setup interrupts
     idt_install();
     pic_setup();
-
-    void* test = malloc(4096);
-    printf("new space: 0x%x\n", test);
-    free(test);
+    irq_install();
+    ps2_init();
+    timer_init();
 
 	/* Newline support is left as an exercise. */
-	terminal_writestring("Hello Kernel\n");
+	//terminal_writestring("Hello Kernel\n");
 
-    while(1) {
-
+    for(int i = 0; i < 64; i++) {
+        commandline[i] = 0;
     }
+
+    registerKeyEventHandler(key_event);
+
+    process_create_task(&test_task);
+
+    /*while(1) {
+        terminal_resetline();
+        printf("> ");
+
+        for(int i = 0; i < 64; i++) {
+            if(commandline[i]) {
+                if(commandline[i] == '\n') {
+                    //Execute command
+                    if(commandline[0] == 'o' && commandline[1] == 'w' && commandline[2] == 'o') {
+                        //Flip all memory bits
+                        printf("\n");
+                        printf("OwO");
+
+                        for (size_t y = 0; y < VGA_HEIGHT; y++) {
+                            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                                const size_t index = y * VGA_WIDTH + x;
+                                terminal_buffer[index] = ~(terminal_buffer[index]);
+                            }
+                        }
+
+                        asm volatile("cli");
+                        asm volatile("hlt");
+                    }
+                }
+                printf("%c", commandline[i]);
+            }
+        }
+    }*/
 }

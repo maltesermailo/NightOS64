@@ -127,7 +127,7 @@ _start:
     mov edi, 0x4000
 
 	; Identity map 4 MB
-    mov ebx, 0x00000003          ; Set the B-register to 0x00000003.
+    mov ebx, 0x00000007          ; Set the B-register to 0x00000003.
     mov ecx, 1024                 ; Set the C-register to 1024.
  
 .SetEntry:
@@ -153,7 +153,7 @@ _start:
 	lgdt [GDT64.Pointer]
     jmp GDT64.Code:.LongMode
  
- .end:
+.end:
 
 .NoCPUID:
 	cli
@@ -168,6 +168,7 @@ _start:
 [BITS 64]
 PAGE_PRESENT  equ 1 << 0
 PAGE_WRITABLE equ 1 << 1
+PAGE_USER     equ 1 << 2
 
 .LongMode:
     mov rdi, 0x6000
@@ -190,6 +191,7 @@ PAGE_WRITABLE equ 1 << 1
     mov rbx, _bootstrap_end
     or rbx, PAGE_PRESENT
     or rbx, PAGE_WRITABLE
+    or rbx, PAGE_USER
     mov rcx, 1024                 ; Set the C-register to 1024 to map the next 4 MB.
 
 .SetEntryLM:
@@ -200,9 +202,6 @@ PAGE_WRITABLE equ 1 << 1
 
     mov rdi, 0x1FF8
     mov QWORD [rdi], 0x1003
-
-;.loop:
-;    jmp .loop
 
     mov ax, GDT64.Data
     mov ds, ax                    ; Set the data segment to the A-register.

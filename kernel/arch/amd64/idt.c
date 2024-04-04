@@ -4,6 +4,7 @@
 
 #include "../../idt.h"
 #include <stdint.h>
+#include "io.h"
 
 typedef struct {
     uint16_t    isr_low;      // The lower 16 bits of the ISR's address
@@ -24,17 +25,24 @@ __attribute__((aligned(0x10)))
 static idt_entry_t idt[256];
 
 static idtr_t idtr;
+static irq_handler_t irqHandlers[16];
 
 extern void* isr_stub_table[];
 
-void exception_handler(regs_t regs) {
+void exception_handler(regs_t * regs) {
     __asm__ volatile ("cli");
 
-    printf("exception :(\n");
-    printf("no: %x\n", regs.int_no);
-    printf("err: %x\n", regs.err_code);
+    if(regs->int_no < 32) {
+        printf("exception :(\n");
+        printf("no: %d\n", regs->int_no);
+        printf("err: 0x%x\n", regs->err_code);
 
-    __asm__ volatile("hlt");
+        asm volatile("hlt");
+    } else if (regs->int_no >= 32 && regs->int_no < 48) {
+        if(irqHandlers[regs->int_no - 32]) {
+            irqHandlers[regs->int_no - 32](regs);
+        }
+    }
 }
 
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
@@ -47,6 +55,16 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
     descriptor->isr_mid        = ((uint64_t)isr >> 16) & 0xFFFF;
     descriptor->isr_high       = ((uint64_t)isr >> 32) & 0xFFFFFFFF;
     descriptor->reserved       = 0;
+}
+
+void irq_install_handler(size_t irq, irq_handler_t handler) {
+    if(!irqHandlers[irq]) {
+        irqHandlers[irq] = handler;
+    }
+}
+
+void irq_install() {
+
 }
 
 void idt_install() {

@@ -15,6 +15,7 @@
 
 #define PAGE_PRESENT 1 << 0
 #define PAGE_WRITABLE 1 << 1
+#define PAGE_USER 1 << 2
 #define PAGE_LARGE 1 << 7
 
 /* Kernel memory base */
@@ -372,7 +373,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             }
 
             for(size_t i = 1; i < count+1; i++) {
-                memmgr_create_or_get_page(start_addr + 0x1000 * i, 0);
+                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER);
             }
 
             return start_addr;
@@ -386,7 +387,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             }
 
             for(size_t i = 1; i < count+1; i++) {
-                memmgr_create_or_get_page(start_addr * i, 0);
+                memmgr_create_or_get_page(start_addr * i, PAGE_USER);
             }
 
             return start_addr;
@@ -398,7 +399,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
         }
 
         for(size_t i = 1; i < count+1; i++) {
-            memmgr_create_or_get_page((uintptr_t)addr * i, 0);
+            memmgr_create_or_get_page((uintptr_t)addr * i, PAGE_USER);
         }
 
         return addr;
