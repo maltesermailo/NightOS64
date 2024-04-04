@@ -287,7 +287,10 @@ void key_event(key_event_t* event) {
 }
 
 void test_task() {
-    while(1);
+    printf("Hello userspace!");
+
+    asm volatile("cli");
+    asm volatile("hlt");
 }
 
 void kernel_main(multiboot_info_t* info)

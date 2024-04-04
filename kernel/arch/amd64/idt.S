@@ -30,6 +30,7 @@ isr_common:
     push r14
     push r15
 
+    cld
     mov rdi, rsp
     call exception_handler
 

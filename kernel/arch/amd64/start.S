@@ -117,13 +117,13 @@ _start:
     mov edi, cr3       ; Set the destination index to control register 3.
 
 	; Create PDPT, PDP, PT
-    mov DWORD [edi], 0x2003      ; Set the uint32_t at the destination index to 0x2003.
+    mov DWORD [edi], 0x2007      ; Set the uint32_t at the destination index to 0x2003.
     add edi, 0x1000              ; Add 0x1000 to the destination index.
-    mov DWORD [edi], 0x3003      ; Set the uint32_t at the destination index to 0x3003.
+    mov DWORD [edi], 0x3007      ; Set the uint32_t at the destination index to 0x3003.
     add edi, 0x1000              ; Add 0x1000 to the destination index.
-    mov DWORD [edi], 0x4003      ; Set the uint32_t at the destination index to 0x4003.
+    mov DWORD [edi], 0x4007      ; Set the uint32_t at the destination index to 0x4003.
     add edi, 8
-    mov DWORD [edi], 0x5003
+    mov DWORD [edi], 0x5007
     mov edi, 0x4000
 
 	; Identity map 4 MB
@@ -176,13 +176,13 @@ PAGE_USER     equ 1 << 2
     rep stosd
 
     mov rdi, 0x1FF0
-    mov QWORD [rdi], 0x6003
+    mov QWORD [rdi], 0x6007
     mov rdi, 0x6000
-    mov QWORD [rdi], 0x7003
+    mov QWORD [rdi], 0x7007
     add rdi, 0x1000
-    mov QWORD [rdi], 0x8003
+    mov QWORD [rdi], 0x8007
     add rdi, 8
-    mov QWORD [rdi], 0x9003
+    mov QWORD [rdi], 0x9007
     mov rdi, 0x8000
 
     extern _bootstrap_end
