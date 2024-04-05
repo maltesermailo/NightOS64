@@ -23,11 +23,11 @@ section .text
 
 GDT64:                           ; Global Descriptor Table (64-bit).
     .Null: equ $ - GDT64         ; The null descriptor.
-    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Limit (low).
     dw 0                         ; Base (low).
     db 0                         ; Base (middle)
     db 0                         ; Access.
-    db 1                         ; Granularity.
+    db 0                         ; Granularity.
     db 0                         ; Base (high).
     .Code: equ $ - GDT64         ; The kernel mode code descriptor.
     dw 0                         ; Limit (low).
@@ -218,4 +218,9 @@ PAGE_USER     equ 1 << 2
     cli
 .hang: hlt
     jmp .hang
+
+global load_page_map0
+load_page_map0:
+    mov cr3, rdi
+    ret
       

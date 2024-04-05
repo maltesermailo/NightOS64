@@ -66,6 +66,14 @@ extern void reloadPML();
 //The rest after the end. The kernel reserves 4 MB for itself at bootup.
 unsigned long kernel_heap_length = 0x1000;
 
+void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
+    unsigned char* dst = (unsigned char*) dstptr;
+    const unsigned char* src = (const unsigned char*) srcptr;
+    for (size_t i = 0; i < size; i++)
+        dst[i] = src[i];
+    return dstptr;
+}
+
 void memmgr_phys_mark_page(int idx) {
     memory_map[idx] = 1;
 }
@@ -118,7 +126,7 @@ void kfree_frame(uintptr_t addr) {
 }
 
 /**
- * Returns the current Page Map for this process
+ * Returns the current Page Map for the kernel process
  * @return
  */
 void* memmgr_get_current_pml4() {
@@ -141,6 +149,12 @@ void* memmgr_get_from_virtual(uintptr_t virtAddr) {
  */
 void* memmgr_get_from_physical(uintptr_t physAddr) {
     return (physAddr | KERNEL_MEMORY);
+}
+
+extern void load_page_map0(uintptr_t pageMap);
+
+void load_page_map(uintptr_t pageMap) {
+    load_page_map0(pageMap);
 }
 
 void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
@@ -202,6 +216,11 @@ void* get_free_page(size_t len) {
     uint64_t baseAddress = 0;
 
     for(int i = 0; i < 512; i++) {
+        if(!(pageDirectoryPointer[i] & PAGE_USER)) {
+            //No user page directory, skip
+            continue;
+        }
+
         uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i]);
 
         if(pageDirectory == 0) {
@@ -225,6 +244,11 @@ void* get_free_page(size_t len) {
         }
 
         for(int j = 0; j < 512; j++) {
+            if(!(pageDirectory[j] & PAGE_USER)) {
+                //No user page table, skip
+                continue;
+            }
+
             uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[j]);
 
             if(pageTable == 0) {
@@ -248,6 +272,11 @@ void* get_free_page(size_t len) {
             }
 
             for(int k = 0; k < 512; k++) {
+                if(!(pageTable[k] & PAGE_USER)) {
+                    //No user page, skip
+                    continue;
+                }
+
                 uint64_t page = pageTable[k];
 
                 if(page != 0) {
@@ -306,7 +335,7 @@ void memmgr_delete_page(uintptr_t virtualAddr) {
     pageTable[INDEX_PT] = 0;
 }
 
-void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr) {
+void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, uintptr_t flags) {
     uint64_t INDEX_PML4 = PML4_INDEX(virtual_addr);
     uint64_t INDEX_PDP = PDP_INDEX(virtual_addr);
     uint64_t INDEX_PD = PD_INDEX(virtual_addr);
@@ -322,7 +351,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr) {
             //PANIC
         }
 
-        pageMap[INDEX_PML4] = pdp_frame | PAGE_PRESENT | PAGE_WRITABLE;
+        pageMap[INDEX_PML4] = pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectoryPointer = pdp_frame | KERNEL_MEMORY;
     }
@@ -331,7 +360,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr) {
 
     if(pageDirectory == 0) {
         uintptr_t pd_frame = kalloc_frame();
-        pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE;
+        pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectory = pd_frame | KERNEL_MEMORY;
     }
@@ -340,12 +369,12 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr) {
 
     if(pageTable == 0) {
         uintptr_t pt_frame = kalloc_frame();
-        pageDirectory[INDEX_PDP] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE;
+        pageDirectory[INDEX_PDP] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageTable = pt_frame | KERNEL_MEMORY;
     }
 
-    pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE;
+    pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | flags;
 }
 
 /**
@@ -449,6 +478,68 @@ void brk(size_t len) {
     } else {
         mmap(0, len, true);
     }
+}
+
+void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
+    for(int i = 0; i < 511; i++) {
+        uint64_t* pageDirectoryPointerOld = pageMapOld[i];
+
+        if(pageDirectoryPointerOld == 0) {
+            continue;
+        }
+
+        uintptr_t pdp_frame = kalloc_frame();
+
+        pageMapNew[i] = (uintptr_t) pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        uint64_t* pageDirectoryPointer = (uint64_t*) memmgr_get_from_physical(pdp_frame);
+
+        for(int j = 0; j < 512; j++) {
+            uint64_t* pageDirectoryOld = pageDirectoryPointerOld[j];
+
+            if(pageDirectoryOld == 0) {
+                continue;
+            }
+
+            uintptr_t pd_frame = kalloc_frame();
+            pageDirectoryPointer[j] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+
+            uint64_t* pageDirectory = (uint64_t*) memmgr_get_from_physical(pd_frame);
+
+            for(int k = 0; k < 512; k++) {
+                uint64_t* pageTableOld = pageDirectoryOld[k];
+
+                if(pageTableOld == 0) {
+                    continue;
+                }
+
+                uintptr_t pt_frame = kalloc_frame();
+                pageDirectory[k] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+
+                uint64_t* pageTable = (uint64_t*) pt_frame;
+
+                for(int l = 0; l < 512; l++) {
+                    uintptr_t page = pageTableOld[l];
+
+                    if(page == 0) {
+                        continue;
+                    }
+
+                    uintptr_t page_frame = kalloc_frame();
+
+                    if(page & PAGE_USER) {
+                        pageTable[i] = page_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+                    } else {
+                        pageTable[i] = page_frame | PAGE_PRESENT | PAGE_WRITABLE;
+                    }
+
+                    //Copy page
+                    memcpy(memmgr_get_from_physical(page_frame), memmgr_get_from_physical(page), 4096);
+                }
+            }
+        }
+    }
+
+    pageMapNew[512] = pageMapNew;
 }
 
 size_t get_kernel_heap_length() {
