@@ -6,6 +6,7 @@
 #include "../../memmgr.h"
 #include "../../multiboot.h"
 #include "../../terminal.h"
+#include "../../proc/process.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,7 +22,7 @@
 /* Kernel memory base */
 #define KERNEL_MEMORY 0xfffffe8000000000ull
 /* Defines the offset from virtual memory to physical memory */
-#define LOW_MEMORY 0x1ffffffffffull
+#define LOW_MEMORY 0x7fffffffffull
 
 /**** FUNCTIONS FOR PAGE ID *********/
 #define PML4_INDEX(addr) ((addr) >> 39 & 0x1FF)
@@ -30,6 +31,7 @@
 #define PT_INDEX(addr) ((addr) >> 12 & 0x1FF)
 #define PAGE_INDEX(addr) ((addr) & 0x1FF)
 
+#define PAGE_MASK 0xfffffffffffff000ull
 
 /********************PHSYICAL MEMORY MANAGEMENT******************/
 
@@ -73,6 +75,14 @@ void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
         dst[i] = src[i];
     return dstptr;
 }
+
+void* memset(void* bufptr, int value, size_t size) {
+    unsigned char* buf = (unsigned char*) bufptr;
+    for (size_t i = 0; i < size; i++)
+        buf[i] = (unsigned char) value;
+    return bufptr;
+}
+
 
 void memmgr_phys_mark_page(int idx) {
     memory_map[idx] = 1;
@@ -130,7 +140,7 @@ void kfree_frame(uintptr_t addr) {
  * @return
  */
 void* memmgr_get_current_pml4() {
-    return KERNEL_PAGE_MAP;
+    return process_get_current_pml();
 }
 
 /***
@@ -154,7 +164,9 @@ void* memmgr_get_from_physical(uintptr_t physAddr) {
 extern void load_page_map0(uintptr_t pageMap);
 
 void load_page_map(uintptr_t pageMap) {
-    load_page_map0(pageMap);
+    asm volatile (
+            "movq %0, %%cr3"
+            : : "r"((uintptr_t)pageMap));
 }
 
 void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
@@ -163,10 +175,13 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
-    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4]);
+    printf("Virtual addr: 0x%x\n", virtualAddr);
+    printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
 
-    if(pageDirectoryPointer == 0) {
+    uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
+
+    if(pageDirectoryPointer == KERNEL_MEMORY) {
         uintptr_t pdp_frame = kalloc_frame();
 
         if(pdp_frame == UINT64_MAX) {
@@ -178,34 +193,40 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
         pageDirectoryPointer = (uint64_t*)(pdp_frame | KERNEL_MEMORY);
     }
 
-    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP]);
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
-    if(pageDirectory == 0) {
+    if(pageDirectory == KERNEL_MEMORY) {
         uintptr_t pd_frame = kalloc_frame();
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectory = (uint64_t*)(pd_frame | KERNEL_MEMORY);
     }
 
-    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD]);
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
-    if(pageTable == 0) {
+    if(pageTable == KERNEL_MEMORY) {
         uintptr_t pt_frame = kalloc_frame();
-        pageDirectory[INDEX_PDP] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
+        pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
+
+        printf("Creating page table at 0x%x with index 0x%x, 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
     }
 
     if(pageTable[INDEX_PT] == 0) {
-        pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE;
+        printf("Creating new page\n");
+        pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE | flags;
     }
 
     return pageTable[INDEX_PT];
 }
 
 void* get_free_page(size_t len) {
-    uint64_t* pageMap = memmgr_get_current_pml4();
-    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0]);
+    uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0] & PAGE_MASK);
+
+    printf("Page map loc: 0x%x\n", pageMap);
+    printf("Page directory pointer: 0x%x\n", pageDirectoryPointer);
 
     if(pageDirectoryPointer == 0) {
         //No memory???
@@ -216,14 +237,10 @@ void* get_free_page(size_t len) {
     uint64_t baseAddress = 0;
 
     for(int i = 0; i < 512; i++) {
-        if(!(pageDirectoryPointer[i] & PAGE_USER)) {
-            //No user page directory, skip
-            continue;
-        }
+        uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i] & PAGE_MASK);
+        printf("Page directory: %d, 0x%x\n", i, pageDirectory);
 
-        uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i]);
-
-        if(pageDirectory == 0) {
+        if(pageDirectory == KERNEL_MEMORY) {
             if(baseAddress == 0) {
                 //free page directory means free page, lets calculate offset
                 baseAddress = (0x40000000UL * i);
@@ -238,31 +255,39 @@ void* get_free_page(size_t len) {
             continue;
         }
 
+
+        if(!(pageDirectoryPointer[i] & PAGE_USER)) {
+            //No user page directory, skip
+            continue;
+        }
+
         if((uintptr_t)pageDirectory & PAGE_LARGE) {
             //Skip large page
             continue;
         }
 
         for(int j = 0; j < 512; j++) {
-            if(!(pageDirectory[j] & PAGE_USER)) {
-                //No user page table, skip
-                continue;
-            }
+            uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[j] & PAGE_MASK);
+            printf("Page table: %d: 0x%x\n", j, pageTable);
 
-            uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[j]);
-
-            if(pageTable == 0) {
+            if(pageTable == KERNEL_MEMORY) {
                 if(baseAddress == 0) {
-                    //free page directory means free page, lets calculate offset
+                    //free page table means free page, lets calculate offset
                     baseAddress = (0x40000000UL * i) + (0x200000UL * j);
                 }
 
                 freeMemory += 0x200000UL;
 
                 if(freeMemory > len) {
+                    printf("cool: 0x%x\n", baseAddress);
                     return baseAddress;
                 }
 
+                continue;
+            }
+
+            if(!(pageDirectory[j] & PAGE_USER)) {
+                //No user page table, skip
                 continue;
             }
 
@@ -272,14 +297,9 @@ void* get_free_page(size_t len) {
             }
 
             for(int k = 0; k < 512; k++) {
-                if(!(pageTable[k] & PAGE_USER)) {
-                    //No user page, skip
-                    continue;
-                }
-
                 uint64_t page = pageTable[k];
 
-                if(page != 0) {
+                if(page != 0 && page != KERNEL_MEMORY) {
                     baseAddress = 0;
                     freeMemory = 0;
 
@@ -288,12 +308,13 @@ void* get_free_page(size_t len) {
 
                 if(baseAddress == 0) {
                     //free page directory means free page, lets calculate offset
-                    baseAddress = (0x40000000UL * i) + (0x200000UL * j);
+                    baseAddress = (0x40000000UL * i) + (0x200000UL * j) +(0x1000 * k);
                 }
 
                 freeMemory += 0x1000UL;
 
                 if(freeMemory > len) {
+                    printf("cool2: 0x%x\n", baseAddress);
                     return baseAddress;
                 }
             }
@@ -377,6 +398,16 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
     pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | flags;
 }
 
+/***
+ * Invalides the tlb at address
+ * @param addr the address
+ */
+void memmgr_reload(uintptr_t addr) {
+    asm volatile (
+            "invlpg (%0)"
+            : : "r"(addr));
+}
+
 /**
  * Allocates a new memory region, searching for a free place if addr is null or on the address
  * @param addr the desired address
@@ -403,10 +434,12 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
             for(size_t i = 1; i < count+1; i++) {
                 memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER);
+                memmgr_reload(start_addr + 0x1000 * i);
             }
 
             return start_addr;
         } else {
+            printf("Get next free page...\n");
             //Search new space
             uintptr_t start_addr = get_free_page(len);
 
@@ -415,8 +448,11 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 count++;
             }
 
-            for(size_t i = 1; i < count+1; i++) {
-                memmgr_create_or_get_page(start_addr * i, PAGE_USER);
+            printf("Start addr: 0x%x, Count: %d\n", start_addr, count);
+
+            for(size_t i = 0; i < count; i++) {
+                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER);
+                memmgr_reload(start_addr + 0x1000 * i);
             }
 
             return start_addr;
@@ -427,8 +463,9 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             count++;
         }
 
-        for(size_t i = 1; i < count+1; i++) {
-            memmgr_create_or_get_page((uintptr_t)addr * i, PAGE_USER);
+        for(size_t i = 0; i < count; i++) {
+            memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, PAGE_USER);
+            memmgr_reload(addr + 0x1000 * i);
         }
 
         return addr;
@@ -447,7 +484,8 @@ void munmap(void* addr, size_t len) {
     }
 
     for(size_t i = 1; i < count+1; i++) {
-        memmgr_delete_page((uintptr_t)addr * i);
+        memmgr_delete_page((uintptr_t)addr + 0x1000 * i);
+        memmgr_reload(addr + 0x1000 * i);
     }
 }
 
@@ -481,10 +519,19 @@ void brk(size_t len) {
 }
 
 void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
-    for(int i = 0; i < 511; i++) {
-        uint64_t* pageDirectoryPointerOld = pageMapOld[i];
+    memset(pageMapNew, 0, 4096);
 
-        if(pageDirectoryPointerOld == 0) {
+    for(int i = 0; i < 511; i++) {
+        uint64_t* pageDirectoryPointerOld = memmgr_get_from_physical(pageMapOld[i] & PAGE_MASK);
+
+        if(pageDirectoryPointerOld == KERNEL_MEMORY) {
+            continue;
+        }
+
+
+        if(i == 509 || i == 510) {
+            //Kernel space, just copy old PDP
+            pageMapNew[i] = pageMapOld[i];
             continue;
         }
 
@@ -492,11 +539,12 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
 
         pageMapNew[i] = (uintptr_t) pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
         uint64_t* pageDirectoryPointer = (uint64_t*) memmgr_get_from_physical(pdp_frame);
+        memset(pageDirectoryPointer, 0, 4096);
 
         for(int j = 0; j < 512; j++) {
-            uint64_t* pageDirectoryOld = pageDirectoryPointerOld[j];
+            uint64_t* pageDirectoryOld = memmgr_get_from_physical(pageDirectoryPointerOld[j] & PAGE_MASK);
 
-            if(pageDirectoryOld == 0) {
+            if(pageDirectoryOld == KERNEL_MEMORY) {
                 continue;
             }
 
@@ -504,18 +552,20 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
             pageDirectoryPointer[j] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
 
             uint64_t* pageDirectory = (uint64_t*) memmgr_get_from_physical(pd_frame);
+            memset(pageDirectory, 0, 4096);
 
             for(int k = 0; k < 512; k++) {
-                uint64_t* pageTableOld = pageDirectoryOld[k];
+                uint64_t* pageTableOld = memmgr_get_from_physical(pageDirectoryOld[k] & PAGE_MASK);
 
-                if(pageTableOld == 0) {
+                if(pageTableOld == KERNEL_MEMORY) {
                     continue;
                 }
 
                 uintptr_t pt_frame = kalloc_frame();
                 pageDirectory[k] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
 
-                uint64_t* pageTable = (uint64_t*) pt_frame;
+                uint64_t* pageTable = (uint64_t*) memmgr_get_from_physical(pt_frame);
+                memset(pageTable, 0, 4096);
 
                 for(int l = 0; l < 512; l++) {
                     uintptr_t page = pageTableOld[l];
@@ -524,22 +574,31 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
                         continue;
                     }
 
-                    uintptr_t page_frame = kalloc_frame();
-
                     if(page & PAGE_USER) {
-                        pageTable[i] = page_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
-                    } else {
-                        pageTable[i] = page_frame | PAGE_PRESENT | PAGE_WRITABLE;
-                    }
+                        uintptr_t page_frame = kalloc_frame();
+                        pageTable[l] = page_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
 
-                    //Copy page
-                    memcpy(memmgr_get_from_physical(page_frame), memmgr_get_from_physical(page), 4096);
+                        //Copy page
+                        memcpy(memmgr_get_from_physical(page_frame), memmgr_get_from_physical(page & PAGE_MASK), 4096);
+                    } else {
+                        pageTable[l] = page;
+                    }
                 }
             }
         }
     }
 
-    pageMapNew[512] = pageMapNew;
+    pageMapNew[511] = memmgr_get_from_virtual(pageMapNew);
+
+    //Dump new page map
+    for(int i = 0; i < 512; i++) {
+        uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMapNew[i] & PAGE_MASK);
+
+        //printf("PML4 entry is 0x%x\n", pageDirectoryPointer);
+        if(pageDirectoryPointer != KERNEL_MEMORY) {
+            printf("PML4 Entry #%d is set.\n", i);
+        }
+    }
 }
 
 size_t get_kernel_heap_length() {

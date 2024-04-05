@@ -103,6 +103,7 @@ isr_no_err_stub 44
 isr_no_err_stub 45
 isr_no_err_stub 46
 isr_no_err_stub 47
+isr_no_err_stub 128 ; Syscall vector
 
 global isr_stub_table
 isr_stub_table:
@@ -111,3 +112,4 @@ isr_stub_table:
     dq isr_stub_%+i ; use DQ instead if targeting 64-bit
 %assign i i+1
 %endrep
+    dq isr_stub_128

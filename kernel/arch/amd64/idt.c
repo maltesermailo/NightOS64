@@ -42,6 +42,17 @@ void exception_handler(regs_t * regs) {
         if(irqHandlers[regs->int_no - 32]) {
             irqHandlers[regs->int_no - 32](regs);
         }
+    } else if(regs->int_no == 0x80) {
+        //Syscalls baby!
+        if(regs->rax == 0) {
+            //printf
+            uintptr_t pointer = regs->rdi;
+            size_t length = regs->rsi;
+
+            const char* buf = (const char*) pointer;
+
+            printf("%s", buf);
+        }
     }
 }
 
@@ -75,6 +86,8 @@ void idt_install() {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
+    //remember to reroute this if more isrs come, rn syscall is at 48
+    idt_set_descriptor(128, isr_stub_table[48], 0x8E);
+
     __asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
-    __asm__ volatile ("sti"); // set the interrupt flag
 }

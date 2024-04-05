@@ -10,6 +10,7 @@
 #include "keyboard.h"
 #include "timer.h"
 #include "proc/process.h"
+#include "pci/pci.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -79,6 +80,9 @@ void terminal_setcolor(uint8_t color)
 
 void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 {
+    if(c == '\n')
+        return;
+
 	const size_t index = y * VGA_WIDTH + x;
 	terminal_buffer[index] = vga_entry(c, color);
 }
@@ -102,7 +106,7 @@ void terminal_rollover() {
 
 void terminal_putchar(char c)
 {
-	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
 
 	if (++terminal_column == VGA_WIDTH || c == '\n') {
 		terminal_column = 0;
@@ -303,8 +307,13 @@ void kernel_main(multiboot_info_t* info)
     //Setup GDT and TSS
     gdt_install();
 
+    //Set pml for memmgr
+    process_set_current_pml(0x1000);
+
     //Setup Memory Management
     memmgr_init(info);
+
+    printf("test\n");
 
     //Setup interrupts
     idt_install();
@@ -312,6 +321,13 @@ void kernel_main(multiboot_info_t* info)
     irq_install();
     ps2_init();
     timer_init();
+
+    __asm__ volatile ("sti"); // set the interrupt flag
+
+    //Init pci
+    pci_init();
+
+    printf("test2\n");
 
 	/* Newline support is left as an exercise. */
 	//terminal_writestring("Hello Kernel\n");
@@ -321,6 +337,8 @@ void kernel_main(multiboot_info_t* info)
     }
 
     registerKeyEventHandler(key_event);
+
+    printf("test3\n");
 
     process_create_task(&test_task);
 

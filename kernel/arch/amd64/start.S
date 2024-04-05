@@ -15,7 +15,7 @@ align 4
 section .bss
 align 16
 stack_bottom:
-resb 16384 ; 16 KiB
+resb 65536 ; 64 KiB
 global stack_top
 stack_top:
 
@@ -127,7 +127,7 @@ _start:
     mov edi, 0x4000
 
 	; Identity map 4 MB
-    mov ebx, 0x00000007          ; Set the B-register to 0x00000003.
+    mov ebx, 0x00000003          ; Set the B-register to 0x00000003.
     mov ecx, 1024                 ; Set the C-register to 1024.
  
 .SetEntry:
@@ -191,7 +191,6 @@ PAGE_USER     equ 1 << 2
     mov rbx, _bootstrap_end
     or rbx, PAGE_PRESENT
     or rbx, PAGE_WRITABLE
-    or rbx, PAGE_USER
     mov rcx, 1024                 ; Set the C-register to 1024 to map the next 4 MB.
 
 .SetEntryLM:

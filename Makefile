@@ -19,6 +19,7 @@ $(KERNEL_ARCH_OBJS) \
 kernel/kernel.o \
 kernel/alloc/liballoc.o \
 kernel/proc/process.o \
+kernel/pci/pci.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

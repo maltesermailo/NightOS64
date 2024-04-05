@@ -24,6 +24,7 @@ def GetFunctionAddress(functionName):
 def get_pml4_base():
     # Extract the PDBR value from the output string
     pml4_base = GetRegisterValue("cr3")
+    pml4_base = pml4_base | 0xfffffe8000000000
 
     return pml4_base
 
@@ -43,9 +44,11 @@ def translate_address(virtual_address):
 
     # Print flags for PML4
     print_flags("PML4", pml4_value)
+	
+    pml4_value = pml4_value | 0xfffffe8000000000
 
     # Get the base address of the PDPT from the PML4 entry
-    pdpt_base = pml4_value & 0x7ffffffffffff000
+    pdpt_base = pml4_value & 0xfffffffffffff000
     pt_entry_value = None
 
     # Repeat the process for the PDPT, PDT, and PT
@@ -59,11 +62,14 @@ def translate_address(virtual_address):
         # Check if the entry is present
         if not entry_value & 1:
             raise Exception("Address not mapped (%s entry not present)" % level)
+		
+        entry_value = entry_value | 0xfffffe8000000000
 
-        pdpt_base = entry_value & 0x7ffffffffffff000
+        pdpt_base = entry_value & 0xfffffffffffff000
 
         if level == "PT":
-            pt_entry_value = entry_value
+            pt_entry_value = entry_value | 0x7fffffffff
+            pdpt_base = entry_value | 0x7fffffffff
 
     # Calculate the physical address
     physical_address = pdpt_base + (virtual_address & 0xFFF)

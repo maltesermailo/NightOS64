@@ -43,5 +43,7 @@ typedef struct process_control_block {
 };
 
 void process_create_task(void* start_address);
+uintptr_t process_get_current_pml();
+void process_set_current_pml(uintptr_t pml);
 
 #endif //NIGHTOS_PROCESS_H

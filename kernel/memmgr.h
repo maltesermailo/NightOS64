@@ -16,14 +16,27 @@ void memmgr_init(multiboot_info_t* info);
 uintptr_t kalloc_frame();
 void kfree_frame(uintptr_t addr);
 
-void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr);
+void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, uintptr_t flags);
 void munmap(void* addr, size_t len);
 void* mmap(void* addr, size_t len, bool is_kernel);
 
-void memmgr_clone_page_map(uintptr_t pageMapOld, uintptr_t pageMapNew);
+void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew);
 void* memmgr_get_current_pml4();
+void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags);
 
 void load_page_map(uintptr_t pageMap);
+
+void* memmgr_get_from_virtual(uintptr_t virtAddr);
+
+void* memcpy(void* __restrict, const void* __restrict, size_t);
+void* memset(void*, int, size_t);
+
+/***
+ * Returns the identity mapping for the given memory region
+ * @param physAddr the physical address
+ * @return the virtual memory address for direct access by kernel
+ */
+void* memmgr_get_from_physical(uintptr_t physAddr);
 
 size_t get_heap_length();
 

@@ -3,7 +3,9 @@
 //
 
 #include "pci.h"
+#include <stddef.h>
 #include "../terminal.h"
+#include "../arch/amd64/io.h"
 
 static pci_device_t pciDevices[65536];
 
@@ -28,7 +30,7 @@ bool pciCheckVendor(uint8_t bus, uint8_t slot) {
     uint16_t vendor;
     /* Try and read the first configuration register. Since there are no
      * vendors that == 0xFFFF, it must be a non-existent device. */
-    return (vendor = pciConfigReadWord(bus, slot, 0, 0)) != 0xFFFF
+    return (vendor = pciConfigReadWord(bus, slot, 0, 0)) != 0xFFFF;
 }
 
 uint16_t getVendorID(uint8_t bus, uint8_t device, uint8_t function) {
@@ -133,6 +135,7 @@ void pci_init() {
     //Probe PCI
     uint8_t function;
     uint8_t bus;
+    uint8_t headerType;
 
     headerType = getHeaderType(0, 0, 0);
     if ((headerType & 0x80) == 0) {
