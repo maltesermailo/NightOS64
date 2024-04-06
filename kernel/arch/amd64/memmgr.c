@@ -7,6 +7,7 @@
 #include "../../multiboot.h"
 #include "../../terminal.h"
 #include "../../proc/process.h"
+#include "../../lock.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -68,6 +69,9 @@ extern void reloadPML();
 //The rest after the end. The kernel reserves 4 MB for itself at bootup.
 unsigned long kernel_heap_length = 0x1000;
 
+static spin_t PHYS_MEM_LOCK = ATOMIC_FLAG_INIT;
+static spin_t VIRT_MEM_LOCK = ATOMIC_FLAG_INIT;
+
 void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size) {
     unsigned char* dst = (unsigned char*) dstptr;
     const unsigned char* src = (const unsigned char*) srcptr;
@@ -93,12 +97,14 @@ void memmgr_phys_free_page(int idx) {
 }
 
 uintptr_t kalloc_frame() {
+    spin_lock(&PHYS_MEM_LOCK);
     int i = 0;
     for(;;) {
         if(!memory_map[idx]) {
             //Found free, yay
             memmgr_phys_mark_page(idx);
 
+            spin_unlock(&PHYS_MEM_LOCK);
             return PAGE_TO_ADDRESS(idx);
         }
 
@@ -118,11 +124,14 @@ uintptr_t kalloc_frame() {
         i++;
     }
 
+
+    spin_unlock(&PHYS_MEM_LOCK);
     //NO FRAME FOUND, WE ARE OFFICIALLY FUCKED (HOW TF DO U USE 64 GB ANYWAY)
     return UINT64_MAX;
 }
 
 void kfree_frame(uintptr_t addr) {
+    spin_lock(&PHYS_MEM_LOCK);
     int frame_idx = ADDRESS_TO_PAGE((size_t)addr);
 
     memmgr_phys_free_page(frame_idx);
@@ -133,6 +142,8 @@ void kfree_frame(uintptr_t addr) {
     else
         if(frame_idx < idx)
             idx = frame_idx;
+
+    spin_unlock(&PHYS_MEM_LOCK);
 }
 
 /**
@@ -495,6 +506,7 @@ void munmap(void* addr, size_t len) {
  * @param len the increment
  */
 void sbrk(intptr_t len) {
+    spin_lock(&VIRT_MEM_LOCK);
     if(len > 0) {
         //Map new kernel space
         mmap(0, kernel_heap_length + len, true);
@@ -504,9 +516,11 @@ void sbrk(intptr_t len) {
     }
 
     kernel_heap_length += len;
+    spin_unlock(&VIRT_MEM_LOCK);
 }
 
 void brk(size_t len) {
+    spin_lock(&VIRT_MEM_LOCK);
     size_t prev = kernel_heap_length;
 
     kernel_heap_length = len;
@@ -516,6 +530,7 @@ void brk(size_t len) {
     } else {
         mmap(0, len, true);
     }
+    spin_unlock(&VIRT_MEM_LOCK);
 }
 
 void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
@@ -639,6 +654,8 @@ void memmgr_init(multiboot_info_t* info) {
 
     multiboot_memory_map_t* mmap;
 
+    spin_unlock(&PHYS_MEM_LOCK);
+
     for (mmap = (multiboot_memory_map_t *) info->mmap_addr;
          (unsigned long) mmap < info->mmap_addr + info->mmap_length;
          mmap = (multiboot_memory_map_t *) ((unsigned long) mmap
@@ -657,6 +674,7 @@ void memmgr_init(multiboot_info_t* info) {
     for(int i = 0x1000; i < 0x401000; i += 0x1000) {
         memmgr_phys_mark_page(ADDRESS_TO_PAGE(i));
     }
+    spin_unlock(&PHYS_MEM_LOCK);
 
     //Map kernel heap
 

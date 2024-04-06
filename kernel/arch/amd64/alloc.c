@@ -2,6 +2,7 @@
 // Created by Jannik on 17.03.2024.
 //
 #include "../../memmgr.h"
+#include "../../lock.h"
 
 /*extern unsigned long _end;
 
@@ -60,16 +61,17 @@ void init_kernel_heap() {
 }*/
 
 const static int page_size = 0x1000;
+const static spin_t LOCK = ATOMIC_FLAG_INIT;
 
 int liballoc_lock()
 {
-    //TODO: Once threads are implemented
+    spin_lock(&LOCK);
     return 0;
 }
 
 int liballoc_unlock()
 {
-    //TODO: Once threads are implemented
+    spin_unlock(&LOCK);
     return 0;
 }
 

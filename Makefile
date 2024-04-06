@@ -6,7 +6,8 @@ BUILDDIR=build
 CC=x86_64-elf-gcc
 
 ARCHDIR=kernel/arch/amd64
-LIBS:=$(LIBS) -nostdlib -lgcc
+LIBDIR:=/usr/local/lib/
+LIBS:=$(LIBS) -nostdlib -lgcc -lk
 
 include $(ARCHDIR)/make.config
 

@@ -13,7 +13,7 @@ void terminal_resetline();
 
 char* raw_itoa(unsigned int i);
 
-void
+int
 printf (const char *format, ...);
 
 #endif //NIGHTOS_TERMINAL_H

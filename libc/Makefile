@@ -1,6 +1,6 @@
 DEFAULT_HOST!=../default-host.sh
 HOST?=DEFAULT_HOST
-HOSTARCH!=../target-triplet-to-arch.sh $(HOST)
+HOSTARCH=amd64
 
 CFLAGS?=-O2 -g
 CPPFLAGS?=
@@ -11,7 +11,7 @@ DESTDIR?=
 PREFIX?=/usr/local
 EXEC_PREFIX?=$(PREFIX)
 INCLUDEDIR?=$(PREFIX)/include
-LIBDIR?=$(EXEC_PREFIX)/lib
+LIBDIR?=$(EXEC_PREFIX)/
 
 CFLAGS:=$(CFLAGS) -ffreestanding -Wall -Wextra
 CPPFLAGS:=$(CPPFLAGS) -D__is_libc -Iinclude
