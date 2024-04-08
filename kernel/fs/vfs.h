@@ -52,7 +52,6 @@ typedef struct list_dir {
     uint64_t size;
 } list_dir_t;
 
-FILE* OpenFile(char* path);
 FILE* OpenStdIn();
 FILE* OpenStdOut();
 
@@ -78,5 +77,8 @@ list_dir_t* find(char* filename);
 void register_mount(char* name, mount_func func);
 void mount_directly(char* name, file_node_t root);
 void mount_empty(char* name, int fileType);
+
+//Sets up the virtual file system
+void vfs_install();
 
 #endif //NIGHTOS_VFS_H
