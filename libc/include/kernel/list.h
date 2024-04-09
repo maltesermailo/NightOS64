@@ -19,7 +19,8 @@ typedef struct {
 } __attribute__((packed)) list_t;
 
 list_t* list_create();
-void list_destroy(list_t* list);
+void list_destroy(list_t* list); //Frees everything including the value
+void list_free(list_t* list); // Removes all entries and frees them as well as the list
 void list_append(list_t* list, list_entry_t* entry);
 void list_insert(list_t* list, void* item);
 list_entry_t* list_find(list_t* list, void* item);

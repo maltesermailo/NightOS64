@@ -31,6 +31,21 @@ void list_destroy(list_t* list) {
     free(list);
 }
 
+void list_free(list_t* list) {
+    list_entry_t* listEntry = list->head;
+    list->head = NULL;
+
+    while(listEntry) {
+        list_entry_t* listEntryOld = listEntry;
+
+        listEntry = listEntry->next;
+
+        free(listEntryOld);
+    }
+
+    free(list);
+}
+
 void list_append(list_t* list, list_entry_t* entry) {
     if(!list->length) {
         list->head = entry;
@@ -130,6 +145,8 @@ void list_delete(list_t* list, list_entry_t* entry) {
     entry->next = 0;
     entry->prev = 0;
 
+    free(entry);
+
     list->length--;
 }
 
@@ -166,6 +183,8 @@ list_entry_t* list_insert_after(list_t* list, list_entry_t* before, void* item) 
     entry->value = item;
 
     list_append_after(list, before, entry);
+
+    return entry;
 }
 
 void list_append_before(list_t* list, list_entry_t* after, list_entry_t* before) {
@@ -190,4 +209,6 @@ list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item) 
     entry->value = item;
 
     list_append_before(list, after, entry);
+
+    return entry;
 }
