@@ -145,3 +145,49 @@ list_t* list_copy(list_t* original) {
 
     return new;
 }
+
+void list_append_after(list_t* list, list_entry_t* before, list_entry_t* after) {
+    if(before->next) {
+        after->next = before->next; //Set our appended next entry to next entry of the preceeding one
+        before->next = after; // Point preceeding entry to new entry
+
+        after->prev = before; // Point our prev entry to preceeding entry
+        after->next->prev = after; // Point next entry prev pointer to us
+
+        list->length++;
+    } else {
+        //before is tail, so just add
+        list_append(list, after);
+    }
+}
+
+list_entry_t* list_insert_after(list_t* list, list_entry_t* before, void* item) {
+    list_entry_t* entry = calloc(1, sizeof(list_entry_t));
+    entry->value = item;
+
+    list_append_after(list, before, entry);
+}
+
+void list_append_before(list_t* list, list_entry_t* after, list_entry_t* before) {
+    if(after->prev) {
+        before->prev = after->prev;
+        before->next = after;
+
+        after->prev = before;
+        before->prev->next = before;
+
+        list->length++;
+    } else {
+        list->head = before;
+        after->prev = before;
+
+        before->next = after;
+    }
+}
+
+list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item) {
+    list_entry_t* entry = calloc(1, sizeof(list_entry_t));
+    entry->value = item;
+
+    list_append_before(list, after, entry);
+}
