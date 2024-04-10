@@ -33,4 +33,6 @@ list_entry_t* list_insert_after(list_t* list, list_entry_t* before, void* item);
 void list_append_before(list_t* list, list_entry_t* after, list_entry_t* before);
 list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item);
 
+void list_dump(list_t* list);
+
 #endif //NIGHTOS_LIST_H

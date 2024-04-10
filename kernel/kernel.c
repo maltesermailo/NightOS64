@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "proc/process.h"
 #include "pci/pci.h"
+#include "../libc/include/kernel/list.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -313,8 +314,6 @@ void kernel_main(multiboot_info_t* info)
     //Setup Memory Management
     memmgr_init(info);
 
-    printf("test\n");
-
     //Setup interrupts
     idt_install();
     pic_setup();
@@ -327,9 +326,6 @@ void kernel_main(multiboot_info_t* info)
     //Init pci
     pci_init();
 
-    printf("test2\n");
-
-	/* Newline support is left as an exercise. */
 	//terminal_writestring("Hello Kernel\n");
 
     for(int i = 0; i < 64; i++) {
@@ -338,9 +334,31 @@ void kernel_main(multiboot_info_t* info)
 
     registerKeyEventHandler(key_event);
 
-    printf("test3\n");
+    list_t* list = list_create();
+    printf("List size is %d\n", list->length);
 
-    process_create_task(&test_task);
+    int* test1 = malloc(sizeof(int));
+    (*test1) = 42;
+
+    int* test2 = malloc(sizeof(int));
+    (*test2) = 45;
+
+    int* test3 = malloc(sizeof(int));
+    (*test3) = 48;
+
+    list_insert(list, test1);
+    list_insert(list, test2);
+    list_entry_t* head = list->head;
+
+    list_insert_before(list, head, test3);
+
+    list_entry_t* entry = list_find(test2);
+    if(entry->value == test2) {
+        printf("Test succeeded");
+    }
+    list_dump(list);
+
+    //process_create_task(&test_task);
 
     /*while(1) {
         terminal_resetline();

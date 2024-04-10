@@ -212,3 +212,24 @@ list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item) 
 
     return entry;
 }
+
+void list_dump(list_t* list) {
+    int i = 0;
+
+    for(list_entry_t* entry = list->head; entry != NULL; entry = entry->next) {
+        printf("List entry %d references to %d\n", i, entry->value);
+        i++;
+    }
+
+    if(i > list->length) {
+        printf("List length, doesn't correspond to read index. Read index: %d, List lenght: %d\n", i, list->length);
+    }
+
+    if(!list->head) {
+        printf("No list head\n");
+    }
+
+    if(!list->tail) {
+        printf("No list tail\n");
+    }
+}
