@@ -4,6 +4,8 @@
 
 #ifndef NIGHTOS_LIST_H
 #define NIGHTOS_LIST_H
+#include "../sys/cdefs.h"
+#include <stddef.h>
 
 typedef struct list_entry {
     struct list_entry* prev;

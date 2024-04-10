@@ -89,7 +89,7 @@ list_entry_t* list_find(list_t* list, void* item) {
     return 0;
 }
 
-void list_remove_by_index(list_t* list, int index) {
+void list_remove_by_index(list_t* list, size_t index) {
     if(!list->length) {
         return;
     }
@@ -103,7 +103,7 @@ void list_remove_by_index(list_t* list, int index) {
     if(index == 0) {
         list_delete(list, entry);
     } else {
-        for(int i = 1; i < index; i++) {
+        for(size_t i = 1; i < index; i++) {
             if(!entry->next) {
                 return;
             }

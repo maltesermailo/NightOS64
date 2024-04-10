@@ -352,7 +352,7 @@ void kernel_main(multiboot_info_t* info)
 
     list_insert_before(list, head, test3);
 
-    list_entry_t* entry = list_find(test2);
+    list_entry_t* entry = list_find(list, test2);
     if(entry->value == test2) {
         printf("Test succeeded");
     }
