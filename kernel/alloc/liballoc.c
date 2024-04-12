@@ -6,7 +6,7 @@
 
 #define LIBALLOC_MAGIC	0xc001c0de
 #define MAXCOMPLETE		5
-#define MAXEXP	48
+#define MAXEXP	32
 #define MINEXP	8
 
 #define MODE_BEST			0
@@ -32,7 +32,7 @@ unsigned int l_inuse = 0;			//< The amount of memory in use (malloc'ed).
 
 static int l_initialized = 0;			//< Flag to indicate initialization.
 static int l_pageSize  = 4096;			//< Individual page size
-static int l_pageCount = 16;			//< Minimum number of pages to allocate.
+static int l_pageCount = 1;			//< Minimum number of pages to allocate.
 
 
 // ***********   HELPER FUNCTIONS  *******************************
@@ -107,7 +107,7 @@ static void* 	liballoc_memcpy(void* s1, const void* s2, size_t n)
 #ifdef DEBUG
 static void dump_array()
 {
-	long long i = 0;
+    int i = 0;
 	struct boundary_tag *tag = NULL;
 
 	printf("------ Free pages array ---------\n");
@@ -116,7 +116,7 @@ static void dump_array()
 
 		for ( i = 0; i < MAXEXP; i++ )
 		{
-			printf("(%d): ",i, l_completePages[i] );
+			printf("%d(%d): ",i, l_completePages[i] );
 
 			tag = l_freePages[ i ];
 			while ( tag != NULL )
@@ -140,7 +140,7 @@ static void dump_array()
 
 static inline void insert_tag( struct boundary_tag *tag, int index )
 {
-    long long realIndex;
+    int realIndex;
 
     if ( index < 0 )
     {
@@ -354,7 +354,7 @@ void *malloc(size_t size)
 
     if ( ((long long)(remainder) > 0) /*&& ( (tag->real_size - remainder) >= (1<<MINEXP))*/ )
     {
-        long long childIndex = getexp( remainder );
+        int childIndex = getexp( remainder );
 
         if ( childIndex >= 0 )
         {
@@ -395,7 +395,7 @@ void *malloc(size_t size)
 
 void free(void *ptr)
 {
-    long long index;
+    int index;
     struct boundary_tag *tag;
 
     if ( ptr == NULL ) return;
@@ -444,7 +444,9 @@ void free(void *ptr)
     if ( index < MINEXP ) index = MINEXP;
 
     // A whole, empty block?
-    if ( (tag->split_left == NULL) && (tag->split_right == NULL) )
+    // Removed this, since kernel heap will always prevail. Is easier to manage like this. The kernel will always need space.
+    //TODO: Rework get_free_page to return another address for kernel space and dynamically allocate stuff.
+    /*if ( (tag->split_left == NULL) && (tag->split_right == NULL) )
     {
 
         if ( l_completePages[ index ] == MAXCOMPLETE )
@@ -469,7 +471,7 @@ void free(void *ptr)
 
 
         l_completePages[ index ] += 1;	// Increase the count of complete pages.
-    }
+    }*/
 
 
     // ..........

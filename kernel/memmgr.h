@@ -31,6 +31,9 @@ void* memmgr_get_from_virtual(uintptr_t virtAddr);
 void* memcpy(void* __restrict, const void* __restrict, size_t);
 void* memset(void*, int, size_t);
 
+void* sbrk(intptr_t len);
+void* brk(size_t len);
+
 /***
  * Returns the identity mapping for the given memory region
  * @param physAddr the physical address

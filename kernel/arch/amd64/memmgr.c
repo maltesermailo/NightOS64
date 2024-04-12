@@ -186,8 +186,8 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
-    printf("Virtual addr: 0x%x\n", virtualAddr);
-    printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
+    //printf("Virtual addr: 0x%x\n", virtualAddr);
+    //printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
 
     uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
@@ -225,7 +225,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     }
 
     if(pageTable[INDEX_PT] == 0) {
-        printf("Creating new page\n");
+        //printf("Creating new page\n");
         pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE | flags;
     }
 
@@ -236,8 +236,8 @@ void* get_free_page(size_t len) {
     uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0] & PAGE_MASK);
 
-    printf("Page map loc: 0x%x\n", pageMap);
-    printf("Page directory pointer: 0x%x\n", pageDirectoryPointer);
+    //printf("Page map loc: 0x%x\n", pageMap);
+    //printf("Page directory pointer: 0x%x\n", pageDirectoryPointer);
 
     if(pageDirectoryPointer == 0) {
         //No memory???
@@ -249,7 +249,7 @@ void* get_free_page(size_t len) {
 
     for(int i = 0; i < 512; i++) {
         uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i] & PAGE_MASK);
-        printf("Page directory: %d, 0x%x\n", i, pageDirectory);
+        //printf("Page directory: %d, 0x%x\n", i, pageDirectory);
 
         if(pageDirectory == KERNEL_MEMORY) {
             if(baseAddress == 0) {
@@ -279,7 +279,7 @@ void* get_free_page(size_t len) {
 
         for(int j = 0; j < 512; j++) {
             uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[j] & PAGE_MASK);
-            printf("Page table: %d: 0x%x\n", j, pageTable);
+            //printf("Page table: %d: 0x%x\n", j, pageTable);
 
             if(pageTable == KERNEL_MEMORY) {
                 if(baseAddress == 0) {
@@ -505,21 +505,27 @@ void munmap(void* addr, size_t len) {
  * The kernel heap always starts in virtual memory after the kernel binary
  * @param len the increment
  */
-void sbrk(intptr_t len) {
+void* sbrk(intptr_t len) {
     spin_lock(&VIRT_MEM_LOCK);
+
+    void* ptr = 0;
+
     if(len > 0) {
         //Map new kernel space
-        mmap(0, kernel_heap_length + len, true);
+        ptr = mmap(0, kernel_heap_length + len, true) + kernel_heap_length;
     } else {
         //Unmap kernel space
-        munmap(&_end + KERNEL_ENTRY + kernel_heap_length - len, len);
+        munmap(&_end + KERNEL_ENTRY + kernel_heap_length + len, len);
+        ptr = (&_end + KERNEL_ENTRY + kernel_heap_length + len);
     }
 
     kernel_heap_length += len;
     spin_unlock(&VIRT_MEM_LOCK);
+
+    return ptr;
 }
 
-void brk(size_t len) {
+void* brk(size_t len) {
     spin_lock(&VIRT_MEM_LOCK);
     size_t prev = kernel_heap_length;
 
@@ -530,7 +536,15 @@ void brk(size_t len) {
     } else {
         mmap(0, len, true);
     }
+
+    uintptr_t start_addr = (uintptr_t)(&_end);
+    if(!((uintptr_t)start_addr & (PAGE_SIZE - 1))) {
+        start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
+    }
+
     spin_unlock(&VIRT_MEM_LOCK);
+
+    return (void*)start_addr + kernel_heap_length;
 }
 
 void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
@@ -694,9 +708,6 @@ void memmgr_init(multiboot_info_t* info) {
     PAGE_MAP[509] = (uintptr_t)IDENTITY_MAP_PD_TEMP | PAGE_PRESENT | PAGE_WRITABLE;
 
     kernel_heap_length = 0x1000;
-
-    //Increase kernel heap to 2 MB
-    brk(0x200000);
 
     reloadPML();
 

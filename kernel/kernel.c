@@ -336,6 +336,7 @@ void kernel_main(multiboot_info_t* info)
 
     list_t* list = list_create();
     printf("List size is %d\n", list->length);
+    printf("List pointer is 0x%x\n", list);
 
     int* test1 = malloc(sizeof(int));
     (*test1) = 42;
@@ -354,8 +355,11 @@ void kernel_main(multiboot_info_t* info)
 
     list_entry_t* entry = list_find(list, test2);
     if(entry->value == test2) {
-        printf("Test succeeded");
+        printf("Test succeeded\n");
     }
+
+    printf("List pointer is 0x%x\n", list);
+
     list_dump(list);
 
     //process_create_task(&test_task);

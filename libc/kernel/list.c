@@ -3,7 +3,7 @@
 //
 #include "../include/kernel/list.h"
 #include "../../kernel/alloc.h"
-#include "../include/sys/cdefs.h"
+#include "../include/stdio.h"
 
 list_t * list_create() {
     list_t* list = calloc(1, sizeof(list_t));
@@ -65,6 +65,8 @@ void list_append(list_t* list, list_entry_t* entry) {
 void list_insert(list_t* list, void* item) {
     list_entry_t * entry = calloc(1, sizeof(list_entry_t));
     entry->value = item;
+
+    printf("List entry is 0x%x\n", entry);
 
     list_append(list, entry);
 }
@@ -201,6 +203,8 @@ void list_append_before(list_t* list, list_entry_t* after, list_entry_t* before)
         after->prev = before;
 
         before->next = after;
+
+        list->length++;
     }
 }
 
@@ -216,9 +220,16 @@ list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item) 
 void list_dump(list_t* list) {
     int i = 0;
 
+    printf("List pointer is 0x%x\n", list);
+
     for(list_entry_t* entry = list->head; entry != NULL; entry = entry->next) {
-        printf("List entry %d references to %d\n", i, entry->value);
+        printf("List entry %d references to 0x%x, next is 0x%x\n", i, entry->value, entry->next);
         i++;
+
+        if(i > list->length) {
+            printf("Open-ended list, can't continue!!!");
+            break;
+        }
     }
 
     if(i > list->length) {

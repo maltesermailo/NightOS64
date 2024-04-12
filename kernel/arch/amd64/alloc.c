@@ -79,7 +79,7 @@ void* liballoc_alloc( int pages )
 {
     unsigned int size = pages * page_size;
 
-    char *p2 = (char*) mmap(0, size, 1);
+    char *p2 = (char*) sbrk(size);
     if ( p2 == -1) return NULL;
 
     return p2;
