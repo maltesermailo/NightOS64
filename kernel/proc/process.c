@@ -6,6 +6,7 @@
 #include "../memmgr.h"
 #include "../terminal.h"
 static struct process_control_block pcb;
+list_t* process_list;
 
 extern void longjmp(kernel_thread_t* thread);
 extern void enter_user(uintptr_t rip, uintptr_t rsp);
