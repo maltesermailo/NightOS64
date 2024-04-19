@@ -13,6 +13,7 @@
 #include "pci/pci.h"
 #include "../libc/include/kernel/list.h"
 #include "test.h"
+#include "serial.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -303,6 +304,11 @@ void kernel_main(multiboot_info_t* info)
 {
 	/* Initialize terminal interface */
 	terminal_initialize();
+    if(!serial_init()) {
+        printf("No serial.");
+
+        return;
+    }
 
     printf("Colonel version 0.0.0 starting up...\n");
 
