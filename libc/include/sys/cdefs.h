@@ -3,5 +3,6 @@
 
 #define __nightos_libc 1
 #define NULL 0
+#define null 0
 
 #endif

@@ -51,16 +51,23 @@ void tree_test() {
     int* test4 = malloc(sizeof(int));
     (*test4) = 51;
 
-    tree_node_t* root = tree_insert_child(tree, null, test1);
+    printf("Inserting root\n");
+
+    tree_node_t* root = tree_insert_child(tree, 0, test1);
+
+    printf("Inserting child\n");
+
     tree_node_t* find = tree_insert_child(tree, root, test2);
+
+    printf("Inserting last child\n");
 
     tree_node_t* subnode = tree_insert_child(tree, root, test3);
     tree_insert_child(tree, subnode, test4);
 
-    tree_node_t* result = tree_find_child(tree, test2);
+    tree_node_t* result = tree_find_child_root(tree, test2);
 
     if(result == find) {
-        printf("Test successful");
+        printf("Test successful\n");
     }
 
     tree_dump(tree);

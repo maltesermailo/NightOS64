@@ -12,7 +12,7 @@ typedef struct TreeNode {
     void* value;
 
     list_t* children;
-    tree_node_t* parent;
+    struct TreeNode* parent;
 } tree_node_t;
 
 typedef struct Tree {
@@ -23,8 +23,8 @@ typedef struct Tree {
 typedef struct AVLTreeNode {
     void* value;
 
-    avl_tree_node_t* left;
-    avl_tree_node_t* right;
+    struct AVLTreeNode* left;
+    struct AVLTreeNode* right;
 
     int height;
     int balanceFactor;
@@ -43,7 +43,7 @@ void tree_free_node(tree_node_t* treeNode);
 void tree_set_root_node(tree_t* tree, tree_node_t* root);
 tree_node_t* tree_insert_child(tree_t* tree, tree_node_t* node, void* value);
 void tree_remove(tree_t* tree, tree_node_t* node);
-tree_node_t* tree_find_child(tree_t* tree, void* value);
+tree_node_t* tree_find_child_root(tree_t* tree, void* value);
 tree_node_t* tree_find_child(tree_t* tree, tree_node_t* node, void* value);
 void tree_dump(tree_t* tree);
 

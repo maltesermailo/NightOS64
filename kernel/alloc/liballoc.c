@@ -2,8 +2,6 @@
 
 /**  Durand's Ridiculously Amazing Super Duper Memory functions.  */
 
-//#define DEBUG
-
 #define LIBALLOC_MAGIC	0xc001c0de
 #define MAXCOMPLETE		5
 #define MAXEXP	32
@@ -14,7 +12,7 @@
 
 #define MODE	MODE_BEST
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #include "../terminal.h"
 #endif

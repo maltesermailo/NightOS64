@@ -5,6 +5,7 @@
 #include "../alloc.h"
 #include "../memmgr.h"
 #include "../terminal.h"
+#include "../../libc/include/kernel/list.h"
 static struct process_control_block pcb;
 list_t* process_list;
 

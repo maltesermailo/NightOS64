@@ -335,7 +335,9 @@ void kernel_main(multiboot_info_t* info)
 
     registerKeyEventHandler(key_event);
 
+    printf("Performing list test now...\n");
     list_test();
+    printf("Performing tree test now...\n");
     tree_test();
 
     //process_create_task(&test_task);

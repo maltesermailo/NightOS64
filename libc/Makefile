@@ -39,6 +39,7 @@ string/memmove.o \
 string/memset.o \
 string/strlen.o \
 kernel/list.o \
+kernel/tree.o \
 
 HOSTEDOBJS=\
 $(ARCH_HOSTEDOBJS) \
