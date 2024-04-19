@@ -12,6 +12,7 @@
 #include "proc/process.h"
 #include "pci/pci.h"
 #include "../libc/include/kernel/list.h"
+#include "test.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -334,33 +335,8 @@ void kernel_main(multiboot_info_t* info)
 
     registerKeyEventHandler(key_event);
 
-    list_t* list = list_create();
-    printf("List size is %d\n", list->length);
-    printf("List pointer is 0x%x\n", list);
-
-    int* test1 = malloc(sizeof(int));
-    (*test1) = 42;
-
-    int* test2 = malloc(sizeof(int));
-    (*test2) = 45;
-
-    int* test3 = malloc(sizeof(int));
-    (*test3) = 48;
-
-    list_insert(list, test1);
-    list_insert(list, test2);
-    list_entry_t* head = list->head;
-
-    list_insert_before(list, head, test3);
-
-    list_entry_t* entry = list_find(list, test2);
-    if(entry->value == test2) {
-        printf("Test succeeded\n");
-    }
-
-    printf("List pointer is 0x%x\n", list);
-
-    list_dump(list);
+    list_test();
+    tree_test();
 
     //process_create_task(&test_task);
 

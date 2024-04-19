@@ -27,7 +27,7 @@ void tree_destroy_node(tree_node_t* node) {
     for(list_entry_t* entry = node->children->head; entry != NULL; entry = entry->next) {
         tree_node_t* other = (tree_node_t*)entry->value;
 
-        tree_free_node(other);
+        tree_destroy_node(other);
     }
 
     list_free(node->children);
@@ -161,4 +161,27 @@ tree_node_t* tree_find_child(tree_t* tree, tree_node_t* node, void* value) {
 
 tree_node_t* tree_find_child(tree_t* tree, void* value) {
     return tree_find_child(tree, tree->head, value);
+}
+
+void tree_dump_preorder(tree_node_t* node) {
+    printf("Node points to 0x%x", node->value);
+    printf("Node has %d children", node->children->length);
+
+    for(list_entry_t* listEntry = node->children->head; listEntry != null; listEntry = listEntry->next) {
+        if(listEntry) {
+            tree_node_t* other = (tree_node_t*)listEntry->value;
+
+            tree_dump_preorder(other);
+        }
+    }
+}
+
+void tree_dump(tree_t* tree) {
+    if(!tree->head) {
+        printf("Tree has no head!");
+
+        return;
+    }
+
+    tree_dump_preorder(tree->head);
 }

@@ -45,6 +45,7 @@ tree_node_t* tree_insert_child(tree_t* tree, tree_node_t* node, void* value);
 void tree_remove(tree_t* tree, tree_node_t* node);
 tree_node_t* tree_find_child(tree_t* tree, void* value);
 tree_node_t* tree_find_child(tree_t* tree, tree_node_t* node, void* value);
+void tree_dump(tree_t* tree);
 
 avl_tree_t* avl_tree_create();
 void avl_tree_destroy(avl_tree_t* tree);
