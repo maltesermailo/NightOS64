@@ -73,6 +73,17 @@ void tree_set_root_node(tree_t* tree, tree_node_t* node) {
     tree_calculate_height(tree, node, 1);
 }
 
+/***
+ * Inserts a child into the tree.
+ * A special case is if node == NULL, then the entire tree is replaced.
+ * To ensure that the tree is properly cleaned up, the previous root node will be destroyed.
+ * This means it's values and nodes will be freed.
+ * If it is desired to not cleanup the tree, use tree_set_root_node and cleanup the nodes yourself with tree_free_node.
+ * @param tree the tree
+ * @param node the node or NULL
+ * @param value the value to insert
+ * @return the new tree node
+ */
 tree_node_t* tree_insert_child(tree_t* tree, tree_node_t* node, void* value) {
     tree_node_t* tree_node = calloc(1, sizeof(tree_node_t));
 
@@ -81,6 +92,16 @@ tree_node_t* tree_insert_child(tree_t* tree, tree_node_t* node, void* value) {
     list_t* children = list_create();
     tree_node->children = children;
 
+    //Completely cleanup tree if replacing root node
+    if(node == NULL) {
+        if(tree->head) {
+            tree_destroy_node(tree->head);
+
+            tree->head = NULL;
+        }
+    }
+
+    //Set new root if head is not set or cleaned up
     if(!tree->head) {
         tree_node->value = value;
         tree_set_root_node(tree, tree_node);

@@ -75,7 +75,7 @@ list_dir_t* find(char* filename);
 
 //Mount functions
 void register_mount(char* name, mount_func func);
-void mount_directly(char* name, file_node_t root);
+void mount_directly(char* name, file_node_t* root);
 void mount_empty(char* name, int fileType);
 
 //Sets up the virtual file system
