@@ -305,12 +305,13 @@ void kernel_main(multiboot_info_t* info)
 {
 	/* Initialize terminal interface */
 	terminal_initialize();
-    if(!serial_init()) {
+    if(serial_init()) {
         printf("No serial.");
 
         return;
     }
 
+    serial_printf("Colonel version 0.0.0 starting up...\n");
     printf("Colonel version 0.0.0 starting up...\n");
 
     //Setup GDT and TSS
