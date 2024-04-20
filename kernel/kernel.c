@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <limits.h>
 #include "multiboot.h"
 #include "memmgr.h"
@@ -142,7 +143,7 @@ void terminal_resetline() {
     }
 }
 
-static void
+void
 itoa (char *buf, int base, long d)
 {
     char *p = buf;

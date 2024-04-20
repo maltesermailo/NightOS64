@@ -22,6 +22,7 @@ kernel/alloc/liballoc.o \
 kernel/proc/process.o \
 kernel/pci/pci.o \
 kernel/test.o \
+kernel/serial.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

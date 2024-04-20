@@ -2,6 +2,12 @@
 // Created by Jannik on 19.04.2024.
 //
 #include "serial.h"
+#include <string.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include "arch/amd64/io.h"
 
 #define PORT 0x3f8          // COM1
