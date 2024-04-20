@@ -75,10 +75,10 @@ char *strncat(char * dest, const char * src, size_t n) {
 }
 
 int strcmp(const char * s1, const char * s2) {
-    if(dest == NULL || src == NULL) {
-        if(dest == NULL && src == NULL) {
+    if(s1 == NULL || s2 == NULL) {
+        if(s1 == NULL && s2 == NULL) {
             return 0;
-        } else if(src == NULL) {
+        } else if(s2 == NULL) {
             return -1;
         } else {
             return 1;
