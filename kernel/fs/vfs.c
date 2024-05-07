@@ -37,6 +37,142 @@ void mount_empty(char* name) {
 
 }
 
+tree_node_t* get_child(tree_node_t* parent, char* name) {
+    for(list_node_t* child = parent->children->head; child != null; child = child->next) {
+        tree_node_t* node = (tree_node_t*)child->value;
+        file_node_t* file = (file_node_t*)node->value;
+
+        if(strcmp(name, file->name) == 0) {
+            return node;
+        }
+    }
+
+    return NULL;
+}
+
+/***
+ * Resolves the path from the current working directory.
+ * The current working directory should always be already resolved!
+ * @param cwd the current working directory
+ * @param file the file to resolve
+ * @param outParent the parent of the file if resolved
+ * @param outFileName the name of the file
+ * @return the resolved path
+ */
+file_node_t* resolve_path(char* cwd, char* file, file_node_t* outParent, char* outFileName) {
+    tree_node_t* fCwd = NULL;
+    file_node_t* fResult = NULL;
+
+    if(fCwd == NULL) {
+        tree_node_t* current = file_tree->head;
+
+        char* pch = NULL;
+        char* save = NULL;
+        printf("Resolving cwd: %s", cwd);
+
+        pch = strtok_r(cwd, "/", &save);
+
+        do {
+            if(strcmp(pch, "..") == 0) {
+                //Funny.
+                if(current == file_tree->head) {
+                    return root_node;
+                }
+
+                if(current->parent != NULL) {
+                    current = current->parent;
+                }
+
+                pch = strtok_r(NULL, "/", &save);
+
+                continue;
+            } else if(strcmp(pch, ".") == 0) {
+                pch = strtok_r(NULL, "/", &save);
+
+                continue;
+            } else {
+                current = get_child(current, pch);
+
+                if(current == NULL) {
+                    return NULL;
+                }
+            }
+        } while(pch != null);
+
+        if(current != NULL) {
+            fCwd = current;
+        }
+    }
+
+    tree_node_t* current = fCwd;
+    tree_node_t fParent = NULL;
+
+    char* pch = NULL;
+    char* save = NULL;
+    printf("Resolving path: %s", file);
+
+    pch = strtok_r(file, "/", &save);
+
+    do {
+        if(strcmp(pch, "..") == 0) {
+            //Funny.
+            if(current == file_tree->head) {
+                return root_node;
+            }
+
+            if(current->parent != NULL) {
+                current = current->parent;
+            }
+
+            pch = strtok_r(NULL, "/", &save);
+
+            continue;
+        } else if(strcmp(pch, ".") == 0) {
+            pch = strtok_r(NULL, "/", &save);
+
+            continue;
+        } else {
+            char* name = pch;
+
+            fParent = current;
+
+            current = get_child(current, name);
+
+            pch = strtok_r(NULL, "/", &save);
+
+            if(current == NULL) {
+                if(pch == NULL) {
+                    //Path is almost resolved, return parent for file creation
+                    outParent = fParent;
+                    outFileName = name;
+                }
+
+                return NULL;
+            }
+        }
+    } while(pch != null);
+
+    if(current != NULL) {
+        return (file_node_t*)current->value;
+    }
+}
+
+file_node_t* vfs_open(char* filename) {
+    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+        return root_node;
+    }
+
+    file_node_t* node = resolve_path("/", filename);
+
+    return node;
+}
+
+unsigned long open(char* filename, int mode) {
+    file_node_t* node = vfs_open(filename);
+
+    return 0;
+}
+
 void vfs_install() {
     file_tree = tree_create();
 

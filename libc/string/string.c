@@ -201,3 +201,28 @@ char *strtok(char *str, const char *delim) {
 
     return *str ? str : NULL;
 }
+
+char *strtok_r(char *str, const char *delim, char **saveptr) {
+    if (!delim || !saveptr) return NULL;  // Ensure the delimiter and saveptr are not NULL
+
+    if (str == NULL) str = *saveptr;  // If str is NULL, continue where we left off
+    if (str == NULL) return NULL;  // If saveptr is also NULL, there's nothing to tokenize
+
+    // Skip leading delimiters to find the start of the next token
+    str += strspn(str, delim);
+    if (*str == '\0') {  // If we reach the end of the string
+        *saveptr = NULL;
+        return NULL;
+    }
+
+    // Find the end of the token
+    char *end = str + strcspn(str, delim);
+    if (*end == '\0') {  // If we reach the end of the string
+        *saveptr = NULL;
+    } else {
+        *end = '\0';  // Terminate the token
+        *saveptr = end + 1;  // Set saveptr to just after the current token
+    }
+
+    return str;  // Return the token
+}
