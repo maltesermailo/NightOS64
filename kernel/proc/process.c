@@ -6,7 +6,7 @@
 #include "../memmgr.h"
 #include "../terminal.h"
 #include "../../libc/include/kernel/list.h"
-static struct process_control_block pcb;
+static struct process_control_block pcb; //currently the only one, we're running single core
 list_t* process_list;
 
 extern void longjmp(kernel_thread_t* thread);
@@ -46,6 +46,18 @@ void process_create_task(void* address) {
     process->main_thread.rip = copy_app_memory(address, 4096);
     process->main_thread.rsp = mmap(0, 16384, false);
 
+    process->uid = 0;
+    process->gid = 0;
+
+    process->fd_table = calloc(1, sizeof(fd_table_t));
+    process->fd_table->capacity = 32;
+    process->fd_table->length = 0;
+    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->handles);
+    process->fd_table->lock = ATOMIC_FLAG_INIT;
+
+    list_insert(process_list, process);
+
     printf("Executing at 0x%x with stack 0x%x\n", process->main_thread.rip, process->main_thread.rsp);
 
     enter_user(process->main_thread.rip, process->main_thread.rsp);
@@ -57,4 +69,8 @@ uintptr_t process_get_current_pml() {
 
 void process_set_current_pml(uintptr_t pml) {
     pcb.current_page_map = pml;
+}
+
+process_t* get_current_process() {
+    return pcb.current_process;
 }

@@ -59,53 +59,57 @@ tree_node_t* get_child(tree_node_t* parent, char* name) {
  * @param outFileName the name of the file
  * @return the resolved path
  */
-file_node_t* resolve_path(char* cwd, char* file, file_node_t* outParent, char* outFileName) {
+file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char** outFileName) {
     tree_node_t* fCwd = NULL;
     file_node_t* fResult = NULL;
 
-    if(fCwd == NULL) {
-        tree_node_t* current = file_tree->head;
+    if(file[0] == '/') {
+        fCwd = file_tree->head;
+    } else {
+        if(fCwd == NULL) {
+            tree_node_t* current = file_tree->head;
 
-        char* pch = NULL;
-        char* save = NULL;
-        printf("Resolving cwd: %s", cwd);
+            char* pch = NULL;
+            char* save = NULL;
+            printf("Resolving cwd: %s", cwd);
 
-        pch = strtok_r(cwd, "/", &save);
+            pch = strtok_r(cwd, "/", &save);
 
-        do {
-            if(strcmp(pch, "..") == 0) {
-                //Funny.
-                if(current == file_tree->head) {
-                    return root_node;
+            do {
+                if(strcmp(pch, "..") == 0) {
+                    //Funny.
+                    if(current == file_tree->head) {
+                        return root_node;
+                    }
+
+                    if(current->parent != NULL) {
+                        current = current->parent;
+                    }
+
+                    pch = strtok_r(NULL, "/", &save);
+
+                    continue;
+                } else if(strcmp(pch, ".") == 0) {
+                    pch = strtok_r(NULL, "/", &save);
+
+                    continue;
+                } else {
+                    current = get_child(current, pch);
+
+                    if(current == NULL) {
+                        return NULL;
+                    }
                 }
+            } while(pch != null);
 
-                if(current->parent != NULL) {
-                    current = current->parent;
-                }
-
-                pch = strtok_r(NULL, "/", &save);
-
-                continue;
-            } else if(strcmp(pch, ".") == 0) {
-                pch = strtok_r(NULL, "/", &save);
-
-                continue;
-            } else {
-                current = get_child(current, pch);
-
-                if(current == NULL) {
-                    return NULL;
-                }
+            if(current != NULL) {
+                fCwd = current;
             }
-        } while(pch != null);
-
-        if(current != NULL) {
-            fCwd = current;
         }
     }
 
     tree_node_t* current = fCwd;
-    tree_node_t fParent = NULL;
+    tree_node_t* fParent = NULL;
 
     char* pch = NULL;
     char* save = NULL;
@@ -143,8 +147,13 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t* outParent, char* o
             if(current == NULL) {
                 if(pch == NULL) {
                     //Path is almost resolved, return parent for file creation
-                    outParent = fParent;
-                    outFileName = name;
+                    if(outParent != NULL) {
+                        *outParent = fParent->value;
+                    }
+
+                    if(outFileName != NULL) {
+                        *outFileName = name;
+                    }
                 }
 
                 return NULL;
@@ -162,13 +171,43 @@ file_node_t* vfs_open(char* filename) {
         return root_node;
     }
 
-    file_node_t* node = resolve_path("/", filename);
+    file_node_t* node = resolve_path("/", filename, NULL, NULL);
+
+    return node;
+}
+
+file_node_t* vfs_create(char* filename, int mode) {
+    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+        return root_node;
+    }
+
+    file_node_t* parent = NULL;
+    char* filename = NULL;
+
+    resolve_path("/", file, &parent, &filename);
+
+    parent->file_ops->create(parent, filename, mode);
+
+    file_node_t* node = vfs_open(filename);
 
     return node;
 }
 
 unsigned long open(char* filename, int mode) {
     file_node_t* node = vfs_open(filename);
+
+    return 0;
+}
+
+unsigned long create(char* filename, int mode) {
+    file_node_t* node = vfs_open(filename);
+
+    //If node exists, don't create it, just return invalid
+    if(node != NULL) {
+        return 0;
+    }
+
+    file_node_t* node = vfs_create(filename, mode);
 
     return 0;
 }
