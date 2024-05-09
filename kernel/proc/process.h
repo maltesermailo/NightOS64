@@ -8,6 +8,9 @@
 #include "../fs/vfs.h"
 #include "../lock.h"
 
+#define PROC_FLAG_KERNEL 1
+#define PROC_FLAG_RUNNING 2
+
 typedef unsigned long long pid_t;
 
 struct process;
@@ -33,12 +36,6 @@ typedef struct kernel_thread {
     process* process;
 } kernel_thread_t;
 
-typedef struct file_handle {
-    file_node_t* fileNode;
-    int mode;
-    uint64_t offset;
-} file_handle_t;
-
 typedef struct file_descriptor_table {
     int capacity; // Current max
     int length; // Current length
@@ -53,6 +50,8 @@ typedef struct process {
 
     int uid;
     int gid;
+
+    int flags;
 
     uintptr_t page_directory;
     kernel_thread_t main_thread; // this is the thread that started the process, if it is killed, the process is dead and all threads are killed
@@ -82,6 +81,10 @@ void process_exit(int retval);
 //Process memory functions
 uintptr_t process_get_current_pml();
 void process_set_current_pml(uintptr_t pml);
+
+//Process file management functions
+int process_open_fd(file_node_t* node, int mode);
+void process_close_fd(int fd);
 
 //Current process state
 process_t* get_current_process();

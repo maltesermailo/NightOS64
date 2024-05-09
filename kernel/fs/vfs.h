@@ -45,6 +45,12 @@ typedef struct FILE {
     int64_t refcount;
 } file_node_t;
 
+typedef struct file_handle {
+    file_node_t* fileNode;
+    int mode;
+    uint64_t offset;
+} file_handle_t;
+
 typedef struct list_dir {
     char name[256];
 
@@ -56,9 +62,11 @@ FILE* OpenStdIn();
 FILE* OpenStdOut();
 
 //File functions
-unsigned long open(char* filename, int mode);
-unsigned long create(char* filename, int mode);
-unsigned long mkdir(char* filename);
+file_node_t* open(char* filename, int mode);
+file_node_t* create(char* filename, int mode);
+file_node_t* mkdir(char* filename);
+
+file_handle_t* create_handle(file_node_t*);
 
 //File descriptor functions
 void close(FILE* file);

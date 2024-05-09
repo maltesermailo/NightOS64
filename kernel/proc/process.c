@@ -11,14 +11,15 @@ list_t* process_list;
 
 extern void longjmp(kernel_thread_t* thread);
 extern void enter_user(uintptr_t rip, uintptr_t rsp);
+extern void enter_kernel(uintptr_t rip, uintptr_t rsp);
 
 /**
  * Small internal function to copy a mini function from the kernel to another location accessible by user space
  * @param address the address
  * @param len the size
  */
-void* copy_app_memory(void* address, size_t len) {
-    void* memory = mmap(0, len, 0);
+void* copy_app_memory(void* address, size_t len, bool is_kernel) {
+    void* memory = mmap(0, len, is_kernel);
 
     printf("Copied %d bytes to 0x%x\n", len, memory);
 
@@ -27,7 +28,7 @@ void* copy_app_memory(void* address, size_t len) {
     return memory;
 }
 
-void process_create_task(void* address) {
+void process_create_task(void* address, bool is_kernel) {
     process_t* process = calloc(1, sizeof(process_t));
 
     process->id = 1;
@@ -43,11 +44,13 @@ void process_create_task(void* address) {
 
     process->main_thread.process = 1;
     process->main_thread.priority = 0;
-    process->main_thread.rip = copy_app_memory(address, 4096);
-    process->main_thread.rsp = mmap(0, 16384, false);
+    process->main_thread.rip = copy_app_memory(address, 4096, is_kernel);
+    process->main_thread.rsp = mmap(0, 16384, is_kernel);
 
     process->uid = 0;
     process->gid = 0;
+    process->flags = is_kernel ? PROC_FLAG_KERNEL : 0;
+    process->flags |= PROC_FLAG_RUNNING;
 
     process->fd_table = calloc(1, sizeof(fd_table_t));
     process->fd_table->capacity = 32;
@@ -60,7 +63,11 @@ void process_create_task(void* address) {
 
     printf("Executing at 0x%x with stack 0x%x\n", process->main_thread.rip, process->main_thread.rsp);
 
-    enter_user(process->main_thread.rip, process->main_thread.rsp);
+    if(is_kernel) {
+        enter_kernel(process->main_thread.rip, process->main_thread.rsp);
+    } else {
+        enter_user(process->main_thread.rip, process->main_thread.rsp);
+    }
 }
 
 uintptr_t process_get_current_pml() {

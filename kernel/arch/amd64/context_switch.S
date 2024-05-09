@@ -3,6 +3,7 @@
 global setjmp
 global longjmp
 global enter_user
+global enter_kernel
 setjmp:
     ; We get a structure containing all registers as a pointer, therefore we use that pointer on rdi
     ; 0 = stack pointer
@@ -51,6 +52,13 @@ enter_user:
     push qword 0x18 | 0x03 ; Push code selector
 enter_user_rip:    push qword rdi         ; Push RIP
 enter_user_iret:    iretq                  ; Return to userspace
+
+enter_kernel:
+    ; Like enter_user, simple jump to kernel code
+    mov rsp, rsi
+    mov rax, rdi
+
+    jmp rdi
 
 
 enter_user_2:

@@ -2,8 +2,10 @@
 // Created by Jannik on 07.04.2024.
 //
 #include "vfs.h"
+#include "../proc/process.h"
 #include <string.h>
 #include "../../libc/include/kernel/tree.h"
+#include "../../libc/include/fcntl.h"
 
 file_node_t* root_node;
 tree_t* file_tree;
@@ -34,7 +36,15 @@ void register_mount(char* name, mount_func func) {
 }
 
 void mount_empty(char* name) {
+    file_node_t* node = calloc(1, sizeof(file_node_t));
 
+    node->name = name;
+    node->size = 0;
+    node->type = FILE_TYPE_MOUNT_POINT;
+    node->id = 0; //Replace with get_next_id
+    node->refcount = 0;
+
+    mount_directly(name, node);
 }
 
 tree_node_t* get_child(tree_node_t* parent, char* name) {
@@ -193,13 +203,32 @@ file_node_t* vfs_create(char* filename, int mode) {
     return node;
 }
 
-unsigned long open(char* filename, int mode) {
-    file_node_t* node = vfs_open(filename);
+file_node_t* vfs_mkdir(char* filename) {
+    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+        return NULL;
+    }
 
-    return 0;
+    file_node_t* parent = NULL;
+    char* filename = NULL;
+
+    resolve_path("/", file, &parent, &filename);
+
+    if(parent->file_ops->mkdir(parent, filename)) {
+        file_node_t* node = vfs_open(filename);
+
+        return node;
+    }
+
+    return NULL;
 }
 
-unsigned long create(char* filename, int mode) {
+file_node_t* open(char* filename, int mode) {
+    file_node_t* node = vfs_open(filename);
+
+    return node;
+}
+
+file_node_t* create(char* filename, int mode) {
     file_node_t* node = vfs_open(filename);
 
     //If node exists, don't create it, just return invalid
@@ -207,9 +236,37 @@ unsigned long create(char* filename, int mode) {
         return 0;
     }
 
-    file_node_t* node = vfs_create(filename, mode);
+    node = vfs_create(filename, mode);
 
-    return 0;
+    return node;
+}
+
+file_node_t* mkdir(char* dirname) {
+    file_node_t* node = vfs_open(filename);
+
+    //If node exists, don't create it, just return invalid
+    if(node != NULL) {
+        return 0;
+    }
+
+    node = vfs_mkdir(dirname);
+
+    return node;
+}
+
+/**
+ * Utility function for the kernel to create in kernel handles.
+ * The handle is volatile and should only be used to keep track inside the kernel.
+ * Don't pass to user processes unless the handle is in the file descriptor table.
+ * @return a file handle
+ */
+file_handle_t* create_handle(file_node_t* node) {
+    file_handle_t handle = calloc(1, sizeof(file_handle_t));
+    handle.fileNode = node;
+    handle.mode = 4; // 4 = FULL ACCESS; Kernel mode
+    handle.offset = 0;
+
+    return handle;
 }
 
 void vfs_install() {
