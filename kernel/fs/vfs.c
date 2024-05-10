@@ -112,9 +112,29 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
                     continue;
                 } else {
+                    fCwd = current; // save temporarily in fCwd
+
                     current = get_child(current, pch);
 
                     if(current == NULL) {
+                        //No node found, try fs
+                        file_node_t* fs_node = fCwd->value;
+                        if(fs_node->file_ops->read_dir) {
+                            file_node_t* node = fs_node->file_ops->find_dir(fs_node, name);
+
+                            if(node != NULL) {
+                                //Add caching of node and continue traversal
+                                current = cache_node(fCwd, node);
+
+                                if(pch == NULL) {
+                                    fCwd = current;
+                                    break;
+                                }
+
+                                continue;
+                            }
+                        }
+
                         return NULL;
                     }
                 }
