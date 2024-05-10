@@ -15,20 +15,22 @@
 #define FILE_TYPE_DEVICES 0x6
 #define FILE_TYPE_KERNEL 0x7
 
-typedef struct file_operations {
-    int (*read) (file_node_t*, char *, size_t, size_t);
-    int (*write) (file_node_t*, char**, size_t, size_t);
-    size_t (*seek) (file_node_t*, size_t);
-    void (*open) (file_node_t*);
-    void (*close) (file_node_t*);
-    void (*read_dir) (file_node_t*, file_node_t**);
-    bool (*mkdir) (file_node_t*, char*);
-    void (*find_dir) (file_node_t*, char*);
+struct FILE;
+
+struct file_operations {
+    int (*read) (FILE*, char *, size_t, size_t);
+    int (*write) (FILE*, char**, size_t, size_t);
+    size_t (*seek) (FILE*, size_t);
+    void (*open) (FILE*);
+    void (*close) (FILE*);
+    void (*read_dir) (FILE*, FILE**);
+    bool (*mkdir) (FILE*, char*);
+    FILE* (*find_dir) (FILE*, char*);
     int (*get_size) (file_node_t*);
-    int (*chmod) (file_node_t*, int);
-    int (*chown) (file_node_t*, unsigned int, unsigned int);
-    bool (*create)(file_node_t*, char*, int);
-    int (*ioctl) (file_node_t*, unsigned long, void*);
+    int (*chmod) (FILE*, int);
+    int (*chown) (FILE*, unsigned int, unsigned int);
+    bool (*create)(FILE*, char*, int);
+    int (*ioctl) (FILE*, unsigned long, void*);
 };
 
 typedef file_node_t* (*mount_func)(char*);

@@ -47,6 +47,10 @@ void mount_empty(char* name) {
     mount_directly(name, node);
 }
 
+void vfs_listdir(file_node_t* dir, file_node_t** entries) {
+
+}
+
 tree_node_t* get_child(tree_node_t* parent, char* name) {
     for(list_node_t* child = parent->children->head; child != null; child = child->next) {
         tree_node_t* node = (tree_node_t*)child->value;
@@ -58,6 +62,10 @@ tree_node_t* get_child(tree_node_t* parent, char* name) {
     }
 
     return NULL;
+}
+
+tree_node_t* cache_node(tree_node_t* parent, file_node_t* node) {
+    return tree_insert_child(file_tree, parent, node);
 }
 
 /***
@@ -155,6 +163,22 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
             pch = strtok_r(NULL, "/", &save);
 
             if(current == NULL) {
+                //No node found, try fs
+                file_node_t* fs_node = fParent->value;
+                if(fs_node->file_ops->read_dir) {
+                    file_node_t* node = fs_node->file_ops->find_dir(fs_node, name);
+
+                    if(node != NULL) {
+                        //Add caching of node and continue traversal
+                        current = cache_node(fParent, node);
+
+                        if(pch == NULL) {
+                            //End of search, return current
+                            return current;
+                        }
+                    }
+                }
+
                 if(pch == NULL) {
                     //Path is almost resolved, return parent for file creation
                     if(outParent != NULL) {
@@ -162,7 +186,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                     }
 
                     if(outFileName != NULL) {
-                        *outFileName = name;
+                        *outFileName = strdup(name);
                     }
                 }
 
