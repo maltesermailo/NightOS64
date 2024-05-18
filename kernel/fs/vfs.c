@@ -10,12 +10,34 @@
 file_node_t* root_node;
 tree_t* file_tree;
 
+static int id_generator = 1;
+
+void vfs_listdir(file_node_t* dir, file_node_t** entries) {
+
+}
+
+file_node_t* vfs_open(char* filename) {
+
+}
+
+file_node_t* vfs_create(char* filename, int mode) {
+
+}
+
+file_node_t* vfs_mkdir(char* filename) {
+
+}
+
 int vfs_read(file_node_t* node, int offset, int len) {
 
 }
 
 const struct file_operations fileOperations = {
-    .read = vfs_read;
+    .read = vfs_read,
+    .read_dir = vfs_listdir,
+    .open = vfs_open,
+    .create = vfs_create,
+    .mkdir = vfs_mkdir;
 };
 
 void mount_directly(char* name, file_node_t* node) {
@@ -45,10 +67,6 @@ void mount_empty(char* name) {
     node->refcount = 0;
 
     mount_directly(name, node);
-}
-
-void vfs_listdir(file_node_t* dir, file_node_t** entries) {
-
 }
 
 tree_node_t* get_child(tree_node_t* parent, char* name) {
@@ -119,7 +137,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                     if(current == NULL) {
                         //No node found, try fs
                         file_node_t* fs_node = fCwd->value;
-                        if(fs_node->file_ops->read_dir) {
+                        if(fs_node->file_ops->find_dir) {
                             file_node_t* node = fs_node->file_ops->find_dir(fs_node, name);
 
                             if(node != NULL) {
@@ -135,6 +153,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                             }
                         }
 
+                        //We couldn't resolve cwd, wtf?
                         return NULL;
                     }
                 }
@@ -220,7 +239,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     }
 }
 
-file_node_t* vfs_open(char* filename) {
+file_node_t* open(char* filename, int mode) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
         return root_node;
     }
@@ -230,9 +249,12 @@ file_node_t* vfs_open(char* filename) {
     return node;
 }
 
-file_node_t* vfs_create(char* filename, int mode) {
-    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
-        return root_node;
+file_node_t* create(char* filename, int mode) {
+    file_node_t* node = open(filename, mode);
+
+    //If node exists, don't create it, just return invalid
+    if(node != NULL) {
+        return 0;
     }
 
     file_node_t* parent = NULL;
@@ -242,14 +264,21 @@ file_node_t* vfs_create(char* filename, int mode) {
 
     parent->file_ops->create(parent, filename, mode);
 
-    file_node_t* node = vfs_open(filename);
+    file_node_t* node = open(filename, mode);
 
     return node;
 }
 
-file_node_t* vfs_mkdir(char* filename) {
+file_node_t* mkdir(char* dirname) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
         return NULL;
+    }
+
+    file_node_t* node = open(filename, 0);
+
+    //If node exists, don't create it, just return invalid
+    if(node != NULL) {
+        return 0;
     }
 
     file_node_t* parent = NULL;
@@ -258,44 +287,12 @@ file_node_t* vfs_mkdir(char* filename) {
     resolve_path("/", file, &parent, &filename);
 
     if(parent->file_ops->mkdir(parent, filename)) {
-        file_node_t* node = vfs_open(filename);
+        file_node_t* node = open(filename, 0);
 
         return node;
     }
 
     return NULL;
-}
-
-file_node_t* open(char* filename, int mode) {
-    file_node_t* node = vfs_open(filename);
-
-    return node;
-}
-
-file_node_t* create(char* filename, int mode) {
-    file_node_t* node = vfs_open(filename);
-
-    //If node exists, don't create it, just return invalid
-    if(node != NULL) {
-        return 0;
-    }
-
-    node = vfs_create(filename, mode);
-
-    return node;
-}
-
-file_node_t* mkdir(char* dirname) {
-    file_node_t* node = vfs_open(filename);
-
-    //If node exists, don't create it, just return invalid
-    if(node != NULL) {
-        return 0;
-    }
-
-    node = vfs_mkdir(dirname);
-
-    return node;
 }
 
 /**
@@ -313,13 +310,17 @@ file_handle_t* create_handle(file_node_t* node) {
     return handle;
 }
 
+int get_next_file_id() {
+    return id_generator++;
+}
+
 void vfs_install() {
     file_tree = tree_create();
 
     root_node = calloc(1, sizeof(file_node_t));
 
     root_node.type = FILE_TYPE_MOUNT_POINT; //Is set to mount point, because mount point is the most free to change type
-    root_node.id = 1; //id 1 will always be the root
+    root_node.id = id_generator++; //id 1 will always be the root
     root_node.size = 0;
     root_node.name = "[root]";
     root_node.refcount = 0;

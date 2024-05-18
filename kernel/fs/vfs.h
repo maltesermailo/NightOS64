@@ -7,13 +7,36 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define FILE_TYPE_FILE 0x1
-#define FILE_TYPE_DIR 0x2
+#define FILE_TYPE_FILE 0x0
 #define FILE_TYPE_BLOCK_DEVICE 0x3
 #define FILE_TYPE_VIRTUAL_DEVICE 0x4
-#define FILE_TYPE_MOUNT_POINT 0x5
-#define FILE_TYPE_DEVICES 0x6
-#define FILE_TYPE_KERNEL 0x7
+#define FILE_TYPE_DIR 0x5
+#define FILE_TYPE_NAMED_PIPE 0x6
+#define FILE_TYPE_MOUNT_POINT 0x7
+#define FILE_TYPE_DEVICES 0x8
+#define FILE_TYPE_KERNEL 0x9
+
+#define DT_UNKNOWN	0
+#define DT_FIFO		1
+#define DT_CHR		2
+#define DT_DIR		4
+#define DT_BLK		6
+#define DT_REG		8
+#define DT_LNK		10
+#define DT_SOCK		12
+#define DT_WHT		14
+
+#define S_IFMT  00170000
+#define S_IFSOCK 0140000
+#define S_IFLNK	 0120000
+#define S_IFREG  0100000
+#define S_IFBLK  0060000
+#define S_IFDIR  0040000
+#define S_IFCHR  0020000
+#define S_IFIFO  0010000
+#define S_ISUID  0004000
+#define S_ISGID  0002000
+#define S_ISVTX  0001000
 
 struct FILE;
 
@@ -33,14 +56,14 @@ struct file_operations {
     int (*ioctl) (FILE*, unsigned long, void*);
 };
 
-typedef file_node_t* (*mount_func)(char*);
-
 typedef struct FILE {
     char name[256];
+    char full_path[4096];
 
     uint64_t id;
     uint64_t type;
     uint64_t size;
+    void* fs; //File system specific data
 
     const struct file_operations* file_ops;
 
@@ -59,6 +82,8 @@ typedef struct list_dir {
     uint64_t type;
     uint64_t size;
 } list_dir_t;
+
+typedef file_node_t* (*mount_func)(char*);
 
 FILE* OpenStdIn();
 FILE* OpenStdOut();
@@ -90,5 +115,8 @@ void mount_empty(char* name, int fileType);
 
 //Sets up the virtual file system
 void vfs_install();
+
+//Utility
+int get_next_file_id();
 
 #endif //NIGHTOS_VFS_H
