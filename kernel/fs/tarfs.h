@@ -32,7 +32,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE
 */
 typedef struct tar {
-    unsigned int begin;                     // location of data in file (including metadata)
+    uintptr_t begin;                     // location of data in file (including metadata)
     union {
         // UStar format (POSIX IEEE P1003.1)
         struct {
@@ -61,6 +61,7 @@ typedef struct tar {
 
 typedef struct tar_filesystem {
     tar_t* root;
+    file_node_t* root_node;
     int len;
 } tar_filesystem_t;
 

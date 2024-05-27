@@ -34,6 +34,39 @@ THE SOFTWARE
 
 tar_t* archive;
 
+int tarfs_read(file_node_t* node, char* buf, size_t offset, size_t length) {
+    //Grab the context
+    tar_context_t* context = (tar_context_t*)node->fs;
+
+    //Check if no tar entry
+    if(context->entry == NULL) {
+        return 0;
+    }
+
+    tar_t* entry = context->entry;
+
+    uintptr_t pointer = entry->begin;
+    int size = oct2bin(current->size, 11);
+    uintptr_t end = pointer + size;
+
+    //If offset is ahead of file
+    if(offset > size) {
+        return 0;
+    }
+
+    if(offset + length > size) {
+        length = size - offset;
+    }
+
+    pointer += offset;
+
+    char* ptr = (char*) pointer;
+
+    memcpy(buf, ptr, length);
+
+    return length;
+}
+
 file_node_t* tarfs_finddir(file_node_t* node, char* name) {
     //Grab the context
     tar_context_t* context = (tar_context_t*)node->fs;
@@ -55,9 +88,7 @@ file_node_t* tarfs_finddir(file_node_t* node, char* name) {
                 count += (str[i] == '/');
             }
 
-            if(count > 1) {
-                //Skip to next one
-            } else {
+            if(count <= 1) {
                 if(strcmp(filename, name) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
                     node_context->fs = context->fs;
@@ -80,7 +111,56 @@ file_node_t* tarfs_finddir(file_node_t* node, char* name) {
             i++;
         }
 
-        return;
+        return null;
+    } else {
+        tar_t* current = context->fs->root;
+
+        while(current) {
+            char filename[256];
+            strncat(filename, current->prefix, 155);
+            strncat(filename, current->name, 100);
+
+            //The sub path inside the tar file system, because I like mounting at subdirectories.
+            char* path = strstr(name, context->fs->root_node->full_path);
+
+            //Path is as long as root path, what happened?
+            if(strlen(path) <= strlen(context->fs->root_node->full_path)) {
+                return NULL;
+            }
+
+            path += strlen(context->fs->root_node->full_path);
+
+            printf("Finding in %s", path);
+
+            int count = 0;
+            for(int i = 0; filename[i]; i++) {
+                count += (str[i] == '/');
+            }
+
+            if(count <= 1) {
+                if(strcmp(filename, path) == 0) {
+                    tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
+                    node_context->fs = context->fs;
+                    node_context->entry = current;
+
+                    file_node_t* node = calloc(1, sizeof(file_node_t));
+                    node->name = name;
+                    node->full_path = filename;
+                    node->id = id;
+                    node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+                    node->size = current->size;
+                    node->refcount = 0;
+                    node->fs = node_context;
+
+                    return node;
+                }
+            }
+
+            current = current->next;
+            i++;
+        }
+
+        return NULL;
     }
 }
 
@@ -140,6 +220,7 @@ file_node_t* tarfs_mount(char* name) {
     //Create the tar filesystem structure
     tar_filesystem_t* fs = calloc(1, sizeof(tar_filesystem_t));
     fs->root = archive;
+    fs->root_node = root;
 
     tar_t* current = fs->root;
 
