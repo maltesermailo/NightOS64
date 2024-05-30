@@ -33,7 +33,7 @@ typedef struct kernel_thread {
 
     int tid;
     int priority;
-    process* process;
+    struct process* process;
 } kernel_thread_t;
 
 typedef struct file_descriptor_table {
@@ -42,7 +42,7 @@ typedef struct file_descriptor_table {
 
     file_node_t** handles; // Array of file nodes
 
-    spin_t lock;
+    spin_t lock
 } fd_table_t;
 
 typedef struct process {
@@ -72,7 +72,7 @@ void process_init();
 
 //Process creation functions
 void process_create_init(); //Loads the init file into memory and calls process_create_task with the start address
-void process_create_task(void* start_address);
+void process_create_task(void* start_address, bool is_kernel);
 pid_t process_fork();
 
 //Process management functions

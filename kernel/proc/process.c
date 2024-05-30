@@ -56,8 +56,8 @@ void process_create_task(void* address, bool is_kernel) {
     process->fd_table->capacity = 32;
     process->fd_table->length = 0;
     process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
-    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->handles);
-    process->fd_table->lock = ATOMIC_FLAG_INIT;
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+    spin_unlock(&process->fd_table->lock);
 
     list_insert(process_list, process);
 

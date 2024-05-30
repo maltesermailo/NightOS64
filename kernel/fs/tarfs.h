@@ -86,5 +86,6 @@ void tarfs_init(char* path, void* tarptr, uintptr_t size);
 file_node_t* tarfs_mount(char* name);
 
 file_node_t* tarfs_find_dir(file_node_t* node, char* name);
+int tarfs_read(file_node_t* node, char* buf, size_t offset, size_t length);
 
 #endif //NIGHTOS_TARFS_H

@@ -3,6 +3,7 @@
 //
 #include "vfs.h"
 #include "../proc/process.h"
+#include "../../libc/include/kernel/list.h"
 #include <string.h>
 #include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
@@ -37,7 +38,7 @@ const struct file_operations fileOperations = {
     .read_dir = vfs_listdir,
     .open = vfs_open,
     .create = vfs_create,
-    .mkdir = vfs_mkdir;
+    .mkdir = vfs_mkdir
 };
 
 void mount_directly(char* name, file_node_t* node) {
@@ -45,7 +46,7 @@ void mount_directly(char* name, file_node_t* node) {
         //Root file system, just load directories
         root_node = node;
 
-        tree_insert_child(tree, NULL, root_node);
+        tree_insert_child(file_tree, NULL, root_node);
     }
 
     //
@@ -57,12 +58,13 @@ void register_mount(char* name, mount_func func) {
     mount_directly(name, mount);
 }
 
-void mount_empty(char* name) {
+void mount_empty(char* name, int fileType) {
     file_node_t* node = calloc(1, sizeof(file_node_t));
 
-    node->name = name;
+    memset(&node->name, 0, 256);
+    memcpy(&node->name, name, strlen(name));
     node->size = 0;
-    node->type = FILE_TYPE_MOUNT_POINT;
+    node->type = fileType;
     node->id = 0; //Replace with get_next_id
     node->refcount = 0;
 
@@ -70,7 +72,7 @@ void mount_empty(char* name) {
 }
 
 tree_node_t* get_child(tree_node_t* parent, char* name) {
-    for(list_node_t* child = parent->children->head; child != null; child = child->next) {
+    for(list_entry_t* child = parent->children->head; child != null; child = child->next) {
         tree_node_t* node = (tree_node_t*)child->value;
         file_node_t* file = (file_node_t*)node->value;
 
@@ -130,6 +132,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
                     continue;
                 } else {
+                    char* name = pch;
                     fCwd = current; // save temporarily in fCwd
 
                     current = get_child(current, pch);
@@ -240,7 +243,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 }
 
 file_node_t* open(char* filename, int mode) {
-    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+    if(strlen(filename) == 1 && memcmp(filename, "/", strlen(filename))) {
         return root_node;
     }
 
@@ -258,23 +261,23 @@ file_node_t* create(char* filename, int mode) {
     }
 
     file_node_t* parent = NULL;
-    char* filename = NULL;
+    char* outFileName = NULL;
 
-    resolve_path("/", file, &parent, &filename);
+    resolve_path("/", filename, &parent, &outFileName);
 
-    parent->file_ops->create(parent, filename, mode);
+    parent->file_ops->create(parent, outFileName, mode);
 
-    file_node_t* node = open(filename, mode);
+    node = open(filename, mode);
 
     return node;
 }
 
 file_node_t* mkdir(char* dirname) {
-    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+    if(strlen(dirname) == 1 && memcmp(dirname, "/", strlen(dirname))) {
         return NULL;
     }
 
-    file_node_t* node = open(filename, 0);
+    file_node_t* node = open(dirname, 0);
 
     //If node exists, don't create it, just return invalid
     if(node != NULL) {
@@ -284,7 +287,7 @@ file_node_t* mkdir(char* dirname) {
     file_node_t* parent = NULL;
     char* filename = NULL;
 
-    resolve_path("/", file, &parent, &filename);
+    resolve_path("/", dirname, &parent, &filename);
 
     if(parent->file_ops->mkdir(parent, filename)) {
         file_node_t* node = open(filename, 0);
@@ -302,10 +305,10 @@ file_node_t* mkdir(char* dirname) {
  * @return a file handle
  */
 file_handle_t* create_handle(file_node_t* node) {
-    file_handle_t handle = calloc(1, sizeof(file_handle_t));
-    handle.fileNode = node;
-    handle.mode = 4; // 4 = FULL ACCESS; Kernel mode
-    handle.offset = 0;
+    file_handle_t* handle = calloc(1, sizeof(file_handle_t));
+    handle->fileNode = node;
+    handle->mode = 4; // 4 = FULL ACCESS; Kernel mode
+    handle->offset = 0;
 
     return handle;
 }
@@ -319,14 +322,13 @@ void vfs_install() {
 
     root_node = calloc(1, sizeof(file_node_t));
 
-    root_node.type = FILE_TYPE_MOUNT_POINT; //Is set to mount point, because mount point is the most free to change type
-    root_node.id = id_generator++; //id 1 will always be the root
-    root_node.size = 0;
-    root_node.name = "[root]";
-    root_node.refcount = 0;
-    root_node.file_ops = fileOperations;
+    root_node->type = FILE_TYPE_MOUNT_POINT; //Is set to mount point, because mount point is the most free to change type
+    root_node->id = id_generator++; //id 1 will always be the root
+    root_node->size = 0;
+    strncpy(root_node->name, "[root]", 6);
+    root_node->refcount = 0;
 
-    tree_insert_child(tree, NULL, root_node);
+    tree_insert_child(file_tree, NULL, root_node);
 
     //At this point, drivers would read the root file system
 }

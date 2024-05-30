@@ -5,6 +5,7 @@
 #ifndef NIGHTOS_VFS_H
 #define NIGHTOS_VFS_H
 #include <stdbool.h>
+#include <stdint.h>
 #include <stddef.h>
 
 #define FILE_TYPE_FILE 0x0
@@ -41,19 +42,19 @@
 struct FILE;
 
 struct file_operations {
-    int (*read) (FILE*, char *, size_t, size_t);
-    int (*write) (FILE*, char**, size_t, size_t);
-    size_t (*seek) (FILE*, size_t);
-    void (*open) (FILE*);
-    void (*close) (FILE*);
-    void (*read_dir) (FILE*, FILE**);
-    bool (*mkdir) (FILE*, char*);
-    FILE* (*find_dir) (FILE*, char*);
-    int (*get_size) (file_node_t*);
-    int (*chmod) (FILE*, int);
-    int (*chown) (FILE*, unsigned int, unsigned int);
-    bool (*create)(FILE*, char*, int);
-    int (*ioctl) (FILE*, unsigned long, void*);
+    int (*read) (struct FILE*, char *, size_t, size_t);
+    int (*write) (struct FILE*, char**, size_t, size_t);
+    size_t (*seek) (struct FILE*, size_t);
+    void (*open) (struct FILE*);
+    void (*close) (struct FILE*);
+    void (*read_dir) (struct FILE*, struct FILE**);
+    bool (*mkdir) (struct FILE*, char*);
+    struct FILE* (*find_dir) (struct FILE*, char*);
+    int (*get_size) (struct FILE*);
+    int (*chmod) (struct FILE*, int);
+    int (*chown) (struct FILE*, unsigned int, unsigned int);
+    bool (*create)(struct FILE*, char*, int);
+    int (*ioctl) (struct FILE*, unsigned long, void*);
 };
 
 typedef struct FILE {
@@ -65,7 +66,7 @@ typedef struct FILE {
     uint64_t size;
     void* fs; //File system specific data
 
-    const struct file_operations* file_ops;
+    struct file_operations* file_ops;
 
     int64_t refcount;
 } file_node_t;
@@ -85,8 +86,8 @@ typedef struct list_dir {
 
 typedef file_node_t* (*mount_func)(char*);
 
-FILE* OpenStdIn();
-FILE* OpenStdOut();
+file_node_t* OpenStdIn();
+file_node_t* OpenStdOut();
 
 //File functions
 file_node_t* open(char* filename, int mode);
@@ -96,16 +97,16 @@ file_node_t* mkdir(char* filename);
 file_handle_t* create_handle(file_node_t*);
 
 //File descriptor functions
-void close(FILE* file);
-int seek(FILE* file, size_t len);
-int write(FILE* file, char* bytes, size_t len);
-int read(FILE* file, char** buffer, size_t len);
-int getdents(FILE* file, list_dir_t** buffer, int count);
-int get_size(FILE* file);
-int chmod(FILE* file, int mode);
-int chown(FILE* file, unsigned int user, unsigned int group);
-int ioctl(FILE* file, unsigned long request, void* args);
-int fcntl(FILE* file);
+void close(file_node_t* file);
+int seek(file_node_t* file, size_t len);
+int write(file_node_t* file, char* bytes, size_t len);
+int read(file_node_t* file, char** buffer, size_t len);
+int getdents(file_node_t* file, list_dir_t** buffer, int count);
+int get_size(file_node_t* file);
+int chmod(file_node_t* file, int mode);
+int chown(file_node_t* file, unsigned int user, unsigned int group);
+int ioctl(file_node_t* file, unsigned long request, void* args);
+int fcntl(file_node_t* file);
 list_dir_t* find(char* filename);
 
 //Mount functions

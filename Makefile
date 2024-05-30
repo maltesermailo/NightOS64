@@ -23,6 +23,8 @@ kernel/proc/process.o \
 kernel/pci/pci.o \
 kernel/test.o \
 kernel/serial.o \
+kernel/fs/vfs.o \
+kernel/fs/tarfs.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

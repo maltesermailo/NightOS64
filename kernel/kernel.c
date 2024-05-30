@@ -15,6 +15,7 @@
 #include "../libc/include/kernel/list.h"
 #include "test.h"
 #include "serial.h"
+#include "fs/tarfs.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -342,6 +343,17 @@ void kernel_main(multiboot_info_t* info)
     }
 
     registerKeyEventHandler(key_event);
+
+    //Setup filesystem and modules
+    vfs_install();
+
+    if(info->mods_count > 0) {
+        multiboot_module_t* module = info->mods_addr;
+
+        if(strcmp(module->cmdline, "tarfs") == 0) {
+            tarfs_init("/nightos/", module->mod_start, module->mod_end);
+        }
+    }
 
     printf("Performing list test now...\n");
     list_test();
