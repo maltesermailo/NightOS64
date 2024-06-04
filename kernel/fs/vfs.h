@@ -40,14 +40,15 @@
 #define S_ISVTX  0001000
 
 struct FILE;
+struct list_dir;
 
 struct file_operations {
-    int (*read) (struct FILE*, char *, size_t, size_t);
-    int (*write) (struct FILE*, char**, size_t, size_t);
+    int (*read) (struct FILE*, char**, size_t, size_t);
+    int (*write) (struct FILE*, char*, size_t, size_t);
     size_t (*seek) (struct FILE*, size_t);
     void (*open) (struct FILE*);
     void (*close) (struct FILE*);
-    void (*read_dir) (struct FILE*, struct FILE**);
+    void (*read_dir) (struct FILE*, struct list_dir**, int);
     bool (*mkdir) (struct FILE*, char*);
     struct FILE* (*find_dir) (struct FILE*, char*);
     int (*get_size) (struct FILE*);
@@ -97,10 +98,10 @@ file_node_t* mkdir(char* filename);
 file_handle_t* create_handle(file_node_t*);
 
 //File descriptor functions
-void close(file_node_t* file);
-int seek(file_node_t* file, size_t len);
-int write(file_node_t* file, char* bytes, size_t len);
-int read(file_node_t* file, char** buffer, size_t len);
+void close(file_handle_t* file);
+int seek(file_handle_t* file, size_t len);
+int write(file_handle_t* file, char* bytes, size_t len);
+int read(file_handle_t* file, char** buffer, size_t len);
 int getdents(file_node_t* file, list_dir_t** buffer, int count);
 int get_size(file_node_t* file);
 int chmod(file_node_t* file, int mode);
@@ -119,5 +120,7 @@ void vfs_install();
 
 //Utility
 int get_next_file_id();
+
+tree_t* debug_get_file_tree();
 
 #endif //NIGHTOS_VFS_H

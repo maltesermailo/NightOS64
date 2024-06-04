@@ -13,34 +13,6 @@ tree_t* file_tree;
 
 static int id_generator = 1;
 
-void vfs_listdir(file_node_t* dir, file_node_t** entries) {
-
-}
-
-file_node_t* vfs_open(char* filename) {
-
-}
-
-file_node_t* vfs_create(char* filename, int mode) {
-
-}
-
-file_node_t* vfs_mkdir(char* filename) {
-
-}
-
-int vfs_read(file_node_t* node, int offset, int len) {
-
-}
-
-const struct file_operations fileOperations = {
-    .read = vfs_read,
-    .read_dir = vfs_listdir,
-    .open = vfs_open,
-    .create = vfs_create,
-    .mkdir = vfs_mkdir
-};
-
 void mount_directly(char* name, file_node_t* node) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
         //Root file system, just load directories
@@ -266,6 +238,7 @@ file_node_t* create(char* filename, int mode) {
     resolve_path("/", filename, &parent, &outFileName);
 
     parent->file_ops->create(parent, outFileName, mode);
+    parent->size++;
 
     node = open(filename, mode);
 
@@ -298,6 +271,40 @@ file_node_t* mkdir(char* dirname) {
     return NULL;
 }
 
+int getdents(file_node_t* node, list_dir_t** buffer, int count) {
+    int i = 0; //Total count of entries received.
+
+    list_dir_t* dir = calloc(count, sizeof(list_dir_t));
+    list_dir_t* ptr = dir;
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+
+    if(!treeNode) {
+        return 0;
+    }
+
+    for(list_entry_t* child = treeNode->children->head; child != NULL; child = child->next) {
+        file_node_t* subNode = (file_node_t*)child->value;
+
+        ptr->type = subNode->type;
+        strncpy(ptr->name, subNode->name, strlen(subNode->name));
+        ptr->size = subNode->size;
+
+        ptr++;
+        i++;
+    }
+
+    buffer = &dir;
+
+    return i;
+}
+
+int read(file_handle_t* handle, char** buffer, size_t length) {
+    file_node_t* node = handle->fileNode;
+
+    return node->file_ops->read(node, buffer, handle->offset, length);
+}
+
 /**
  * Utility function for the kernel to create in kernel handles.
  * The handle is volatile and should only be used to keep track inside the kernel.
@@ -315,6 +322,10 @@ file_handle_t* create_handle(file_node_t* node) {
 
 int get_next_file_id() {
     return id_generator++;
+}
+
+tree_t* debug_get_file_tree() {
+    return file_tree;
 }
 
 void vfs_install() {

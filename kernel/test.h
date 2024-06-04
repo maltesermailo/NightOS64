@@ -7,5 +7,6 @@
 
 void list_test();
 void tree_test();
+void vfs_test();
 
 #endif //NIGHTOS_TEST_H

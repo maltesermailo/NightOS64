@@ -5,6 +5,8 @@
 #include "test.h"
 #include "../libc/include/kernel/list.h"
 #include "../libc/include/kernel/tree.h"
+#include "fs/vfs.h"
+#include "serial.h"
 
 void list_test() {
     list_t* list = list_create();
@@ -71,4 +73,36 @@ void tree_test() {
     }
 
     tree_dump(tree);
+}
+
+void print_fs_tree(tree_node_t* treeNode, int depth) {
+    //Gonna print this on serial.
+    for(int i = 0; i < depth; i++) {
+        serial_printf("-");
+    }
+
+    file_node_t* node = treeNode->value;
+
+    serial_printf("%s, %d, %d", node->name, node->size, node->type);
+
+    if(node->type == FILE_TYPE_DIR || node->type == FILE_TYPE_MOUNT_POINT) {
+        if(node->size > 0) {
+            for(list_entry_t* entry = treeNode->children->head; entry != NULL; entry = entry->next) {
+                tree_node_t* subNode = entry->value;
+
+                if(subNode) {
+                    print_fs_tree(subNode, depth+1);
+                }
+            }
+        }
+    }
+}
+
+void vfs_test() {
+    file_node_t* root = open("/", 0); //This should return the root
+    tree_t* tree = debug_get_file_tree();
+
+    tree_node_t* node = tree_find_child_root(tree, root);
+
+    print_fs_tree(node, 0);
 }
