@@ -4,7 +4,7 @@
 #define BITMAP_SIZE 524288
 
 #include "../../memmgr.h"
-#include "../../multiboot.h"
+#include "../../multiboot2.h"
 #include "../../terminal.h"
 #include "../../proc/process.h"
 #include "../../lock.h"
@@ -89,10 +89,18 @@ void* memset(void* bufptr, int value, size_t size) {
 
 
 void memmgr_phys_mark_page(int idx) {
+    if(idx >= BITMAP_SIZE) {
+        return;
+    }
+
     memory_map[idx] = 1;
 }
 
 void memmgr_phys_free_page(int idx) {
+    if(idx >= BITMAP_SIZE) {
+        return;
+    }
+
     memory_map[idx] = 0;
 }
 
@@ -661,24 +669,23 @@ void memmgr_dump() {
     }
 }
 
-void memmgr_init(multiboot_info_t* info) {
-    printf("Mem lower: %d\n", info->mem_lower);
-    printf("Mem upper: %d\n", info->mem_upper);
+void memmgr_init(struct multiboot_tag_mmap* tag) {
     //printf("info loc: 0x%x\n", info);
 
     multiboot_memory_map_t* mmap;
 
     spin_unlock(&PHYS_MEM_LOCK);
 
-    for (mmap = (multiboot_memory_map_t *) info->mmap_addr;
-         (unsigned long) mmap < info->mmap_addr + info->mmap_length;
-         mmap = (multiboot_memory_map_t *) ((unsigned long) mmap
-                                            + mmap->size + sizeof (mmap->size))) {
-        //printf("Found mmap, analysing\n");
-        //printf("Mmap start: 0x%x, Mmap end: 0x%x, Mmap size: %d, Mmap type: %d \n", mmap->addr, mmap->addr + mmap->len, mmap->len, mmap->type);
+    for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
+         (multiboot_uint8_t *) mmap
+         < (multiboot_uint8_t *) tag + tag->size;
+         mmap = (multiboot_memory_map_t *)
+                 ((unsigned long) mmap
+                  + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
+        printf("Mmap start: 0x%x, Mmap end: 0x%x, Mmap size: %d, Mmap type: %d \n", mmap->addr, mmap->addr + mmap->len, mmap->len, mmap->type);
 
         if(mmap->type != MULTIBOOT_MEMORY_AVAILABLE) {
-            for(int i = mmap->addr; i < mmap->addr + mmap->len; i += 0x1000) {
+            for(unsigned long i = mmap->addr; i < mmap->addr + mmap->len; i += 0x1000) {
                 memmgr_phys_mark_page(ADDRESS_TO_PAGE(i));
             }
         }

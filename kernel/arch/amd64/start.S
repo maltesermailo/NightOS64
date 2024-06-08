@@ -5,13 +5,53 @@ MEMINFO  equ  1 << 1            ; provide memory map
 FLAGS    equ  MBALIGN | MEMINFO ; this is the Multiboot 'flag' field
 MAGIC    equ  0x1BADB002        ; 'magic number' lets bootloader find the header
 CHECKSUM equ -(MAGIC + FLAGS)   ; checksum of above, to prove we are multiboot
+
+; Multiboot2
+ARCHITECTURE                     equ 0
+MULTIBOOT2_HEADER_MAGIC          equ 0xe85250d6
+MULTIBOOT_HEADER_TAG_END         equ 0
+MULTIBOOT_HEADER_TAG_FRAMEBUFFER equ 5
+MULTIBOOT_HEADER_TAG_OPTIONAL    equ 1
  
 section .multiboot
 align 4
 	dd MAGIC
 	dd FLAGS
 	dd CHECKSUM
- 
+
+align 8
+multiboot_header:
+        dd MULTIBOOT2_HEADER_MAGIC
+        dd ARCHITECTURE
+        dd multiboot_header_end - multiboot_header
+        dd -(MULTIBOOT2_HEADER_MAGIC + ARCHITECTURE + (multiboot_header_end - multiboot_header))
+
+align 8
+entry_address_tag_start:
+        dw 3
+        dw 0
+        dd (entry_address_tag_end - entry_address_tag_start)
+        dd _start
+entry_address_tag_end:
+align 8
+        dw 4
+        dw 0
+        dw 12
+        dd 3
+framebuffer_tag_start:
+        dw MULTIBOOT_HEADER_TAG_FRAMEBUFFER
+        dw MULTIBOOT_HEADER_TAG_OPTIONAL
+        dd framebuffer_tag_end - framebuffer_tag_start
+        dd 85
+        dd 25
+        dd 0
+framebuffer_tag_end:
+align 8
+        dw MULTIBOOT_HEADER_TAG_END
+        dw 0
+        dd 8
+multiboot_header_end:
+
 section .bss
 align 16
 stack_bottom:
@@ -77,6 +117,8 @@ _start:
 
     push 0
 	push ebx
+	push 0
+	push eax
 
 	pushfd
 	pop eax
@@ -121,20 +163,13 @@ _start:
     add edi, 0x1000              ; Add 0x1000 to the destination index.
     mov DWORD [edi], 0x3007      ; Set the uint32_t at the destination index to 0x3003.
     add edi, 0x1000              ; Add 0x1000 to the destination index.
-    mov DWORD [edi], 0x4007      ; Set the uint32_t at the destination index to 0x4003.
+    mov DWORD [edi], 0x00000083
     add edi, 8
-    mov DWORD [edi], 0x5007
-    mov edi, 0x4000
-
-	; Identity map 4 MB
-    mov ebx, 0x00000003          ; Set the B-register to 0x00000003.
-    mov ecx, 1024                 ; Set the C-register to 1024.
- 
-.SetEntry:
-    mov DWORD [edi], ebx         ; Set the uint32_t at the destination index to the B-register.
-    add ebx, 0x1000              ; Add 0x1000 to the B-register.
-    add edi, 8                   ; Add eight to the destination index.
-    loop .SetEntry               ; Set the next entry.
+    mov DWORD [edi], 0x00200083
+    add edi, 8
+    mov DWORD [edi], 0x00400083
+    add edi, 8
+    mov DWORD [edi], 0x00600083
 
 	; Enable paging
     mov eax, cr4                 ; Set the A-register to control register 4.
@@ -210,6 +245,7 @@ PAGE_USER     equ 1 << 2
     mov ss, ax                    ; Set the stack segment to the A-register.
 
     pop rdi
+    pop rsi
 
     mov rax, 0xffffff0000000000
     jmp rax

@@ -5,13 +5,13 @@
 #ifndef NIGHTOS_MEMMGR_H
 #define NIGHTOS_MEMMGR_H
 
-#include "multiboot.h"
+#include "multiboot2.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include "alloc.h"
 
 
-void memmgr_init(multiboot_info_t* info);
+void memmgr_init(struct multiboot_tag_mmap* info);
 
 uintptr_t kalloc_frame();
 void kfree_frame(uintptr_t addr);

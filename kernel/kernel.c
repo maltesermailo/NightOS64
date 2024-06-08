@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <limits.h>
-#include "multiboot.h"
+#include "multiboot2.h"
 #include "memmgr.h"
 #include "gdt.h"
 #include "idt.h"
@@ -302,7 +302,7 @@ void test_task() {
     asm volatile("hlt");
 }
 
-void kernel_main(multiboot_info_t* info)
+void kernel_main(unsigned long magic, unsigned long header)
 {
 	/* Initialize terminal interface */
 	terminal_initialize();
@@ -312,8 +312,73 @@ void kernel_main(multiboot_info_t* info)
         return;
     }
 
+    if(magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
+        printf("No multiboot detected.\n");
+        return;
+    }
+
+    struct multiboot_tag* tag;
+    unsigned size;
+
+    struct multiboot_tag_mmap* mmap;
+
+    size = *(unsigned *) header;
+
     serial_printf("Colonel version 0.0.0 starting up...\n");
     printf("Colonel version 0.0.0 starting up...\n");
+
+    //Multiboot parsing
+    for (tag = (struct multiboot_tag *) (header + 8);
+         tag->type != MULTIBOOT_TAG_TYPE_END;
+         tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
+                                         + ((tag->size + 7) & ~7)))
+    {
+        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        switch (tag->type)
+        {
+            case MULTIBOOT_TAG_TYPE_CMDLINE:
+                printf ("Command line = %s\n",
+                        ((struct multiboot_tag_string *) tag)->string);
+                break;
+            case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
+                printf ("Boot loader name = %s\n",
+                        ((struct multiboot_tag_string *) tag)->string);
+                break;
+            case MULTIBOOT_TAG_TYPE_MODULE:
+                printf ("Module at 0x%x-0x%x. Command line %s\n",
+                        ((struct multiboot_tag_module *) tag)->mod_start,
+                        ((struct multiboot_tag_module *) tag)->mod_end,
+                        ((struct multiboot_tag_module *) tag)->cmdline);
+                break;
+            case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
+                printf ("mem_lower = %uKB, mem_upper = %uKB\n",
+                        ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
+                        ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);
+                break;
+            case MULTIBOOT_TAG_TYPE_BOOTDEV:
+                printf ("Boot device 0x%x,%u,%u\n",
+                        ((struct multiboot_tag_bootdev *) tag)->biosdev,
+                        ((struct multiboot_tag_bootdev *) tag)->slice,
+                        ((struct multiboot_tag_bootdev *) tag)->part);
+                break;
+            case MULTIBOOT_TAG_TYPE_MMAP:
+            {
+                printf ("mmap\n");
+
+                mmap = tag;
+            }
+                break;
+            case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
+            {
+                multiboot_uint32_t color;
+                unsigned i;
+                struct multiboot_tag_framebuffer *tagfb
+                        = (struct multiboot_tag_framebuffer *) tag;
+                void *fb = (void *) (unsigned long) tagfb->common.framebuffer_addr;
+            }
+
+        }
+    }
 
     //Setup GDT and TSS
     gdt_install();
@@ -322,7 +387,7 @@ void kernel_main(multiboot_info_t* info)
     process_set_current_pml(0x1000);
 
     //Setup Memory Management
-    memmgr_init(info);
+    memmgr_init(mmap);
 
     //Setup interrupts
     idt_install();
@@ -347,18 +412,20 @@ void kernel_main(multiboot_info_t* info)
     //Setup filesystem and modules
     vfs_install();
 
-    if(info->mods_count > 0) {
+    /*if(info->mods_count > 0) {
         multiboot_module_t* module = info->mods_addr;
 
         if(strcmp(module->cmdline, "tarfs") == 0) {
             tarfs_init("/nightos/", module->mod_start, module->mod_end);
         }
-    }
+    }*/
 
     printf("Performing list test now...\n");
     list_test();
     printf("Performing tree test now...\n");
     tree_test();
+    printf("Performing VFS test now...\n");
+    vfs_test();
 
     //process_create_task(&test_task);
 
