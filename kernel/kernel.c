@@ -427,6 +427,9 @@ void kernel_main(unsigned long magic, unsigned long header)
     printf("Performing VFS test now...\n");
     vfs_test();
 
+    __asm__ volatile("cli");
+    __asm__ volatile("hlt");
+
     //process_create_task(&test_task);
 
     /*while(1) {

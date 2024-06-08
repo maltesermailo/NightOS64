@@ -83,7 +83,7 @@ void print_fs_tree(tree_node_t* treeNode, int depth) {
 
     file_node_t* node = treeNode->value;
 
-    serial_printf("%s, %d, %d", node->name, node->size, node->type);
+    serial_printf("%s, %d, %d\n", node->name, node->size, node->type);
 
     if(node->type == FILE_TYPE_DIR || node->type == FILE_TYPE_MOUNT_POINT) {
         if(node->size > 0) {
@@ -102,7 +102,7 @@ void vfs_test() {
     file_node_t* root = open("/", 0); //This should return the root
     tree_t* tree = debug_get_file_tree();
 
-    tree_node_t* node = tree_find_child_root(tree, root);
+    tree_node_t* node = tree->head;
 
     print_fs_tree(node, 0);
 }

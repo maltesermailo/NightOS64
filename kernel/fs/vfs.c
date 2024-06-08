@@ -73,6 +73,10 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     tree_node_t* fCwd = NULL;
     file_node_t* fResult = NULL;
 
+    if(!strcmp(file, "/")) {
+        return root_node;
+    }
+
     if(file[0] == '/') {
         fCwd = file_tree->head;
     } else {
