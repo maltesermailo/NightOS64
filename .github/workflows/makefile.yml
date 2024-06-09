@@ -65,9 +65,10 @@ jobs:
 
     - name: Run build
       run: |
+        ./config.sh
         cd ./libc/
         make clean
-        make install
+        sudo make install-libs
         cd ..
         ./headers.sh
         make build
