@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Update PATH
-      run: echo "$PREFIX/bin" >> $GITHUB_PATH
+      run: echo $PREFIX/bin >> $GITHUB_PATH
       
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
@@ -28,7 +28,7 @@ jobs:
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
         wget https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
-        tar -xzvf binutils-2.42.tar.gz
+        tar -xzf binutils-2.42.tar.gz
         mkdir build-binutils
         cd build-binutils
         ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
@@ -39,7 +39,7 @@ jobs:
         which -- $TARGET-as || echo $TARGET-as is not in the PATH
 
         wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
-        tar -xzvf gcc-13.2.0.tar.gz
+        tar -xzf gcc-13.2.0.tar.gz
         
         mkdir build-gcc
         cd build-gcc
