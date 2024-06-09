@@ -1,0 +1,51 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+env:
+  PREFIX: "/usr/local/cross"
+  TARGET: "x86_64-elf"
+  PATH: "$PREFIX/bin:$PATH"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
+
+    - name: Compile cross compiler
+      run: |
+        mkdir -p /tmp/cross-compiler
+        cd /tmp/cross-compiler
+        wget https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
+        tar -xzvf binutils-2.42.tar.gz
+        mkdir build-binutils
+        cd build-binutils
+        ../binutils-2.42/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
+        make
+        make install
+
+        cd /tmp/cross-compiler
+        which -- $TARGET-as || echo $TARGET-as is not in the PATH
+
+        wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
+        tar -xzvf gcc-13.2.0.tar.gz
+        
+        mkdir build-gcc
+        cd build-gcc
+        ../gcc-13.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
+        make all-gcc
+        make all-target-libgcc
+        make install-gcc
+        make install-target-libgcc
+
+    - name: Run build
+      run: make build
