@@ -8,7 +8,6 @@ on:
 env:
   PREFIX: "/usr/local/cross"
   TARGET: "x86_64-elf"
-  PATH: "$PREFIX/bin:$PATH"
 
 jobs:
   build:
@@ -16,8 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Update PATH
+      run: echo "$PREFIX/bin" >> $GITHUB_PATH
+      
     - name: Install dependencies
-      run: apt-get update && apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo tar
+      run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
     
     - uses: actions/checkout@v4
 
