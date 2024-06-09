@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "master" ]
 env:
-  PREFIX: "/usr/local/cross"
+  PREFIX: "$HOME/cross"
   TARGET: "x86_64-elf"
 
 jobs:
