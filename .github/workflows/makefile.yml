@@ -8,6 +8,7 @@ on:
 env:
   PREFIX: "/usr/local/cross"
   TARGET: "x86_64-elf"
+  SYSROOT: "$HOME/sysroot/"
 
 jobs:
   build:
@@ -63,4 +64,10 @@ jobs:
         sudo make install-target-libgcc
 
     - name: Run build
-      run: make build
+      run: |
+        cd ./libc/
+        make clean
+        make install
+        cd ..
+        ./headers.sh
+        make build
