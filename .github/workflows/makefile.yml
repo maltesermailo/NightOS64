@@ -26,15 +26,18 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm
     
     - uses: actions/checkout@v4
+
+    - name: root suid tar because github actions doesnt support sudo on cache
+      run: sudo chown root:wheel /bin/tar && sudo chmod u+s /bin/tar
     
     - name: Cache cross compiler
       id: cache-compiler
       uses: actions/cache@v3
       with:
         path: /usr/local/cross
-        key: ${{ runner.os }}-cross-compiler-${{ hashFiles('makefile.yml') }}
+        key: ${{ runner.os }}-cross-compiler-${{ hashFiles('.github/workflows/makefile.yml') }}
         restore-keys: |
-          ${{ runner.os }}-cross-compiler-
+          ${{ runner.os }}-cross-compiler-${{ hashFiles('.github/workflows/makefile.yml') }}
 
     - name: Compile cross compiler
       if: steps.cache-compiler.outputs.cache-hit != 'true'
