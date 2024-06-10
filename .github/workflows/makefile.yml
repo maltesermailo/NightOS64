@@ -66,6 +66,7 @@ jobs:
     - name: Run build
       run: |
         chmod +x config.sh
+        chmod +x default-host.sh
         ./config.sh
         cd ./libc/
         make clean
