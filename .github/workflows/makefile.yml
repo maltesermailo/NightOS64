@@ -77,4 +77,4 @@ jobs:
         cd ..
         chmod +x headers.sh
         ./headers.sh
-        echo $SYSROOT
+        make build
