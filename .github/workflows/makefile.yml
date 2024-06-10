@@ -28,7 +28,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: root suid tar because github actions doesnt support sudo on cache
-      run: sudo chown root:wheel /bin/tar && sudo chmod u+s /bin/tar
+      run: sudo chown root:root /bin/tar && sudo chmod u+s /bin/tar
     
     - name: Cache cross compiler
       id: cache-compiler
