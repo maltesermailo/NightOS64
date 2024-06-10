@@ -1,0 +1,74 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+env:
+  PREFIX: "/usr/local/cross"
+  TARGET: "x86_64-elf"
+  SYSROOT: "$HOME/sysroot/"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Update PATH
+      run: echo $PREFIX/bin >> $GITHUB_PATH
+
+    - name: Print Path
+      run: echo $GITHUB_PATH && echo $PATH
+      
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm
+    
+    - uses: actions/checkout@v4
+    
+    - name: Cache cross compiler
+      id: cache-compiler
+      uses: actions/cache@v3
+      with:
+        path: /usr/local/cross
+        key: ${{ runner.os }}-cross-compiler-${{ hashFiles('makefile.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-cross-compiler-
+
+    - name: Compile cross compiler
+      if: steps.cache-compiler.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p /tmp/cross-compiler
+        cd /tmp/cross-compiler
+        wget https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
+        tar -xzf binutils-2.42.tar.gz
+        mkdir build-binutils
+        cd build-binutils
+        ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
+        sudo make
+        sudo make install
+
+        cd /tmp/cross-compiler
+        which -- $TARGET-as || echo $TARGET-as is not in the PATH
+
+        wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
+        tar -xzf gcc-13.2.0.tar.gz
+        
+        mkdir build-gcc
+        cd build-gcc
+        ../gcc-13.2.0/configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c,c++ --without-headers
+        sudo make all-gcc
+        sudo make all-target-libgcc
+        sudo make install-gcc
+        sudo make install-target-libgcc
+
+    - name: Run build
+      run: |
+        ./config.sh
+        cd ./libc/
+        make clean
+        sudo make install-libs
+        cd ..
+        ./headers.sh
+        make build
