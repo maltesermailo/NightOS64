@@ -46,7 +46,7 @@ jobs:
         mkdir build-binutils
         cd build-binutils
         ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-        sudo make
+        sudo make -j4
         sudo make install
 
         cd /tmp/cross-compiler
@@ -58,8 +58,8 @@ jobs:
         mkdir build-gcc
         cd build-gcc
         ../gcc-13.2.0/configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c,c++ --without-headers
-        sudo make all-gcc
-        sudo make all-target-libgcc
+        sudo make all-gcc -j4
+        sudo make all-target-libgcc -j4
         sudo make install-gcc
         sudo make install-target-libgcc
 
