@@ -65,10 +65,12 @@ jobs:
 
     - name: Run build
       run: |
+        chmod +x config.sh
         ./config.sh
         cd ./libc/
         make clean
         sudo make install-libs
         cd ..
+        chmod +x headers.sh
         ./headers.sh
         make build
