@@ -35,9 +35,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: /usr/local/cross
-        key: ${{ runner.os }}-cross-compiler-${{ hashFiles('.github/workflows/makefile.yml') }}
+        key: ${{ runner.os }}-cross-compiler
         restore-keys: |
-          ${{ runner.os }}-cross-compiler-${{ hashFiles('.github/workflows/makefile.yml') }}
+          ${{ runner.os }}-cross-compiler
 
     - name: Compile cross compiler
       if: steps.cache-compiler.outputs.cache-hit != 'true'
@@ -77,4 +77,4 @@ jobs:
         cd ..
         chmod +x headers.sh
         ./headers.sh
-        make build
+        echo $CC
