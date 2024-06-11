@@ -77,4 +77,5 @@ jobs:
         cd ..
         chmod +x headers.sh
         ./headers.sh
-        echo $CC
+        chmod +x build.sh
+        ./build.sh
