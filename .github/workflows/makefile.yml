@@ -71,9 +71,7 @@ jobs:
         chmod +x config.sh
         chmod +x default-host.sh
         ./config.sh
-        cd ./libc/
-        make clean
-        sudo make install-libs
+        ./build_lib.sh
         cd ..
         chmod +x headers.sh
         ./headers.sh
