@@ -8,7 +8,7 @@ export AR=${HOST}-ar
 export AS=${HOST}-as
 export CC=${HOST}-gcc
  
-export PREFIX=/usr
+export PREFIX=/usr/local
 export EXEC_PREFIX=$PREFIX
 export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib
