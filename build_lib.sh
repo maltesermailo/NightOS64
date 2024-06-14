@@ -8,8 +8,7 @@ export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib
 export INCLUDEDIR=$PREFIX/include
 
-echo $PATH
-echo $GITHUB_PATH
+$(CC) --print-search-dirs
 
 make clean
 make install
