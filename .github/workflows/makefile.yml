@@ -75,3 +75,5 @@ jobs:
         sudo -E PATH="$PATH" ./build_lib.sh
         chmod +x headers.sh
         ./headers.sh
+        chmod +x build.sh
+        ./build.sh
