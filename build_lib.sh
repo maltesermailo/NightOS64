@@ -8,7 +8,7 @@ export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib
 export INCLUDEDIR=$PREFIX/include
 
-x86_64-elf-ld --verbose
+x86_64-elf-gcc --print-search-dirs
 
 make clean
 make install
