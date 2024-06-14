@@ -8,6 +8,7 @@ on:
 env:
   PREFIX: "/usr/local/cross"
   TARGET: "x86_64-elf"
+  CROSS_PATH: "/usr/local/cross/x86_64-elf/lib"
   SYSROOT: "$HOME/sysroot/"
 
 jobs:
