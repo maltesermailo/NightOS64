@@ -72,7 +72,6 @@ jobs:
         chmod +x default-host.sh
         chmod +x build_lib.sh
         sudo -E PATH="$PATH" ./build_lib.sh
-        cd ..
         chmod +x headers.sh
         ./headers.sh
         chmod +x build.sh
