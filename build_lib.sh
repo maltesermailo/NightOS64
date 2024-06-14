@@ -2,7 +2,7 @@ set -e
 . ./config.sh
 cd ./libc/
 
-export PREFIX=/usr/local/cross
+export PREFIX=/usr/local
 export EXEC_PREFIX=$PREFIX
 export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib
