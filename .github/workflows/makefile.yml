@@ -95,3 +95,22 @@ jobs:
         # A file, directory or wildcard pattern that describes what to upload
         path: nightos.kernel
         # The desired behavior if no files are found using the provided path.
+
+  test:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y qemu-system
+
+      - uses: actions/download-artifact@master
+        with:
+          name: nightos.iso
+
+      - name: Run qemu
+        run: qemu-system-x86_64 -cdrom myos.iso -monitor stdio -serial file:serial.txt -d int -no-reboot -m 512m -M smm=off
+
+      - name: Print serial output
+        run: cat serial.txt
+
+
