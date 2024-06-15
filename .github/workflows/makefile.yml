@@ -108,7 +108,7 @@ jobs:
           name: nightos.iso
 
       - name: Run qemu
-        run: qemu-system-x86_64 -cdrom myos.iso -monitor stdio -serial file:serial.txt -d int -no-reboot -m 512m -M smm=off
+        run: qemu-system-x86_64 -cdrom myos.iso -nographic -monitor stdio -serial file:serial.txt -d int -no-reboot -m 512m -M smm=off
 
       - name: Print serial output
         run: cat serial.txt
