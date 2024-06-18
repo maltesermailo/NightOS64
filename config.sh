@@ -7,8 +7,8 @@ export HOST=${HOST:-$(./default-host.sh)}
 export AR=${HOST}-ar
 export AS=${HOST}-as
 export CC=${HOST}-gcc
- 
-export PREFIX=${CROSS_PATH:-/usr/}
+
+export PREFIX=${CROSS_PATH:-$HOME/opt/cross/x86_64-elf/}
 export EXEC_PREFIX=$PREFIX
 export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib

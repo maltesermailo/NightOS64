@@ -104,5 +104,8 @@ void vfs_test() {
 
     tree_node_t* node = tree->head;
 
-    print_fs_tree(node, 0);
+    print_fs_tree(node, 0); //Prints only in ram tree. Tar filesystem and others will not show up until read by read_dir
+
+    //Now do the same with read_dir in the root directory
+    int count = get_size(root);
 }

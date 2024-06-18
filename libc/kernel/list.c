@@ -8,10 +8,6 @@
 list_t * list_create() {
     list_t* list = calloc(1, sizeof(list_t));
 
-    list->length = 0;
-    list->head = NULL;
-    list->tail = NULL;
-
     return list;
 }
 

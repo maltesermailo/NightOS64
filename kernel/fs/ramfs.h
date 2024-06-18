@@ -5,6 +5,9 @@
 #ifndef NIGHTOS_RAMFS_H
 #define NIGHTOS_RAMFS_H
 
+#include <stdint.h>
+#include "vfs.h"
+
 //* This defines an in-ram filesystem. Every file created on this is flushed after restart. */
 
 typedef struct RamFile {

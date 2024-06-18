@@ -44,7 +44,7 @@ struct FILE;
 struct list_dir;
 
 struct file_operations {
-    int (*read) (struct FILE*, char**, size_t, size_t);
+    int (*read) (struct FILE*, char*, size_t, size_t);
     int (*write) (struct FILE*, char*, size_t, size_t);
     size_t (*seek) (struct FILE*, size_t);
     void (*open) (struct FILE*);
@@ -111,10 +111,12 @@ int ioctl(file_node_t* file, unsigned long request, void* args);
 int fcntl(file_node_t* file);
 list_dir_t* find(char* filename);
 
+char* get_full_path(file_node_t* node);
+
 //Mount functions
-void register_mount(char* name, mount_func func);
-void mount_directly(char* name, file_node_t* root);
-void mount_empty(char* name, int fileType);
+int register_mount(char* name, mount_func func);
+int mount_directly(char* name, file_node_t* root);
+int mount_empty(char* name, int fileType);
 
 //Sets up the virtual file system
 void vfs_install();

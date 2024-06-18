@@ -55,7 +55,7 @@ multiboot_header_end:
 section .bss
 align 16
 stack_bottom:
-resb 65536 ; 64 KiB
+resb 1048576 ; 1 MiB
 global stack_top
 stack_top:
 

@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <string.h>
 #include "multiboot2.h"
 #include "memmgr.h"
 #include "gdt.h"
@@ -376,7 +377,6 @@ void kernel_main(unsigned long magic, unsigned long header)
                         = (struct multiboot_tag_framebuffer *) tag;
                 void *fb = (void *) (unsigned long) tagfb->common.framebuffer_addr;
             }
-
         }
     }
 
@@ -412,6 +412,27 @@ void kernel_main(unsigned long magic, unsigned long header)
     //Setup filesystem and modules
     vfs_install();
 
+    for (tag = (struct multiboot_tag *) (header + 8);
+         tag->type != MULTIBOOT_TAG_TYPE_END;
+         tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
+                                         + ((tag->size + 7) & ~7)))
+    {
+        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        switch (tag->type)
+        {
+            case MULTIBOOT_TAG_TYPE_MODULE:
+                printf ("Module at 0x%x-0x%x. Command line %s\n",
+                        ((struct multiboot_tag_module *) tag)->mod_start,
+                        ((struct multiboot_tag_module *) tag)->mod_end,
+                        ((struct multiboot_tag_module *) tag)->cmdline);
+
+                if(strcmp(((struct multiboot_tag_module *) tag)->cmdline, "tarfs") == 0) {
+                    tarfs_init("/", (void *) ((struct multiboot_tag_module *) tag)->mod_start, ((struct multiboot_tag_module *) tag)->mod_end - ((struct multiboot_tag_module *) tag)->mod_start);
+                }
+                break;
+        }
+    }
+
     /*if(info->mods_count > 0) {
         multiboot_module_t* module = info->mods_addr;
 
@@ -421,9 +442,9 @@ void kernel_main(unsigned long magic, unsigned long header)
     }*/
 
     printf("Performing list test now...\n");
-    list_test();
+    //list_test();
     printf("Performing tree test now...\n");
-    tree_test();
+    //tree_test();
     printf("Performing VFS test now...\n");
     vfs_test();
 

@@ -7,13 +7,16 @@
 #include <string.h>
 #include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
+#include "../terminal.h"
 
 file_node_t* root_node;
 tree_t* file_tree;
 
+file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char** outFileName);
+
 static int id_generator = 1;
 
-void mount_directly(char* name, file_node_t* node) {
+int mount_directly(char* name, file_node_t* node) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
         //Root file system, just load directories
         root_node = node;
@@ -21,16 +24,31 @@ void mount_directly(char* name, file_node_t* node) {
         tree_insert_child(file_tree, NULL, root_node);
     }
 
-    //
+    file_node_t* parent;
+    char* fileName;
+
+    resolve_path("/", name, &parent, &fileName);
+
+    if(parent == null) {
+        return 1;
+    }
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, parent);
+
+    if(treeNode == null) {
+        return 2;
+    }
+
+    tree_insert_child(file_tree, treeNode, node);
 }
 
-void register_mount(char* name, mount_func func) {
+int register_mount(char* name, mount_func func) {
     file_node_t* mount = func(name);
 
-    mount_directly(name, mount);
+    return mount_directly(name, mount);
 }
 
-void mount_empty(char* name, int fileType) {
+int mount_empty(char* name, int fileType) {
     file_node_t* node = calloc(1, sizeof(file_node_t));
 
     memset(&node->name, 0, 256);
@@ -40,7 +58,7 @@ void mount_empty(char* name, int fileType) {
     node->id = 0; //Replace with get_next_id
     node->refcount = 0;
 
-    mount_directly(name, node);
+    return mount_directly(name, node);
 }
 
 tree_node_t* get_child(tree_node_t* parent, char* name) {
@@ -192,7 +210,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
                         if(pch == NULL) {
                             //End of search, return current
-                            return current;
+                            return (file_node_t *) current->value;
                         }
                     }
                 }
@@ -216,6 +234,53 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     if(current != NULL) {
         return (file_node_t*)current->value;
     }
+
+    return NULL;
+}
+
+char* get_full_path(file_node_t* node) {
+    list_t* list = list_create();
+
+    list_insert(list, node->name);
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+    size_t pathSize = 0;
+
+    if(treeNode == null) {
+        return null;
+    }
+
+    for(tree_node_t* parent = treeNode->parent;; parent = parent->parent) {
+        if(parent->parent == null) {
+            break;
+        }
+
+        if(parent->value == root_node) {
+            break;
+        }
+
+        pathSize += strlen(((file_node_t*)parent->value)->name) + 1;
+
+        list_insert(list, ((file_node_t*)parent->value)->name);
+    }
+
+    char* path = malloc(pathSize * sizeof(char));
+    char* ptr = path;
+    memset(path, 0, pathSize * sizeof(char));
+
+    for(list_entry_t * entry = list->tail; entry != null; entry = entry->prev) {
+        char* name = entry->value;
+
+        *ptr = '/';
+        ptr++;
+
+        strcpy(ptr, name);
+        ptr += strlen(name);
+    }
+
+    list_free(list);
+
+    return path;
 }
 
 file_node_t* open(char* filename, int mode) {
@@ -333,6 +398,7 @@ tree_t* debug_get_file_tree() {
 }
 
 void vfs_install() {
+    printf("VFS INIT");
     file_tree = tree_create();
 
     root_node = calloc(1, sizeof(file_node_t));
@@ -346,4 +412,5 @@ void vfs_install() {
     tree_insert_child(file_tree, NULL, root_node);
 
     //At this point, drivers would read the root file system
+    printf("VFS INIT END");
 }

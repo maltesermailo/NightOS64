@@ -15,7 +15,7 @@ LIBDIR?=$(EXEC_PREFIX)/
 
 CFLAGS:=$(CFLAGS) -ffreestanding -Wall -Wextra -mcmodel=large
 CPPFLAGS:=$(CPPFLAGS) -D__is_libc -Iinclude
-LIBK_CFLAGS:=$(CFLAGS)
+LIBK_CFLAGS:=$(CFLAGS) -mno-sse -mno-sse2 -mno-avx
 LIBK_CPPFLAGS:=$(CPPFLAGS) -D__is_libk
 
 ARCHDIR=arch/$(HOSTARCH)

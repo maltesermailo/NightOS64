@@ -2,6 +2,7 @@
 // Created by Jannik on 17.05.2024.
 //
 #include "tarfs.h"
+#include "../terminal.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -201,6 +202,95 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
     }
 }
 
+int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
+    tar_context_t* context = node->fs;
+
+    if(node->type == FILE_TYPE_DIR) {
+        tar_t* entry = context->entry;
+
+        int readCount;
+
+        char* name = malloc(256);
+        memset(name, 0, 256);
+
+        strncat(name, entry->prefix, 155);
+        strncat(name, entry->name, 100);
+
+        size_t len = strlen(name);
+
+        tar_t* next = entry->next;
+
+        while(next) {
+            char* entry_name = malloc(256);
+            memset(entry_name, 0, 256);
+
+            strncat(name, next->prefix, 155);
+            strncat(name, next->name, 100);
+
+            if(strncmp(name, entry_name, len) != 0) {
+                break;
+            }
+
+            char* ptr = entry_name;
+            ptr += len + 1;
+
+            if(strstr(ptr, "/") != 0) {
+                break;
+            }
+
+            entries[readCount]->size = oct2bin(next->size, 11);
+            entries[readCount]->type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+            strcpy(entries[readCount]->name, ptr);
+
+            readCount++;
+
+            next = next->next;
+        }
+
+        return readCount;
+    }
+}
+
+int tarfs_get_size(file_node_t* node) {
+    tar_context_t* context = node->fs;
+
+    if(node->type == FILE_TYPE_DIR) {
+        tar_t* entry = context->entry;
+
+        int count;
+
+        char* name = malloc(256);
+        memset(name, 0, 256);
+
+        strncat(name, entry->prefix, 155);
+        strncat(name, entry->name, 100);
+
+        size_t len = strlen(name);
+
+        tar_t* next = entry->next;
+
+        while(next) {
+            char* entry_name = malloc(256);
+            memset(entry_name, 0, 256);
+
+            strncat(name, next->prefix, 155);
+            strncat(name, next->name, 100);
+
+            if(strncmp(name, entry_name, len) != 0) {
+                break;
+            }
+
+            count++;
+
+            next = next->next;
+        }
+
+        return count;
+    } else if(node->type == FILE_TYPE_FILE) {
+        return oct2bin(context->entry->size, 11);
+    }
+}
+
 void tar_free(tar_t* ptr) {
     while(ptr) {
         tar_t* next = ptr->next;
@@ -222,6 +312,7 @@ file_node_t* tarfs_mount(char* name) {
     root->refcount = 0;
     root->file_ops->find_dir = tarfs_find_dir;
     root->file_ops->read = tarfs_read;
+    root->file_ops->get_size = tarfs_get_size;
 
     //Create the tar filesystem structure
     tar_filesystem_t* fs = calloc(1, sizeof(tar_filesystem_t));
@@ -258,6 +349,8 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
 
     bool read = true;
 
+    printf("Trying to load filesystem\n");
+
     while(read && buf < ((uintptr_t)ptr + bufsize)) {
         previous = current;
         current = calloc(1, sizeof(tar_t));
@@ -265,21 +358,29 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
         if(read && read_mem(buf, current->block, 512) == 0) {
             buf += 512;
 
-            if(read_mem(buf, current->block, 512) == 0) {
-                tar_free(current);
-                tar_free(tar);
+            if(buf > ((uintptr_t)ptr + bufsize)) {
+                read = false;
 
-                return;
+                break;
+            }
+
+            uint64_t remaining = (uint64_t) ((ptr + bufsize) - (uint64_t) buf);
+
+            if(remaining >= 512 && read_mem(buf, current->block, 512) == 0) {
+                tar_free(current);
+
+                break;
             }
 
             read = false;
+            break;
         }
 
         if(tar == NULL) {
             tar = current;
         }
 
-        tar->begin = buf;
+        tar->begin = (uintptr_t) buf;
 
         int jump = oct2bin(current->size, 11);
         if(jump % 512) {
@@ -295,6 +396,17 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
 
     //After this the tar should be completely loaded in, starting at the tar pointer. Now we load the file structure into memory by using the mount function.
     archive = tar;
+
+    printf("Loaded tar filesystem\n");
+
+    {
+        tar_t* ptr = tar;
+
+        while(ptr) {
+            printf("%s\n", ptr->name);
+            ptr = ptr->next;
+        }
+    }
 
     register_mount(path, tarfs_mount);
 }
