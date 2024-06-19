@@ -2,11 +2,13 @@
 // Created by Jannik on 19.04.2024.
 //
 
+#include <string.h>
 #include "test.h"
 #include "../libc/include/kernel/list.h"
 #include "../libc/include/kernel/tree.h"
 #include "fs/vfs.h"
 #include "serial.h"
+#include "terminal.h"
 
 void list_test() {
     list_t* list = list_create();
@@ -108,4 +110,30 @@ void vfs_test() {
 
     //Now do the same with read_dir in the root directory
     int count = get_size(root);
+
+    list_dir_t* ptr = null;
+    int readCount = getdents(root, &ptr, count);
+
+    printf("Read %d entries from root directory\n", readCount);
+
+    for(int i = 0; i < readCount; i++) {
+        printf("Entry: %s, %d, %d\n", ptr->name, ptr->type, ptr->size);
+
+        ptr++;
+    }
+
+    file_node_t* test = open("/test.txt", 0);
+    file_handle_t* handle = create_handle(test);
+
+    int testSize = get_size(test);
+    printf("Test file size %d\n", testSize);
+
+    char* bytes = malloc(testSize+1);
+    memset(bytes, 0, testSize+1);
+    read(handle, bytes, testSize);
+
+    printf("Test: %d\n", strlen(bytes));
+    printf("%s: %s\n", test->name, bytes);
+
+    printf("Test successful if output is correct.\n");
 }

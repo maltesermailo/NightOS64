@@ -49,7 +49,7 @@ struct file_operations {
     size_t (*seek) (struct FILE*, size_t);
     void (*open) (struct FILE*);
     void (*close) (struct FILE*);
-    void (*read_dir) (struct FILE*, struct list_dir**, int);
+    int (*read_dir) (struct FILE*, struct list_dir**, int);
     bool (*mkdir) (struct FILE*, char*);
     struct FILE* (*find_dir) (struct FILE*, char*);
     int (*get_size) (struct FILE*);
@@ -95,6 +95,7 @@ file_node_t* OpenStdOut();
 file_node_t* open(char* filename, int mode);
 file_node_t* create(char* filename, int mode);
 file_node_t* mkdir(char* filename);
+file_node_t* mkdir_vfs(char* filename);
 
 file_handle_t* create_handle(file_node_t*);
 
@@ -102,7 +103,7 @@ file_handle_t* create_handle(file_node_t*);
 void close(file_handle_t* file);
 int seek(file_handle_t* file, size_t len);
 int write(file_handle_t* file, char* bytes, size_t len);
-int read(file_handle_t* file, char** buffer, size_t len);
+int read(file_handle_t* file, char* buffer, size_t len);
 int getdents(file_node_t* file, list_dir_t** buffer, int count);
 int get_size(file_node_t* file);
 int chmod(file_node_t* file, int mode);

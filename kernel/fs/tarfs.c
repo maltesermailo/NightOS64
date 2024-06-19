@@ -79,16 +79,16 @@ int tarfs_read(file_node_t* node, char* buf, size_t offset, size_t length) {
 
     tar_t* entry = context->entry;
 
-    uintptr_t pointer = entry->begin;
+    uintptr_t pointer = 512 + entry->begin;
     int size = oct2bin(entry->size, 11);
     uintptr_t end = pointer + size;
 
     //If offset is ahead of file
-    if(offset > size) {
+    if(offset > end) {
         return 0;
     }
 
-    if(offset + length > size) {
+    if(offset + length > end) {
         length = size - offset;
     }
 
@@ -205,10 +205,38 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
 int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
     tar_context_t* context = node->fs;
 
-    if(node->type == FILE_TYPE_DIR) {
+    if(node->type == FILE_TYPE_DIR || node->type == FILE_TYPE_MOUNT_POINT) {
         tar_t* entry = context->entry;
 
         int readCount;
+
+        if(entry == NULL) {
+            tar_t* next = context->fs->root;
+
+            while(next) {
+                char* entry_name = malloc(256);
+                memset(entry_name, 0, 256);
+
+                strncat(entry_name, next->prefix, 155);
+                strncat(entry_name, next->name, 100);
+
+                if(strstr(entry_name, "/") != 0) {
+                    break;
+                }
+
+                entries[readCount]->size = oct2bin(next->size, 11);
+                entries[readCount]->type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+                strcpy(entries[readCount]->name, entry_name);
+
+                free(entry_name);
+
+                readCount++;
+
+                next = next->next;
+            }
+
+            return readCount;
+        }
 
         char* name = malloc(256);
         memset(name, 0, 256);
@@ -244,6 +272,8 @@ int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
 
             readCount++;
 
+            free(entry_name);
+
             next = next->next;
         }
 
@@ -254,10 +284,37 @@ int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
 int tarfs_get_size(file_node_t* node) {
     tar_context_t* context = node->fs;
 
-    if(node->type == FILE_TYPE_DIR) {
+    if(node->type == FILE_TYPE_DIR || node->type == FILE_TYPE_MOUNT_POINT) {
         tar_t* entry = context->entry;
 
-        int count;
+        if(entry == NULL) {
+            //Null is the root
+            int count = 0;
+
+            tar_t* next = context->fs->root;
+
+            while(next) {
+                char* entry_name = malloc(256);
+                memset(entry_name, 0, 256);
+
+                strncat(entry_name, next->prefix, 155);
+                strncat(entry_name, next->name, 100);
+
+                if(strstr("/", entry_name) != 0) {
+                    break;
+                }
+
+                count++;
+
+                free(entry_name);
+
+                next = next->next;
+            }
+
+            return count;
+        }
+
+        int count = 0;
 
         char* name = malloc(256);
         memset(name, 0, 256);
@@ -273,8 +330,8 @@ int tarfs_get_size(file_node_t* node) {
             char* entry_name = malloc(256);
             memset(entry_name, 0, 256);
 
-            strncat(name, next->prefix, 155);
-            strncat(name, next->name, 100);
+            strncat(entry_name, next->prefix, 155);
+            strncat(entry_name, next->name, 100);
 
             if(strncmp(name, entry_name, len) != 0) {
                 break;
@@ -282,12 +339,16 @@ int tarfs_get_size(file_node_t* node) {
 
             count++;
 
+            free(entry_name);
+
             next = next->next;
         }
 
         return count;
     } else if(node->type == FILE_TYPE_FILE) {
         return oct2bin(context->entry->size, 11);
+    } else {
+        return 0;
     }
 }
 
@@ -307,10 +368,11 @@ file_node_t* tarfs_mount(char* name) {
     root->id = 0; // is the root
     root->size = 0; //Is a directory
     root->type = FILE_TYPE_MOUNT_POINT; //We set it to mount point so the driver knows its the root of the tar filesystem
-    strncpy(root->name, file_name, strlen(file_name));
+    strncpy(root->name, "[root_tarfs]", strlen("[root_tarfs]"));
     strncpy(root->full_path, name, strlen(name));
     root->refcount = 0;
     root->file_ops->find_dir = tarfs_find_dir;
+    root->file_ops->read_dir = tarfs_read_dir;
     root->file_ops->read = tarfs_read;
     root->file_ops->get_size = tarfs_get_size;
 
@@ -398,15 +460,6 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
     archive = tar;
 
     printf("Loaded tar filesystem\n");
-
-    {
-        tar_t* ptr = tar;
-
-        while(ptr) {
-            printf("%s\n", ptr->name);
-            ptr = ptr->next;
-        }
-    }
 
     register_mount(path, tarfs_mount);
 }

@@ -448,6 +448,8 @@ void kernel_main(unsigned long magic, unsigned long header)
     printf("Performing VFS test now...\n");
     vfs_test();
 
+    mkdir_vfs("/dev");
+
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
 

@@ -16,16 +16,47 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
 static int id_generator = 1;
 
+int vfs_read_dir(struct FILE* node, struct list_dir** buffer, int count) {
+    int i = 0;
+
+    list_dir_t* ptr = *buffer;
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+
+    if(!treeNode) {
+        return 0;
+    }
+
+    for(list_entry_t* child = treeNode->children->head; child != NULL; child = child->next) {
+        file_node_t* subNode = (file_node_t*)child->value;
+
+        ptr->type = subNode->type;
+        strncpy(ptr->name, subNode->name, strlen(subNode->name));
+        ptr->size = subNode->size;
+
+        ptr++;
+        i++;
+
+        if(i >= count) {
+            break;
+        }
+    }
+
+    return i;
+}
+
 int mount_directly(char* name, file_node_t* node) {
-    if(strlen(name) == 1 && memcmp(name, "/", strlen(name))) {
+    if(strlen(name) == 1 && memcmp(name, "/", strlen(name)) == 0) {
         //Root file system, just load directories
         root_node = node;
 
-        tree_insert_child(file_tree, NULL, root_node);
+        file_tree->head->value = node;
+
+        return 0;
     }
 
-    file_node_t* parent;
-    char* fileName;
+    file_node_t* parent = NULL;
+    char* fileName = NULL;
 
     resolve_path("/", name, &parent, &fileName);
 
@@ -103,7 +134,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
             char* pch = NULL;
             char* save = NULL;
-            printf("Resolving cwd: %s", cwd);
+            printf("Resolving cwd: %s\n", cwd);
 
             pch = strtok_r(cwd, "/", &save);
 
@@ -167,7 +198,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
     char* pch = NULL;
     char* save = NULL;
-    printf("Resolving path: %s", file);
+    printf("Resolving path: %s\n", file);
 
     pch = strtok_r(file, "/", &save);
 
@@ -340,11 +371,48 @@ file_node_t* mkdir(char* dirname) {
     return NULL;
 }
 
+file_node_t* mkdir_vfs(char* dirname) {
+    if(strlen(dirname) == 1 && memcmp(dirname, "/", strlen(dirname))) {
+        return NULL;
+    }
+
+    file_node_t* node = open(dirname, 0);
+
+    //If node exists, don't create it, just return invalid
+    if(node != NULL) {
+        return 0;
+    }
+
+    file_node_t* parent = NULL;
+    char* filename = NULL;
+
+    resolve_path("/", dirname, &parent, &filename);
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, parent);
+
+    if(!treeNode) {
+        printf("Warning: File %s is not present in file tree\n", parent->name);
+        return NULL;
+    }
+
+    node = calloc(1, sizeof(file_node_t));
+
+    node->type = FILE_TYPE_DIR; //Is set to mount point, because mount point is the most free to change type
+    node->id = id_generator++; //id 1 will always be the root
+    node->size = 0;
+    strncpy(root_node->name, dirname, strlen(dirname));
+    node->refcount = 0;
+    node->file_ops->read_dir = vfs_read_dir;
+
+    tree_insert_child(file_tree, treeNode, node);
+
+    return node;
+}
+
 int getdents(file_node_t* node, list_dir_t** buffer, int count) {
     int i = 0; //Total count of entries received.
 
     list_dir_t* dir = calloc(count, sizeof(list_dir_t));
-    list_dir_t* ptr = dir;
 
     tree_node_t* treeNode = tree_find_child_root(file_tree, node);
 
@@ -352,23 +420,22 @@ int getdents(file_node_t* node, list_dir_t** buffer, int count) {
         return 0;
     }
 
-    for(list_entry_t* child = treeNode->children->head; child != NULL; child = child->next) {
-        file_node_t* subNode = (file_node_t*)child->value;
+    i = node->file_ops->read_dir(node, &dir, count);
 
-        ptr->type = subNode->type;
-        strncpy(ptr->name, subNode->name, strlen(subNode->name));
-        ptr->size = subNode->size;
-
-        ptr++;
-        i++;
-    }
-
-    buffer = &dir;
+    *buffer = dir;
 
     return i;
 }
 
-int read(file_handle_t* handle, char** buffer, size_t length) {
+int get_size(file_node_t* node) {
+    if(node->file_ops->get_size) {
+        return node->file_ops->get_size(node);
+    }
+
+    return node->size;
+}
+
+int read(file_handle_t* handle, char* buffer, size_t length) {
     file_node_t* node = handle->fileNode;
 
     return node->file_ops->read(node, buffer, handle->offset, length);
@@ -408,6 +475,7 @@ void vfs_install() {
     root_node->size = 0;
     strncpy(root_node->name, "[root]", 6);
     root_node->refcount = 0;
+    root_node->file_ops->read_dir = vfs_read_dir;
 
     tree_insert_child(file_tree, NULL, root_node);
 

@@ -163,6 +163,10 @@ void tree_remove(tree_t* tree, tree_node_t* node) {
 }
 
 tree_node_t* tree_find_child(tree_t* tree, tree_node_t* node, void* value) {
+    if(node->value == value) {
+        return node;
+    }
+
     for(list_entry_t* listEntry = node->children->head; listEntry != null; listEntry = listEntry->next) {
         if(listEntry) {
             tree_node_t* other = (tree_node_t*)listEntry->value;

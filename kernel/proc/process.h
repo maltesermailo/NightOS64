@@ -40,9 +40,9 @@ typedef struct file_descriptor_table {
     int capacity; // Current max
     int length; // Current length
 
-    file_node_t** handles; // Array of file nodes
+    file_handle_t** handles; // Array of file nodes
 
-    spin_t lock
+    spin_t lock;
 } fd_table_t;
 
 typedef struct process {
