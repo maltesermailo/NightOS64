@@ -449,6 +449,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     vfs_test();
 
     mkdir_vfs("/dev");
+    mkdir_vfs("/test");
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");

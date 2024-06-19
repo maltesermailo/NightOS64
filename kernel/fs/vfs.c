@@ -45,6 +45,27 @@ int vfs_read_dir(struct FILE* node, struct list_dir** buffer, int count) {
     return i;
 }
 
+bool vfs_create(struct FILE* parent, char* filename, int mode) {
+    tree_node_t* treeNode = tree_find_child_root(file_tree, parent);
+
+    if(!treeNode) {
+        printf("Warning: Parent %s has no tree entry.\n", parent);
+        return false;
+    }
+
+    file_node_t* node = calloc(1, sizeof(file_node_t));
+
+    node->type = FILE_TYPE_FILE;
+    node->size = 0;
+    node->refcount = 0;
+    node->id = id_generator++;
+    strncpy(node->name, filename, strlen(filename));
+
+    tree_insert_child(file_tree, treeNode, node);
+
+    return true;
+}
+
 int mount_directly(char* name, file_node_t* node) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name)) == 0) {
         //Root file system, just load directories
@@ -403,6 +424,7 @@ file_node_t* mkdir_vfs(char* dirname) {
     strncpy(root_node->name, dirname, strlen(dirname));
     node->refcount = 0;
     node->file_ops->read_dir = vfs_read_dir;
+    node->file_ops->create = vfs_create;
 
     tree_insert_child(file_tree, treeNode, node);
 
@@ -462,6 +484,14 @@ int get_next_file_id() {
 
 tree_t* debug_get_file_tree() {
     return file_tree;
+}
+
+struct file_operations fileOperations = {
+    .create = vfs_create;
+};
+
+struct file_operations* get_vfs_ops() {
+
 }
 
 void vfs_install() {

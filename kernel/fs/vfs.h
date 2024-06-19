@@ -124,6 +124,7 @@ void vfs_install();
 
 //Utility
 int get_next_file_id();
+struct file_operations* get_vfs_ops();
 
 tree_t* debug_get_file_tree();
 
