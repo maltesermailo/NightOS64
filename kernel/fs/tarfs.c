@@ -135,8 +135,9 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     strncpy(node->full_path, filename, strlen(filename));
                     node->id = id;
                     node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-                    node->size = current->size;
+                    node->size = oct2bin(current->size, 11);
                     node->refcount = 0;
+                    node->file_ops.read = tarfs_read;
                     node->fs = node_context;
 
                     return node;
@@ -186,8 +187,9 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     strncpy(node->full_path, filename, strlen(filename));
                     node->id = id;
                     node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-                    node->size = current->size;
+                    node->size = oct2bin(current->size, 11);
                     node->refcount = 0;
+                    node->file_ops.read = tarfs_read;
                     node->fs = node_context;
 
                     return node;
@@ -371,10 +373,10 @@ file_node_t* tarfs_mount(char* name) {
     strncpy(root->name, "[root_tarfs]", strlen("[root_tarfs]"));
     strncpy(root->full_path, name, strlen(name));
     root->refcount = 0;
-    root->file_ops->find_dir = tarfs_find_dir;
-    root->file_ops->read_dir = tarfs_read_dir;
-    root->file_ops->read = tarfs_read;
-    root->file_ops->get_size = tarfs_get_size;
+    root->file_ops.find_dir = tarfs_find_dir;
+    root->file_ops.read_dir = tarfs_read_dir;
+    root->file_ops.read = tarfs_read;
+    root->file_ops.get_size = tarfs_get_size;
 
     //Create the tar filesystem structure
     tar_filesystem_t* fs = calloc(1, sizeof(tar_filesystem_t));

@@ -92,6 +92,8 @@ int mount_directly(char* name, file_node_t* node) {
     }
 
     tree_insert_child(file_tree, treeNode, node);
+
+    return 0;
 }
 
 int register_mount(char* name, mount_func func) {
@@ -186,8 +188,8 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                     if(current == NULL) {
                         //No node found, try fs
                         file_node_t* fs_node = fCwd->value;
-                        if(fs_node->file_ops->find_dir) {
-                            file_node_t* node = fs_node->file_ops->find_dir(fs_node, name);
+                        if(fs_node->file_ops.find_dir) {
+                            file_node_t* node = fs_node->file_ops.find_dir(fs_node, name);
 
                             if(node != NULL) {
                                 //Add caching of node and continue traversal
@@ -253,8 +255,8 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
             if(current == NULL) {
                 //No node found, try fs
                 file_node_t* fs_node = fParent->value;
-                if(fs_node->file_ops->read_dir) {
-                    file_node_t* node = fs_node->file_ops->find_dir(fs_node, name);
+                if(fs_node->file_ops.find_dir) {
+                    file_node_t* node = fs_node->file_ops.find_dir(fs_node, name);
 
                     if(node != NULL) {
                         //Add caching of node and continue traversal
@@ -358,7 +360,7 @@ file_node_t* create(char* filename, int mode) {
 
     resolve_path("/", filename, &parent, &outFileName);
 
-    parent->file_ops->create(parent, outFileName, mode);
+    parent->file_ops.create(parent, outFileName, mode);
     parent->size++;
 
     node = open(filename, mode);
@@ -383,7 +385,7 @@ file_node_t* mkdir(char* dirname) {
 
     resolve_path("/", dirname, &parent, &filename);
 
-    if(parent->file_ops->mkdir(parent, filename)) {
+    if(parent->file_ops.mkdir(parent, filename)) {
         file_node_t* node = open(filename, 0);
 
         return node;
@@ -421,10 +423,10 @@ file_node_t* mkdir_vfs(char* dirname) {
     node->type = FILE_TYPE_DIR; //Is set to mount point, because mount point is the most free to change type
     node->id = id_generator++; //id 1 will always be the root
     node->size = 0;
-    strncpy(root_node->name, dirname, strlen(dirname));
+    strncpy(node->name, filename, strlen(dirname));
     node->refcount = 0;
-    node->file_ops->read_dir = vfs_read_dir;
-    node->file_ops->create = vfs_create;
+    node->file_ops.read_dir = vfs_read_dir;
+    node->file_ops.create = vfs_create;
 
     tree_insert_child(file_tree, treeNode, node);
 
@@ -442,7 +444,7 @@ int getdents(file_node_t* node, list_dir_t** buffer, int count) {
         return 0;
     }
 
-    i = node->file_ops->read_dir(node, &dir, count);
+    i = node->file_ops.read_dir(node, &dir, count);
 
     *buffer = dir;
 
@@ -450,8 +452,8 @@ int getdents(file_node_t* node, list_dir_t** buffer, int count) {
 }
 
 int get_size(file_node_t* node) {
-    if(node->file_ops->get_size) {
-        return node->file_ops->get_size(node);
+    if(node->file_ops.get_size) {
+        return node->file_ops.get_size(node);
     }
 
     return node->size;
@@ -460,7 +462,13 @@ int get_size(file_node_t* node) {
 int read(file_handle_t* handle, char* buffer, size_t length) {
     file_node_t* node = handle->fileNode;
 
-    return node->file_ops->read(node, buffer, handle->offset, length);
+    return node->file_ops.read(node, buffer, handle->offset, length);
+}
+
+int write(file_handle_t* handle, char* buffer, size_t length) {
+    file_node_t* node = handle->fileNode;
+
+    return node->file_ops.write(node, buffer, handle->offset, length);
 }
 
 /**
@@ -487,7 +495,7 @@ tree_t* debug_get_file_tree() {
 }
 
 struct file_operations fileOperations = {
-    .create = vfs_create;
+    .create = vfs_create
 };
 
 struct file_operations* get_vfs_ops() {
@@ -505,7 +513,7 @@ void vfs_install() {
     root_node->size = 0;
     strncpy(root_node->name, "[root]", 6);
     root_node->refcount = 0;
-    root_node->file_ops->read_dir = vfs_read_dir;
+    root_node->file_ops.read_dir = vfs_read_dir;
 
     tree_insert_child(file_tree, NULL, root_node);
 

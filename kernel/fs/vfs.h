@@ -68,7 +68,7 @@ typedef struct FILE {
     uint64_t size;
     void* fs; //File system specific data
 
-    struct file_operations* file_ops;
+    struct file_operations file_ops;
 
     int64_t refcount;
 } file_node_t;

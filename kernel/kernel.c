@@ -17,6 +17,7 @@
 #include "test.h"
 #include "serial.h"
 #include "fs/tarfs.h"
+#include "fs/console.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -441,6 +442,10 @@ void kernel_main(unsigned long magic, unsigned long header)
         }
     }*/
 
+    mkdir_vfs("/dev");
+    mkdir_vfs("/test");
+    console_init();
+
     printf("Performing list test now...\n");
     //list_test();
     printf("Performing tree test now...\n");
@@ -448,8 +453,10 @@ void kernel_main(unsigned long magic, unsigned long header)
     printf("Performing VFS test now...\n");
     vfs_test();
 
-    mkdir_vfs("/dev");
-    mkdir_vfs("/test");
+    //Try opening console
+    file_node_t* console0 = open("/dev/console0", 0);
+    file_handle_t* hConsole = create_handle(console0);
+    write(hConsole, "test", strlen("test")+1);
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");

@@ -25,6 +25,7 @@ kernel/test.o \
 kernel/serial.o \
 kernel/fs/vfs.o \
 kernel/fs/tarfs.o \
+kernel/fs/console.o \
 
 OBJS=\
 $(KERNEL_OBJS) \
