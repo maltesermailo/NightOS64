@@ -5,6 +5,7 @@
 #include "../../idt.h"
 #include <stdint.h>
 #include "io.h"
+#include "../../terminal.h"
 
 typedef struct {
     uint16_t    isr_low;      // The lower 16 bits of the ISR's address
@@ -44,15 +45,7 @@ void exception_handler(regs_t * regs) {
         }
     } else if(regs->int_no == 0x80) {
         //Syscalls baby!
-        if(regs->rax == 0) {
-            //printf
-            uintptr_t pointer = regs->rdi;
-            size_t length = regs->rsi;
-
-            const char* buf = (const char*) pointer;
-
-            printf("%s", buf);
-        }
+        syscall_entry(regs);
     }
 }
 

@@ -335,7 +335,7 @@ void kernel_main(unsigned long magic, unsigned long header)
          tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                          + ((tag->size + 7) & ~7)))
     {
-        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        //printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
         switch (tag->type)
         {
             case MULTIBOOT_TAG_TYPE_CMDLINE:
@@ -418,7 +418,7 @@ void kernel_main(unsigned long magic, unsigned long header)
          tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                          + ((tag->size + 7) & ~7)))
     {
-        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        //printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
         switch (tag->type)
         {
             case MULTIBOOT_TAG_TYPE_MODULE:

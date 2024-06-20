@@ -62,8 +62,6 @@ void list_insert(list_t* list, void* item) {
     list_entry_t * entry = calloc(1, sizeof(list_entry_t));
     entry->value = item;
 
-    printf("List entry is 0x%x\n", entry);
-
     list_append(list, entry);
 }
 

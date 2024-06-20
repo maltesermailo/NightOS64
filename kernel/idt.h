@@ -28,5 +28,6 @@ void idt_install();
 void irq_install();
 
 void exception_handler(regs_t * regs);
+void syscall_entry(regs_t* regs);
 
 #endif //NIGHTOS_IDT_H
