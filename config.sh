@@ -8,7 +8,7 @@ export AR=${HOST}-ar
 export AS=${HOST}-as
 export CC=${HOST}-gcc
 
-export PREFIX=${CROSS_PATH:-$HOME/opt/cross/x86_64-elf/}
+export PREFIX=${CROSS_PATH:-$HOME/opt/cross/x86_64-nightos/}
 export EXEC_PREFIX=$PREFIX
 export BOOTDIR=/boot
 export LIBDIR=$EXEC_PREFIX/lib
