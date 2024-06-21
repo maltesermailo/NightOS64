@@ -45,10 +45,19 @@ kernel/tree.o \
 
 HOSTEDOBJS=\
 $(ARCH_HOSTEDOBJS) \
+kernel/syscall.o \
+stdlib/exit.o \
+stdlib/setup.o \
+
+CRT=\
+arch/amd64/crt0.o \
+arch/amd64/crti.o \
+arch/amd64/crtn.o \
 
 OBJS=\
 $(FREEOBJS) \
 $(HOSTEDOBJS) \
+$(CRT) \
 
 LIBK_OBJS=$(FREEOBJS:.o=.libk.o)
 
@@ -78,12 +87,15 @@ libk.a: $(LIBK_OBJS)
 .S.libk.o:
 	$(CC) -MD -c $< -o $@ $(LIBK_CFLAGS) $(LIBK_CPPFLAGS)
 
+arch/amd64/crt%.o: arch/amd64/crt%.S
+	${AS} -o $@ $<
+
 clean:
 	rm -f $(BINARIES) *.a
 	rm -f $(OBJS) $(LIBK_OBJS) *.o */*.o */*/*.o
 	rm -f $(OBJS:.o=.d) $(LIBK_OBJS:.o=.d) *.d */*.d */*/*.d
 
-install: install-headers install-libs
+install: install-headers install-libs install-crt
 
 install-headers:
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
@@ -92,6 +104,10 @@ install-headers:
 install-libs: $(BINARIES)
 	mkdir -p $(DESTDIR)$(LIBDIR)
 	cp $(BINARIES) $(DESTDIR)$(LIBDIR)
+
+install-crt:
+	mkdir -p $(DESTDIR)$(LIBDIR)
+	cp $(CRT) $(DESTDIR)$(LIBDIR)
 
 -include $(OBJS:.o=.d)
 -include $(LIBK_OBJS:.o=.d)

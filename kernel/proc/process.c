@@ -78,6 +78,52 @@ void process_set_current_pml(uintptr_t pml) {
     pcb.current_page_map = pml;
 }
 
+int process_open_fd(file_node_t* node, int mode) {
+    process_t* current = get_current_process();
+
+    if(current->fd_table->length >= current->fd_table->capacity) {
+        return -1; //no space, we will increase that later
+    }
+
+    spin_lock(&current->fd_table->lock);
+    int index = 0;
+
+    for(int i = 0; i < current->fd_table->capacity; i++) {
+        if(current->fd_table->handles[i] == NULL) {
+            index = i;
+        }
+    }
+
+    file_handle_t* handle = calloc(1, sizeof(file_handle_t));
+    handle->fileNode = node;
+    handle->offset = 0;
+    handle->mode = mode;
+
+    current->fd_table->handles[index] = handle;
+    current->fd_table->length++;
+    spin_unlock(&current->fd_table->lock);
+
+    return index;
+}
+
+void process_close_fd(int fd) {
+    process_t* current = get_current_process();
+
+    spin_lock(&current->fd_table->lock);
+
+    file_handle_t* handle = current->fd_table->handles[fd];
+
+    if(handle->fileNode->file_ops.close) {
+        handle->fileNode->file_ops.close(handle->fileNode); //Signal file system driver to flush
+    }
+
+    free(handle);
+
+    current->fd_table->handles[fd] = NULL;
+    current->fd_table->length--;
+    spin_unlock(&current->fd_table->lock);
+}
+
 process_t* get_current_process() {
     return pcb.current_process;
 }
