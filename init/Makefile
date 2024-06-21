@@ -1,5 +1,5 @@
 # OS Build File
-CFLAGS :=-g
+CFLAGS := -mno-sse -mno-sse2 -g
 LDFLAGS :=-O2
 NASM = nasm
 BUILDDIR=build

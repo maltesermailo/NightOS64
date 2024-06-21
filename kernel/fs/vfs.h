@@ -49,7 +49,7 @@ struct file_operations {
     size_t (*seek) (struct FILE*, size_t);
     void (*open) (struct FILE*);
     void (*close) (struct FILE*);
-    int (*read_dir) (struct FILE*, struct list_dir**, int);
+    int (*read_dir) (struct FILE*, struct list_dir*, int);
     bool (*mkdir) (struct FILE*, char*);
     struct FILE* (*find_dir) (struct FILE*, char*);
     int (*get_size) (struct FILE*);
@@ -66,6 +66,7 @@ typedef struct FILE {
     uint64_t id;
     uint64_t type;
     uint64_t size;
+    bool cached;
     void* fs; //File system specific data
 
     struct file_operations file_ops;

@@ -3,6 +3,8 @@
 //
 #include "tarfs.h"
 #include "../terminal.h"
+#include "../../libc/include/kernel/list.h"
+#include "../../libc/include/kernel/tree.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -204,18 +206,51 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
     }
 }
 
-int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
+int tarfs_read_dir(file_node_t* node, list_dir_t* entries, int count) {
     tar_context_t* context = node->fs;
+
+    //REWORK TO CACHE ENTRIES IN THE FILE TREE LATER ONCE FIRST CALLED
 
     if(node->type == FILE_TYPE_DIR || node->type == FILE_TYPE_MOUNT_POINT) {
         tar_t* entry = context->entry;
 
         int readCount;
 
+        tree_t* tree = debug_get_file_tree();
+        tree_node_t* treeNode = tree_find_child_root(tree, node);
+
+        if(!treeNode) {
+            printf("WARNING: No treeNode for %s\n", node->name);
+            return 0;
+        }
+
+        for(list_entry_t* listEntry = treeNode->children->head; listEntry != NULL; listEntry = listEntry->next) {
+            if(readCount >= count) {
+                return readCount;
+            }
+
+            tree_node_t* treeSubNode = listEntry->value;
+            file_node_t* subNode = treeSubNode->value;
+
+            if(subNode->cached) {
+                continue;
+            }
+
+            entries[readCount].size = subNode->size;
+            entries[readCount].type = subNode->type;
+            strcpy(entries[readCount].name, subNode->name);
+
+            readCount++;
+        }
+
         if(entry == NULL) {
             tar_t* next = context->fs->root;
 
             while(next) {
+                if(readCount >= count) {
+                    return readCount;
+                }
+
                 char* entry_name = malloc(256);
                 memset(entry_name, 0, 256);
 
@@ -226,9 +261,9 @@ int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
                     break;
                 }
 
-                entries[readCount]->size = oct2bin(next->size, 11);
-                entries[readCount]->type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-                strcpy(entries[readCount]->name, entry_name);
+                entries[readCount].size = oct2bin(next->size, 11);
+                entries[readCount].type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+                strcpy(entries[readCount].name, entry_name);
 
                 free(entry_name);
 
@@ -251,6 +286,10 @@ int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
         tar_t* next = entry->next;
 
         while(next) {
+            if(readCount >= count) {
+                return readCount;
+            }
+
             char* entry_name = malloc(256);
             memset(entry_name, 0, 256);
 
@@ -268,9 +307,9 @@ int tarfs_read_dir(file_node_t* node, list_dir_t** entries, int count) {
                 break;
             }
 
-            entries[readCount]->size = oct2bin(next->size, 11);
-            entries[readCount]->type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-            strcpy(entries[readCount]->name, ptr);
+            entries[readCount].size = oct2bin(next->size, 11);
+            entries[readCount].type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+            strcpy(entries[readCount].name, ptr);
 
             readCount++;
 
@@ -313,6 +352,8 @@ int tarfs_get_size(file_node_t* node) {
                 next = next->next;
             }
 
+            count = count + node->size;
+
             return count;
         }
 
@@ -345,6 +386,8 @@ int tarfs_get_size(file_node_t* node) {
 
             next = next->next;
         }
+
+        count = count + node->size;
 
         return count;
     } else if(node->type == FILE_TYPE_FILE) {
@@ -444,7 +487,7 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
             tar = current;
         }
 
-        tar->begin = (uintptr_t) buf;
+        current->begin = (uintptr_t) buf;
 
         int jump = oct2bin(current->size, 11);
         if(jump % 512) {

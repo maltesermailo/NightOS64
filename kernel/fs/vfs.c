@@ -129,6 +129,8 @@ tree_node_t* get_child(tree_node_t* parent, char* name) {
 }
 
 tree_node_t* cache_node(tree_node_t* parent, file_node_t* node) {
+    node->cached = true; //Mark as cached for drivers to ignore during counting.
+
     return tree_insert_child(file_tree, parent, node);
 }
 
@@ -427,6 +429,7 @@ file_node_t* mkdir_vfs(char* dirname) {
     node->refcount = 0;
     node->file_ops.read_dir = vfs_read_dir;
     node->file_ops.create = vfs_create;
+    parent->size++;
 
     tree_insert_child(file_tree, treeNode, node);
 
@@ -444,7 +447,7 @@ int getdents(file_node_t* node, list_dir_t** buffer, int count) {
         return 0;
     }
 
-    i = node->file_ops.read_dir(node, &dir, count);
+    i = node->file_ops.read_dir(node, dir, count);
 
     *buffer = dir;
 

@@ -117,9 +117,7 @@ void vfs_test() {
     printf("Read %d entries from root directory\n", readCount);
 
     for(int i = 0; i < readCount; i++) {
-        printf("Entry: %s, %d, %d\n", ptr->name, ptr->type, ptr->size);
-
-        ptr++;
+        printf("Entry: %s, %d, %d\n", ptr[i].name, ptr[i].type, ptr[i].size);
     }
 
     file_node_t* test = open("/test.txt", 0);
