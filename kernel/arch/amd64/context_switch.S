@@ -50,8 +50,8 @@ enter_user:
     push rax               ; Push stack pointer
     push 0x202             ; Push EFLAGS
     push qword 0x18 | 0x03 ; Push code selector
-enter_user_rip:    push qword rdi         ; Push RIP
-enter_user_iret:    iretq                  ; Return to userspace
+    push qword rdi         ; Push RIP
+    iretq                  ; Return to userspace
 
 enter_kernel:
     ; Like enter_user, simple jump to kernel code

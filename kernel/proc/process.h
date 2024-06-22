@@ -33,6 +33,8 @@ typedef struct kernel_thread {
 
     int tid;
     int priority;
+    uintptr_t kernel_stack;
+    uintptr_t user_stack;
     struct process* process;
 } kernel_thread_t;
 
@@ -72,7 +74,7 @@ void process_init();
 
 //Process creation functions
 void process_create_init(); //Loads the init file into memory and calls process_create_task with the start address
-void process_create_task(void* start_address, bool is_kernel);
+void process_create_task(char* path, bool is_kernel);
 pid_t process_fork();
 
 //Process management functions

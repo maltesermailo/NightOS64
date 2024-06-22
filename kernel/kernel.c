@@ -458,6 +458,9 @@ void kernel_main(unsigned long magic, unsigned long header)
     file_handle_t* hConsole = create_handle(console0);
     write(hConsole, "test", strlen("test")+1);
 
+    process_init();
+    process_create_task("/initd", false);
+
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
 

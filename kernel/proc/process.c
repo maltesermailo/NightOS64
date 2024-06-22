@@ -28,7 +28,24 @@ void* copy_app_memory(void* address, size_t len, bool is_kernel) {
     return memory;
 }
 
-void process_create_task(void* address, bool is_kernel) {
+void process_init() {
+    process_list = list_create();
+}
+
+void process_create_task(char* path, bool is_kernel) {
+    file_node_t* node = open(path, 0);
+
+    if(node == NULL) {
+        printf("Error: can't open %s\n", path);
+        return;
+    }
+
+    char* mem = malloc(node->size);
+    file_handle_t* handle = create_handle(node);
+    read(handle, mem, node->size);
+
+    free(handle);
+
     process_t* process = calloc(1, sizeof(process_t));
 
     process->id = 1;
@@ -42,10 +59,12 @@ void process_create_task(void* address, bool is_kernel) {
     pcb.current_process = process;
     pcb.kernel_idle_process = 0;
 
-    process->main_thread.process = 1;
+    process->main_thread.process = process;
     process->main_thread.priority = 0;
-    process->main_thread.rip = copy_app_memory(address, 4096, is_kernel);
-    process->main_thread.rsp = mmap(0, 16384, is_kernel);
+    process->main_thread.rip = copy_app_memory(mem, node->size, is_kernel);
+    process->main_thread.user_stack = mmap(0, 16384, false);
+    process->main_thread.kernel_stack = mmap(0, 16384, true);
+    process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
 
     process->uid = 0;
     process->gid = 0;

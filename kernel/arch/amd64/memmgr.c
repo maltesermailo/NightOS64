@@ -106,7 +106,7 @@ void memmgr_phys_free_page(int idx) {
 
 uintptr_t kalloc_frame() {
     spin_lock(&PHYS_MEM_LOCK);
-    int i = 0;
+    int idx = 0;
     for(;;) {
         if(!memory_map[idx]) {
             //Found free, yay
@@ -117,19 +117,18 @@ uintptr_t kalloc_frame() {
         }
 
         if(idx >= BITMAP_SIZE) {
-            if(i < BITMAP_SIZE) {
+            if(idx < BITMAP_SIZE) {
                 //We didnt iterate through all
                 idx = 0;
                 continue;
             } else {
                 break;
             }
-        } else if(i >= BITMAP_SIZE) {
+        } else if(idx >= BITMAP_SIZE) {
             break;
         }
 
         idx++;
-        i++;
     }
 
 
@@ -200,7 +199,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
-    if(pageDirectoryPointer == KERNEL_MEMORY) {
+    if(pageMap[INDEX_PML4] == 0) {
         uintptr_t pdp_frame = kalloc_frame();
 
         if(pdp_frame == UINT64_MAX) {
@@ -214,7 +213,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
 
     uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
-    if(pageDirectory == KERNEL_MEMORY) {
+    if(pageDirectoryPointer[INDEX_PDP] == 0) {
         uintptr_t pd_frame = kalloc_frame();
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
@@ -223,11 +222,11 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
 
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
-    if(pageTable == KERNEL_MEMORY) {
+    if(pageDirectory[INDEX_PD] == 0) {
         uintptr_t pt_frame = kalloc_frame();
         pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
-        printf("Creating page table at 0x%x with index 0x%x, 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
+        printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
     }
@@ -237,7 +236,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
         pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE | flags;
     }
 
-    return pageTable[INDEX_PT];
+    return (void *) (pageTable[INDEX_PT] & PAGE_MASK);
 }
 
 void* get_free_page(size_t len) {
@@ -259,7 +258,12 @@ void* get_free_page(size_t len) {
         uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i] & PAGE_MASK);
         //printf("Page directory: %d, 0x%x\n", i, pageDirectory);
 
-        if(pageDirectory == KERNEL_MEMORY) {
+        if(pageDirectoryPointer[i] & PAGE_LARGE) {
+            //Skip large page
+            continue;
+        }
+
+        if(pageDirectoryPointer[i] == 0) {
             if(baseAddress == 0) {
                 //free page directory means free page, lets calculate offset
                 baseAddress = (0x40000000UL * i);
@@ -280,16 +284,16 @@ void* get_free_page(size_t len) {
             continue;
         }
 
-        if((uintptr_t)pageDirectory & PAGE_LARGE) {
-            //Skip large page
-            continue;
-        }
-
         for(int j = 0; j < 512; j++) {
             uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[j] & PAGE_MASK);
             //printf("Page table: %d: 0x%x\n", j, pageTable);
 
-            if(pageTable == KERNEL_MEMORY) {
+            if((uintptr_t)pageTable & PAGE_LARGE) {
+                //Skip large page
+                continue;
+            }
+
+            if(pageDirectory[j] == 0) {
                 if(baseAddress == 0) {
                     //free page table means free page, lets calculate offset
                     baseAddress = (0x40000000UL * i) + (0x200000UL * j);
@@ -310,15 +314,10 @@ void* get_free_page(size_t len) {
                 continue;
             }
 
-            if((uintptr_t)pageTable & PAGE_LARGE) {
-                //Skip large page
-                continue;
-            }
-
             for(int k = 0; k < 512; k++) {
                 uint64_t page = pageTable[k];
 
-                if(page != 0 && page != KERNEL_MEMORY) {
+                if(page != 0 && pageTable[k] != KERNEL_MEMORY) {
                     baseAddress = 0;
                     freeMemory = 0;
 
@@ -561,10 +560,20 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
     for(int i = 0; i < 511; i++) {
         uint64_t* pageDirectoryPointerOld = memmgr_get_from_physical(pageMapOld[i] & PAGE_MASK);
 
-        if(pageDirectoryPointerOld == KERNEL_MEMORY) {
+        if(pageMapOld[i] & PAGE_LARGE) {
+            //Large page, just copy
+            printf("Copying PDPT %d\n", i);
+            printf("Copying large pdpt\n");
+
+            pageMapNew[i] = pageMapOld[i];
             continue;
         }
 
+        if(pageMapOld[i] == 0) {
+            continue;
+        }
+
+        printf("Copying PDPT %d\n", i);
 
         if(i == 509 || i == 510) {
             //Kernel space, just copy old PDP
@@ -581,9 +590,19 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
         for(int j = 0; j < 512; j++) {
             uint64_t* pageDirectoryOld = memmgr_get_from_physical(pageDirectoryPointerOld[j] & PAGE_MASK);
 
-            if(pageDirectoryOld == KERNEL_MEMORY) {
+            if(pageDirectoryPointerOld[j] & PAGE_LARGE) {
+                //Large page, just copy
+                printf("Copying PD %d-%d\n", i, j);
+                printf("Copying large pd\n");
+                pageDirectoryPointer[j] = pageDirectoryPointerOld[j];
                 continue;
             }
+
+            if(pageDirectoryPointerOld[j] == 0) {
+                continue;
+            }
+
+            printf("Copying PD %d-%d\n", i, j);
 
             uintptr_t pd_frame = kalloc_frame();
             pageDirectoryPointer[j] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
@@ -594,9 +613,19 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
             for(int k = 0; k < 512; k++) {
                 uint64_t* pageTableOld = memmgr_get_from_physical(pageDirectoryOld[k] & PAGE_MASK);
 
-                if(pageTableOld == KERNEL_MEMORY) {
+                if(pageDirectoryOld[k] & PAGE_LARGE) {
+                    //Large page, just copy
+                    printf("Copying PT %d-%d-%d\n", i, j, k);
+                    printf("Copying large pt\n");
+                    pageDirectory[k] = pageDirectoryOld[k];
                     continue;
                 }
+
+                if(pageDirectoryOld[k] == 0) {
+                    continue;
+                }
+
+                printf("Copying PT %d-%d-%d\n", i, j, k);
 
                 uintptr_t pt_frame = kalloc_frame();
                 pageDirectory[k] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
@@ -610,6 +639,8 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
                     if(page == 0) {
                         continue;
                     }
+
+                    printf("Copying page %d-%d-%d-%d\n", i, j, k, l);
 
                     if(page & PAGE_USER) {
                         uintptr_t page_frame = kalloc_frame();
@@ -692,7 +723,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag) {
     }
 
     //Map kernel low memory
-    for(int i = 0x1000; i < 0x401000; i += 0x1000) {
+    for(int i = 0x0; i < 0x401000; i += 0x1000) {
         memmgr_phys_mark_page(ADDRESS_TO_PAGE(i));
     }
     spin_unlock(&PHYS_MEM_LOCK);
