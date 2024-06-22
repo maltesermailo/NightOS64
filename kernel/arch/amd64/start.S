@@ -148,7 +148,15 @@ _start:
 	mov eax, 0x80000001
     cpuid                 
     test edx, 1 << 29      
-    jz .NoLongMode  
+    jz .NoLongMode
+
+    mov eax, cr0
+    and ax, 0xFFFB		;clear coprocessor emulation CR0.EM
+    or ax, 0x2			;set coprocessor monitoring  CR0.MP
+    mov cr0, eax
+    mov eax, cr4
+    or ax, 3 << 9		;set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+    mov cr4, eax
 	
 	; Setup PML4
     mov edi, 0x1000    ; Set the destination index to 0x1000.
@@ -246,6 +254,8 @@ PAGE_USER     equ 1 << 2
 
     pop rdi
     pop rsi
+
+    mov rbx, 0x1000
 
     mov rax, 0xffffff0000000000
     jmp rax

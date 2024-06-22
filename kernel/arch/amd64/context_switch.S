@@ -3,6 +3,7 @@
 global setjmp
 global longjmp
 global enter_user
+global enter_user_2
 global enter_kernel
 setjmp:
     ; We get a structure containing all registers as a pointer, therefore we use that pointer on rdi
@@ -48,7 +49,7 @@ enter_user:
     mov rax, rsi
     push qword 0x20 | 0x03 ; Push stack segment
     push rax               ; Push stack pointer
-    push 0x202             ; Push EFLAGS
+    push 0x200             ; Push EFLAGS
     push qword 0x18 | 0x03 ; Push code selector
     push qword rdi         ; Push RIP
     iretq                  ; Return to userspace
@@ -62,7 +63,6 @@ enter_kernel:
 
 
 enter_user_2:
-
     mov rcx, 0xc0000082 ; Clear LSTAR, needs to be set to syscall handler later
     wrmsr
     mov rcx, 0xc0000080 ; Enable System Call Extensions
@@ -76,6 +76,6 @@ enter_user_2:
     wrmsr
 
     mov rcx, rdi ; Set RIP
-    mov r11, 0x202 ; Restore EFLAGS
+    mov r11, 0x200 ; Restore EFLAGS
     mov rsp, rsi ; Set stack
     o64 sysret ; Syscall into user mode

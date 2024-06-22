@@ -16,7 +16,7 @@ void gdt_install() {
     struct gdt* gdt;
     gdt = pointer.base;
 
-    uintptr_t addr = (uintptr_t)&gdt->tss;
+    uintptr_t addr = (uintptr_t)&tss;
 
     gdt->tss.limit_low = sizeof(tss);
     gdt->tss.base_low = (addr & 0xFFFF);

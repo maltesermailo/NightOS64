@@ -6,12 +6,15 @@
 #include "../memmgr.h"
 #include "../terminal.h"
 #include "../../libc/include/kernel/list.h"
+#include "../gdt.h"
+
 static struct process_control_block pcb; //currently the only one, we're running single core
 list_t* process_list;
 
 extern void longjmp(kernel_thread_t* thread);
 extern void enter_user(uintptr_t rip, uintptr_t rsp);
 extern void enter_kernel(uintptr_t rip, uintptr_t rsp);
+extern void enter_user_2(uintptr_t rip, uintptr_t rsp);
 
 /**
  * Small internal function to copy a mini function from the kernel to another location accessible by user space
@@ -78,6 +81,8 @@ void process_create_task(char* path, bool is_kernel) {
     memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
     spin_unlock(&process->fd_table->lock);
 
+    set_stack_pointer(process->main_thread.kernel_stack);
+
     list_insert(process_list, process);
 
     printf("Executing at 0x%x with stack 0x%x\n", process->main_thread.rip, process->main_thread.rsp);
@@ -110,6 +115,7 @@ int process_open_fd(file_node_t* node, int mode) {
     for(int i = 0; i < current->fd_table->capacity; i++) {
         if(current->fd_table->handles[i] == NULL) {
             index = i;
+            break;
         }
     }
 

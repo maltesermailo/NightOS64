@@ -11,6 +11,8 @@ isr_stub_%+%1:
     jmp isr_common
 %endmacro
 
+global isr_stub_128
+
 extern exception_handler
 
 isr_common:

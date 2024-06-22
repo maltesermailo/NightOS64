@@ -29,6 +29,7 @@ static idtr_t idtr;
 static irq_handler_t irqHandlers[16];
 
 extern void* isr_stub_table[];
+extern void* isr_stub_128;
 
 void exception_handler(regs_t * regs) {
     __asm__ volatile ("cli");
@@ -75,12 +76,12 @@ void idt_install() {
     idtr.base = (uintptr_t)&idt[0];
     idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
 
-    for (uint8_t vector = 0; vector < 35; vector++) {
+    for (uint8_t vector = 0; vector < 48; vector++) {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
     //remember to reroute this if more isrs come, rn syscall is at 48
-    idt_set_descriptor(128, isr_stub_table[48], 0x8E);
+    idt_set_descriptor(0x80, isr_stub_table[48], 0x8E | 0x60);
 
     __asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
 }

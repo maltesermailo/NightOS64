@@ -1,8 +1,12 @@
 ENTRY(_start)
 OUTPUT_FORMAT(binary)
 
+LMA = 0x800000;
+
 SECTIONS
 {
+    . = LMA;
+
     .text : AT(ADDR(.text))
     {
         _code = .;

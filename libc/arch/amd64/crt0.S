@@ -3,7 +3,9 @@
 .global _start
 _start:
 	# Set up end of the stack frame linked list.
-	movq $0, %rbp
+	mov %rsp, %rbp
+
+	movq $0, %rax
 	pushq %rbp # rip=0
 	pushq %rbp # rbp=0
 	movq %rsp, %rbp

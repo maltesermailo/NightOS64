@@ -395,7 +395,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     pic_setup();
     irq_install();
     ps2_init();
-    timer_init();
+    //timer_init();
 
     __asm__ volatile ("sti"); // set the interrupt flag
 

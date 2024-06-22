@@ -24,6 +24,7 @@ struct tss_descriptor {
     uint8_t granularity;
     uint8_t base_high;
     uint32_t base_top;
+    uint32_t reserved;
 } __attribute__((packed));
 
 typedef struct tss_entry {
