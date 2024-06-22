@@ -7,6 +7,7 @@
 #include "console.h"
 #include <stdio.h>
 #include <string.h>
+#include "../terminal.h"
 
 const char CONSOLE_NAME[] = "console0\0";
 
@@ -22,7 +23,7 @@ int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t 
     char printBuffer[length];
     memcpy(printBuffer, buffer, length);
 
-    printf("%s", printBuffer);
+    terminal_write(printBuffer, length);
 
     return length;
 }
