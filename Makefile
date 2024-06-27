@@ -27,6 +27,7 @@ kernel/fs/vfs.o \
 kernel/fs/tarfs.o \
 kernel/fs/console.o \
 kernel/sys/syscall.o \
+kernel/program/elf.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

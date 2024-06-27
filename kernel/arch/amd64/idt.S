@@ -15,7 +15,15 @@ global isr_stub_128
 
 extern exception_handler
 
+%macro swapgs_if_necessary 1
+	cmp QWORD [rsp+24], 0x8
+	je swapgs_end_%1
+	swapgs
+swapgs_end_%1:
+%endmacro
+
 isr_common:
+    swapgs_if_necessary start
     push rax
     push rbx
     push rcx
@@ -51,6 +59,8 @@ isr_common:
     pop rcx
     pop rbx
     pop rax
+
+    swapgs_if_necessary end
 
     add rsp, 16
 

@@ -26,14 +26,15 @@ setjmp:
     ret ; Return to switch_task
 
 longjmp:
-    mov rsp, [RDI] ; Load stack
-    mov rbp, [RDI+8] ; Load base pointer
+    mov rsp, [RDI]    ; Load stack
+    mov rbp, [RDI+8]  ; Load base pointer
 
     mov rbx, [RDI+32] ; RBX
     mov r12, [RDI+40] ; R12
     mov r13, [RDI+48] ; R13
     mov r14, [RDI+56] ; R14
     mov r15, [RDI+64] ; R15
+    mov rax, 1
 
     jmp qword [RDI+16] ; Jump to process
 

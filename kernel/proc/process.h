@@ -9,7 +9,8 @@
 #include "../lock.h"
 
 #define PROC_FLAG_KERNEL 1
-#define PROC_FLAG_RUNNING 2
+#define PROC_FLAG_RUNNING 2 // whether the process is currently running
+#define PROC_FLAG_ON_CPU 3 // whether the process is currently on the cpu
 
 typedef unsigned long long pid_t;
 
@@ -33,6 +34,7 @@ typedef struct kernel_thread {
 
     int tid;
     int priority;
+
     uintptr_t kernel_stack;
     uintptr_t user_stack;
     struct process* process;
@@ -47,15 +49,27 @@ typedef struct file_descriptor_table {
     spin_t lock;
 } fd_table_t;
 
+typedef struct {
+    uintptr_t page_directory;
+    unsigned long heap; //Current program break
+
+    atomic_int process_count; //Count of threads still existent.
+    spin_t lock;
+} mm_struct_t;
+
 typedef struct process {
-    int id;
+    pid_t id;
 
     int uid;
     int gid;
+    int cpu; //the current cpu
+
+    pid_t tgid; //process group, this is the pid of the parent process for each process. we use that since we want to be compatible with linux apps
+    pid_t parent;
 
     int flags;
 
-    uintptr_t page_directory;
+    mm_struct_t* page_directory;
     kernel_thread_t main_thread; // this is the thread that started the process, if it is killed, the process is dead and all threads are killed
 
     fd_table_t* fd_table;
@@ -73,8 +87,9 @@ typedef struct process_control_block {
 void process_init();
 
 //Process creation functions
-void process_create_init(); //Loads the init file into memory and calls process_create_task with the start address
-void process_create_task(char* path, bool is_kernel);
+void process_create_task(char* path, bool is_kernel); //used by the kernel at load to create the init task
+void process_create_thread(void* address); //Creates kernel thread
+void process_create_idle();
 pid_t process_fork();
 
 //Process management functions
@@ -92,6 +107,7 @@ void process_close_fd(int fd);
 process_t* get_current_process();
 
 //Scheduler
-void switch_task();
+void schedule_process(process_t* process);
+void schedule();
 
 #endif //NIGHTOS_PROCESS_H

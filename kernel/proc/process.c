@@ -7,14 +7,26 @@
 #include "../terminal.h"
 #include "../../libc/include/kernel/list.h"
 #include "../gdt.h"
+#include "../../libc/include/kernel/tree.h"
+#include "../program/elf.h"
 
 static struct process_control_block pcb; //currently the only one, we're running single core
+static int id_generator = 1;
 list_t* process_list;
+tree_t* process_tree;
+list_t* thread_queue; //Queue of threads for the scheduler
 
 extern void longjmp(kernel_thread_t* thread);
+extern int setjmp(kernel_thread_t* thread);
 extern void enter_user(uintptr_t rip, uintptr_t rsp);
 extern void enter_kernel(uintptr_t rip, uintptr_t rsp);
 extern void enter_user_2(uintptr_t rip, uintptr_t rsp);
+
+_Noreturn void idle() {
+    while(1) {
+        __asm__ volatile("hlt");
+    }
+}
 
 /**
  * Small internal function to copy a mini function from the kernel to another location accessible by user space
@@ -33,6 +45,8 @@ void* copy_app_memory(void* address, size_t len, bool is_kernel) {
 
 void process_init() {
     process_list = list_create();
+    process_tree = tree_create();
+    thread_queue = list_create();
 }
 
 void process_create_task(char* path, bool is_kernel) {
@@ -43,31 +57,38 @@ void process_create_task(char* path, bool is_kernel) {
         return;
     }
 
-    char* mem = malloc(node->size);
     file_handle_t* handle = create_handle(node);
-    read(handle, mem, node->size);
-
-    free(handle);
 
     process_t* process = calloc(1, sizeof(process_t));
 
     process->id = 1;
-    process->page_directory = kalloc_frame();
-
-    memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory));
-    load_page_map(process->page_directory);
+    process->tgid = 0;
 
     pcb.core = 0;
-    pcb.current_page_map = process->page_directory;
+    pcb.current_page_map = process->page_directory->page_directory;
     pcb.current_process = process;
-    pcb.kernel_idle_process = 0;
 
     process->main_thread.process = process;
     process->main_thread.priority = 0;
-    process->main_thread.rip = copy_app_memory(mem, node->size, is_kernel);
-    process->main_thread.user_stack = mmap(0, 16384, false);
-    process->main_thread.kernel_stack = mmap(0, 16384, true);
+    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
+    process->main_thread.kernel_stack = malloc(16384) + 16384;
     process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
+
+    process->page_directory = calloc(1, sizeof(mm_struct_t));
+    process->page_directory->process_count = 1;
+    process->page_directory->page_directory = kalloc_frame();
+    spin_unlock(&process->page_directory->lock);
+
+    memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory->page_directory));
+    load_page_map(process->page_directory->page_directory);
+
+    elf_t* elf = load_elf(handle);
+    if(exec_elf(elf, 0, 0, 0)) {
+        printf("Error while loading elf file.\n");
+        return;
+    }
+
+    process->main_thread.rip = (uintptr_t)elf->entrypoint;
 
     process->uid = 0;
     process->gid = 0;
@@ -84,6 +105,7 @@ void process_create_task(char* path, bool is_kernel) {
     set_stack_pointer(process->main_thread.kernel_stack);
 
     list_insert(process_list, process);
+    tree_insert_child(process_tree, NULL, process);
 
     printf("Executing at 0x%x with stack 0x%x\n", process->main_thread.rip, process->main_thread.rsp);
 
@@ -94,12 +116,183 @@ void process_create_task(char* path, bool is_kernel) {
     }
 }
 
+void process_create_idle() {
+    process_t* process = calloc(1, sizeof(process_t));
+
+    process->id = 0;
+    process->tgid = 0;
+    process->page_directory = calloc(1, sizeof(mm_struct_t));
+    process->page_directory->process_count = 1;
+    process->page_directory->page_directory = (uintptr_t)memmgr_get_current_pml4();
+    spin_unlock(&process->page_directory->lock);
+
+    pcb.kernel_idle_process = process;
+
+    process->main_thread.process = process;
+    process->main_thread.priority = 0;
+    process->main_thread.rip = (uintptr_t) &idle;
+    process->main_thread.kernel_stack = (uintptr_t) malloc(16384);
+    process->main_thread.rsp = process->main_thread.kernel_stack;
+
+    process->uid = 0;
+    process->gid = 0;
+    process->flags = PROC_FLAG_KERNEL | PROC_FLAG_RUNNING;
+
+    process->fd_table = calloc(1, sizeof(fd_table_t));
+    process->fd_table->capacity = 8;
+    process->fd_table->length = 0;
+    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+    spin_unlock(&process->fd_table->lock);
+}
+
+pid_t process_fork() {
+    process_t* process = calloc(1, sizeof(process_t));
+    process_t* parent = get_current_process();
+
+    process->id = ++id_generator;
+    process->parent = parent->id;
+    process->tgid = 0;
+    process->page_directory = calloc(1, sizeof(mm_struct_t));
+    process->page_directory->process_count = 1;
+    process->page_directory->page_directory = kalloc_frame();
+    spin_unlock(&process->page_directory->lock);
+
+    memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory->page_directory));
+
+    process->main_thread.process = process;
+    process->main_thread.priority = parent->main_thread.priority;
+    process->main_thread.rip = parent->main_thread.rip;
+    process->main_thread.rbp = parent->main_thread.rbp;
+    process->main_thread.rbx = parent->main_thread.rbx;
+    process->main_thread.rdi = parent->main_thread.rdi;
+    process->main_thread.r12 = parent->main_thread.r12;
+    process->main_thread.r13 = parent->main_thread.r13;
+    process->main_thread.r14 = parent->main_thread.r14;
+    process->main_thread.r15 = parent->main_thread.r15;
+    process->main_thread.user_stack = parent->main_thread.user_stack;
+    process->main_thread.kernel_stack = malloc(16384) + 16384;
+    process->main_thread.rsp = parent->flags & PROC_FLAG_KERNEL ? process->main_thread.kernel_stack : process->main_thread.user_stack;
+
+    process->uid = parent->uid;
+    process->gid = parent->gid;
+    process->flags = parent->flags;
+    process->flags &= ~PROC_FLAG_RUNNING;
+    process->flags &= ~PROC_FLAG_ON_CPU;
+
+    process->fd_table = calloc(1, sizeof(fd_table_t));
+    process->fd_table->capacity = parent->fd_table->capacity;
+    process->fd_table->length = parent->fd_table->length;
+    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+
+    for(int i = 0; i < process->fd_table->capacity; i++) {
+        if(parent->fd_table->handles[i] != NULL) {
+            file_handle_t* parentHandle = parent->fd_table->handles[i];
+
+            file_handle_t* handle = calloc(1, sizeof(file_handle_t*));
+            handle->fileNode = parentHandle->fileNode;
+            handle->offset = parentHandle->offset;
+            handle->mode = parentHandle->mode;
+
+            process->fd_table->handles[i] = handle;
+        }
+    }
+
+    spin_unlock(&process->fd_table->lock);
+
+    list_insert(process_list, process);
+    tree_insert_child(process_tree, NULL, process);
+    list_insert(thread_queue, process);
+
+    return process->id;
+}
+
 uintptr_t process_get_current_pml() {
     return pcb.current_page_map;
 }
 
 void process_set_current_pml(uintptr_t pml) {
     pcb.current_page_map = pml;
+}
+
+void process_free_pml(uintptr_t pml) {
+    memmgr_clear_page_map(pml);
+}
+
+int execve(char* path, char* argv, char* envp) {
+    process_t* process = get_current_process();
+
+    if(process == NULL) return -1;
+
+    if(process->tgid != 0) {
+        return -2; //Can't replace image in thread
+    }
+
+    file_node_t* node = open(path, 0);
+
+    if(node == NULL) {
+        printf("Error: can't open %s\n", path);
+        return -1;
+    }
+
+    file_handle_t* handle = create_handle(node);
+
+    spin_lock(&process->page_directory->lock);
+    if(process->page_directory->process_count == 1) {
+        process_free_pml(process->page_directory->page_directory);
+
+        free(process->page_directory);
+    }
+
+    process->page_directory = calloc(1, sizeof(mm_struct_t));
+    process->page_directory->process_count = 1;
+    process->page_directory->page_directory = kalloc_frame();
+    spin_unlock(&process->page_directory->lock);
+    spin_lock(&process->page_directory->lock);
+
+    memmgr_clone_page_map((uint64_t *) 0x1000, (uint64_t *) process->page_directory->page_directory); //Clone from init pml
+    load_page_map(process->page_directory->page_directory);
+
+    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
+
+    process->flags = PROC_FLAG_RUNNING;
+
+    if(process->fd_table->length > 0) {
+        for(int i = 0; i < process->fd_table->capacity; i++) {
+            file_handle_t* handle = process->fd_table->handles[i];
+
+            if(handle->fileNode->file_ops.close) {
+                handle->fileNode->file_ops.close(handle->fileNode); //Signal file system driver to flush
+            }
+
+            free(handle);
+
+            process->fd_table->handles[i] = NULL;
+            process->fd_table->length--;
+        }
+
+        free(process->fd_table->handles);
+        free(process->fd_table);
+    }
+
+    process->fd_table = calloc(1, sizeof(fd_table_t));
+    process->fd_table->capacity = 32;
+    process->fd_table->length = 0;
+    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+    spin_unlock(&process->fd_table->lock);
+
+    elf_t* elf = load_elf(handle);
+    if(exec_elf(elf, 0, 0, 0)) {
+        printf("Error while loading elf file.\n");
+        return -1;
+    }
+
+    process->main_thread.rip = (uintptr_t)elf->entrypoint;
+    process->main_thread.rsp = process->main_thread.user_stack;
+
+    enter_user(process->main_thread.rip, process->main_thread.rsp);
 }
 
 int process_open_fd(file_node_t* node, int mode) {
@@ -151,4 +344,38 @@ void process_close_fd(int fd) {
 
 process_t* get_current_process() {
     return pcb.current_process;
+}
+
+process_t* get_next_process() {
+    if(thread_queue->length == 0) {
+        return NULL;
+    }
+
+    list_entry_t* entry = thread_queue->head;
+    list_remove_by_index(thread_queue, 0);
+
+    return (process_t*)entry->value;
+}
+
+void schedule() {
+    if(pcb.current_process == null) return;
+
+    if(setjmp(&pcb.current_process->main_thread)) {
+        //We are back in kernel space, resume call
+        return;
+    }
+
+    pcb.current_process = get_next_process();
+
+    if(pcb.current_process == null) {
+        pcb.current_process = pcb.kernel_idle_process;
+
+        longjmp(&pcb.kernel_idle_process->main_thread);
+    }
+
+    longjmp(&pcb.current_process->main_thread);
+}
+
+void schedule_process(process_t* process) {
+    list_insert(thread_queue, process);
 }

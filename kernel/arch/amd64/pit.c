@@ -5,6 +5,7 @@
 #include "io.h"
 #include "../../idt.h"
 #include "../../terminal.h"
+#include "../../proc/process.h"
 
 #define PIT0 0x40
 #define PIT1 0x41
@@ -19,10 +20,9 @@ static uint64_t counter = 0;
 void pit_interrupt(regs_t* regs) {
     counter++;
 
-    if(counter % 100 == 0) {
-        printf("1s passed\n");
-    }
+    if(regs->cs == 0x08) return;
 
+    schedule();
     pic_sendEOI(0);
 }
 

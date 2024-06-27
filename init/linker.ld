@@ -1,5 +1,4 @@
 ENTRY(_start)
-OUTPUT_FORMAT(binary)
 
 LMA = 0x800000;
 

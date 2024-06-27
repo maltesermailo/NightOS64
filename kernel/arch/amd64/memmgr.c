@@ -182,6 +182,10 @@ void* memmgr_get_from_physical(uintptr_t physAddr) {
 extern void load_page_map0(uintptr_t pageMap);
 
 void load_page_map(uintptr_t pageMap) {
+    if(pageMap == 0) {
+        pageMap = 0x1000;
+    }
+
     asm volatile (
             "movq %0, %%cr3"
             : : "r"((uintptr_t)pageMap));
@@ -434,7 +438,7 @@ void memmgr_reload(uintptr_t addr) {
  */
 void* mmap(void* addr, size_t len, bool is_kernel) {
     //Page-align
-    if(!((uintptr_t)addr & (PAGE_SIZE - 1)) && addr != 0) {
+    if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
         addr = (uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
     }
 
@@ -505,6 +509,40 @@ void munmap(void* addr, size_t len) {
         memmgr_delete_page((uintptr_t)addr + 0x1000 * i);
         memmgr_reload(addr + 0x1000 * i);
     }
+}
+
+void memmgr_clear_page_map(uintptr_t pageMap) {
+    uint64_t* pageMapVirt = memmgr_get_from_physical(pageMap);
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMapVirt[0] & PAGE_MASK);
+
+    for(int i = 0; i < 512; i++) {
+        if(!(pageDirectoryPointer[i] & PAGE_PRESENT)) {
+            continue;
+        }
+
+        if(pageDirectoryPointer[i] & PAGE_LARGE) {
+            continue;
+        }
+
+        uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i] & PAGE_MASK);
+
+        for(int j = 0; j < 512; j++) {
+            if(!(pageDirectory[j] & PAGE_PRESENT)) {
+                continue;
+            }
+
+            if(pageDirectory[j] & PAGE_LARGE) {
+                continue;
+            }
+
+            kfree_frame(pageDirectory[j]);
+        }
+
+        kfree_frame(pageDirectoryPointer[i]);
+    }
+
+    kfree_frame(pageMapVirt[0]);
+    kfree_frame((uintptr_t) pageMap);
 }
 
 /***
