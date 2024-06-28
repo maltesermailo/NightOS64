@@ -4,8 +4,10 @@
 
 #include "pci.h"
 #include <stddef.h>
+#include <string.h>
 #include "../terminal.h"
 #include "../arch/amd64/io.h"
+#include "../memmgr.h"
 
 static pci_device_t pciDevices[65536];
 
@@ -24,6 +26,54 @@ uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offs
     outl(0xCF8, address);
     tmp = (uint16_t)((inl(0xCFC) >> ((offset & 2) * 8)) & 0xFFFF);
     return tmp;
+}
+
+void pciConfigWriteDword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t value) {
+    uint32_t address;
+    uint32_t lbus  = (uint32_t)bus;
+    uint32_t lslot = (uint32_t)slot;
+    uint32_t lfunc = (uint32_t)func;
+    uint16_t tmp = 0;
+
+    // Create configuration address
+    address = (uint32_t)((lbus << 16) | (lslot << 11) |
+                         (lfunc << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
+
+    // Write out the address
+    outl(0xCF8, address);
+    outl(0xCFC, value);
+}
+
+void pciConfigWriteWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t value) {
+    uint32_t address;
+    uint32_t lbus  = (uint32_t)bus;
+    uint32_t lslot = (uint32_t)slot;
+    uint32_t lfunc = (uint32_t)func;
+    uint16_t tmp = 0;
+
+    // Create configuration address
+    address = (uint32_t)((lbus << 16) | (lslot << 11) |
+                         (lfunc << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
+
+    // Write out the address
+    outl(0xCF8, address);
+    outw(0xCFC, value);
+}
+
+void pciConfigWriteByte(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t value) {
+    uint32_t address;
+    uint32_t lbus  = (uint32_t)bus;
+    uint32_t lslot = (uint32_t)slot;
+    uint32_t lfunc = (uint32_t)func;
+    uint16_t tmp = 0;
+
+    // Create configuration address
+    address = (uint32_t)((lbus << 16) | (lslot << 11) |
+                         (lfunc << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
+
+    // Write out the address
+    outl(0xCF8, address);
+    outb(0xCFC, value);
 }
 
 bool pciCheckVendor(uint8_t bus, uint8_t slot) {
@@ -126,7 +176,87 @@ pci_device_t pci_find_first_by_type(uint8_t type, uint8_t subtype) {
     }
 }
 
-void pci_init() {
+bool doChecksum(ACPISDTHeader *tableHeader)
+{
+    unsigned char sum = 0;
+
+    for (int i = 0; i < tableHeader->Length; i++)
+    {
+        sum += ((char *) tableHeader)[i];
+    }
+
+    return sum == 0;
+}
+
+bool doChecksumXSDP(XSDP_t *tableHeader)
+{
+    unsigned char sum = 0;
+
+    for (int i = 0; i < sizeof(RSDP_t); i++)
+    {
+        sum += ((char *) tableHeader)[i];
+    }
+
+    if(sum != 0) {
+        return false;
+    }
+
+    sum = 0;
+
+    for (int i = sizeof(RSDP_t); i < sizeof(XSDP_t); i++)
+    {
+        sum += ((char *) tableHeader)[i];
+    }
+
+    return sum == 0;
+}
+
+bool doChecksumRSDP(RSDP_t *tableHeader)
+{
+    unsigned char sum = 0;
+
+
+    for (int i = 0; i < sizeof(RSDP_t); i++)
+    {
+        sum += ((char *) tableHeader)[i];
+    }
+
+    return sum == 0;
+}
+
+void pci_init(RSDP_t* rsdp) {
+    if(!doChecksumRSDP(rsdp)) {
+        printf("Warning: ACPI XSDP wrong checksum");
+
+        return;
+    }
+
+    RSDT* rsdt = (RSDT*) memmgr_get_from_physical(rsdp->RsdtAddress);
+    if(!doChecksum(&rsdt->h)) {
+        printf("Warning: ACPI XSDT wrong checksum");
+
+        return;
+    }
+
+    uintptr_t entries = (rsdt->h.Length - sizeof(rsdt->h)) / 4;
+    for(uintptr_t i = 0; i < entries; i++) {
+        ACPISDTHeader *h = (ACPISDTHeader *) memmgr_get_from_physical(rsdt->PointerToOtherSDT[i]);
+        if (!strncmp(h->Signature, "MCFG", 4)) {
+            MCFG* mcfg = (MCFG*) memmgr_get_from_physical(rsdt->PointerToOtherSDT[i]);
+
+            if(!doChecksum(&mcfg->h)) {
+                printf("Warning: ACPI MCFG wrong checksum");
+
+                return;
+            }
+
+            uintptr_t mcfgEntries = (mcfg->h.Length - 44) / 16;
+            for(uintptr_t j = 0; j < mcfgEntries; j++) {
+                printf("PCIe base address: %d\n", mcfg->csba[j].base);
+            }
+        }
+    }
+
     for(int i = 0; i < 65536; i++) {
         //Set all PCI devices as unclassified and therefore not interested
         pciDevices[i].type = 0xFF;

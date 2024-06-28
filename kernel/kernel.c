@@ -18,6 +18,7 @@
 #include "serial.h"
 #include "fs/tarfs.h"
 #include "fs/console.h"
+#include "acpi.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -64,6 +65,8 @@ size_t terminal_row;
 size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
+RSDP_t* rsdp;
+
 
 void terminal_initialize(void)
 {
@@ -335,7 +338,7 @@ void kernel_main(unsigned long magic, unsigned long header)
          tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                          + ((tag->size + 7) & ~7)))
     {
-        //printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
         switch (tag->type)
         {
             case MULTIBOOT_TAG_TYPE_CMDLINE:
@@ -378,6 +381,12 @@ void kernel_main(unsigned long magic, unsigned long header)
                         = (struct multiboot_tag_framebuffer *) tag;
                 void *fb = (void *) (unsigned long) tagfb->common.framebuffer_addr;
             }
+            break;
+            case MULTIBOOT_TAG_TYPE_ACPI_OLD:
+            {
+                struct multiboot_tag_old_acpi* acpi = (struct multiboot_tag_old_acpi*) tag;
+                rsdp = (RSDP_t *) &acpi->rsdp;
+            }
         }
     }
 
@@ -400,7 +409,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     __asm__ volatile ("sti"); // set the interrupt flag
 
     //Init pci
-    pci_init();
+    pci_init(rsdp);
 
 	//terminal_writestring("Hello Kernel\n");
 

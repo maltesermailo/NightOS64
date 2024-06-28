@@ -64,10 +64,6 @@ void process_create_task(char* path, bool is_kernel) {
     process->id = 1;
     process->tgid = 0;
 
-    pcb.core = 0;
-    pcb.current_page_map = process->page_directory->page_directory;
-    pcb.current_process = process;
-
     process->main_thread.process = process;
     process->main_thread.priority = 0;
     process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
@@ -76,11 +72,15 @@ void process_create_task(char* path, bool is_kernel) {
 
     process->page_directory = calloc(1, sizeof(mm_struct_t));
     process->page_directory->process_count = 1;
-    process->page_directory->page_directory = kalloc_frame();
+    process->page_directory->page_directory = 0x1000;
     spin_unlock(&process->page_directory->lock);
 
-    memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory->page_directory));
-    load_page_map(process->page_directory->page_directory);
+    //memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory->page_directory));
+    //load_page_map(process->page_directory->page_directory);
+
+    pcb.core = 0;
+    pcb.current_page_map = process->page_directory->page_directory;
+    pcb.current_process = process;
 
     elf_t* elf = load_elf(handle);
     if(exec_elf(elf, 0, 0, 0)) {

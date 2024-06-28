@@ -28,8 +28,9 @@ void memmgr_clear_page_map(uintptr_t pageMap);
 void load_page_map(uintptr_t pageMap);
 
 void* memmgr_get_from_virtual(uintptr_t virtAddr);
+void* memmgr_get_from_physical(uintptr_t physAddr);
 
-void* memcpy(void* __restrict, const void* __restrict, size_t);
+        void* memcpy(void* __restrict, const void* __restrict, size_t);
 void* memset(void*, int, size_t);
 
 void* sbrk(intptr_t len);

@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../acpi.h"
 
 typedef struct PCIDevice {
     uint8_t type;
@@ -26,7 +27,7 @@ typedef struct PCIDevice {
     uint16_t deviceId;
 } pci_device_t;
 
-void pci_init();
+void pci_init(RSDP_t* rsdp);
 pci_device_t pci_find_first_by_type(uint8_t type, uint8_t subtype);
 
 #endif //NIGHTOS_PCI_H
