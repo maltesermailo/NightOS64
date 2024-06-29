@@ -170,6 +170,60 @@ typedef struct tagFIS_DMA_SETUP
 
 } FIS_DMA_SETUP;
 
+typedef uint16_t FIS_DEV_BITS;
+
+typedef volatile struct tagHBA_FIS
+{
+    // 0x00
+    FIS_DMA_SETUP	dsfis;		// DMA Setup FIS
+    uint8_t         pad0[4];
+
+    // 0x20
+    FIS_PIO_SETUP	psfis;		// PIO Setup FIS
+    uint8_t         pad1[12];
+
+    // 0x40
+    FIS_REG_D2H	rfis;		// Register – Device to Host FIS
+    uint8_t         pad2[4];
+
+    // 0x58
+    FIS_DEV_BITS	sdbfis;		// Set Device Bit FIS
+
+    // 0x60
+    uint8_t         ufis[64];
+
+    // 0xA0
+    uint8_t   	rsv[0x100-0xA0];
+} HBA_FIS;
+
+typedef struct tagHBA_CMD_HEADER
+{
+    // DW0
+    uint8_t  cfl:5;		// Command FIS length in DWORDS, 2 ~ 16
+    uint8_t  a:1;		// ATAPI
+    uint8_t  w:1;		// Write, 1: H2D, 0: D2H
+    uint8_t  p:1;		// Prefetchable
+
+    uint8_t  r:1;		// Reset
+    uint8_t  b:1;		// BIST
+    uint8_t  c:1;		// Clear busy upon R_OK
+    uint8_t  rsv0:1;		// Reserved
+    uint8_t  pmp:4;		// Port multiplier port
+
+    uint16_t prdtl;		// Physical region descriptor table length in entries
+
+    // DW1
+    volatile
+    uint32_t prdbc;		// Physical region descriptor byte count transferred
+
+    // DW2, 3
+    uint32_t ctba;		// Command table descriptor base address
+    uint32_t ctbau;		// Command table descriptor base address upper 32 bits
+
+    // DW4 - 7
+    uint32_t rsv1[4];	// Reserved
+} HBA_CMD_HEADER;
+
 typedef volatile struct tagHBA_PORT
 {
     uint32_t clb;		// 0x00, command list base address, 1K-byte aligned
@@ -193,11 +247,34 @@ typedef volatile struct tagHBA_PORT
     uint32_t vendor[4];	// 0x70 ~ 0x7F, vendor specific
 } HBA_PORT;
 
+typedef volatile struct tagHBA_MEM_CAP {
+    uint32_t S64A : 1; //Whether 64-bit addresses are supported
+    uint32_t SNCQ : 1; //Supports native command queueing
+    uint32_t SSNTF: 1; //Supports Snotification Register
+    uint32_t SMPS : 1; //Supports Mechanical Presence Switch
+    uint32_t SSS  : 1; //Supports Staggered Spin-Up
+    uint32_t SALP : 1; //Supports Aggressive Link Power Management
+    uint32_t SAL  : 1; //Supports Activity LED
+    uint32_t SCLO : 1; //Supports Command List Override
+    uint32_t ISS  : 4; //Interface Speed Support; 0x1 = Gen1(1.5 Gpbs), 0x2 = Gen2 (3 Gbps), 0x3 = Gen3 (6 Gbps)
+    uint32_t res0 : 1;
+    uint32_t SAM  : 1; //Supports only AHCI mode
+    uint32_t SPM  : 1; //Supports Port Multiplier
+    uint32_t FBSS : 1; //Supports FIS-based switching
+    uint32_t PMD  : 1; //PIO Multiple DRQ Block
+    uint32_t SSC  : 1; //Slumber State capable
+    uint32_t PSC  : 1; //Partial state capable;
+    uint32_t NCS  : 5; //Number of command slots per port
+    uint32_t CCCS : 1; //Command completeion coalescing supported
+    uint32_t EMS  : 1; //Enclosure Managment Supported
+    uint32_t SXS  : 1; //Supports External SATA
+    uint32_t NP   : 5; //Number of ports
+} HBA_MEM_CAP;
 
 typedef volatile struct tagHBA_MEM
 {
     // 0x00 - 0x2B, Generic Host Control
-    uint32_t cap;		// 0x00, Host capability
+    HBA_MEM_CAP cap;		// 0x00, Host capability
     uint32_t ghc;		// 0x04, Global host control
     uint32_t is;		// 0x08, Interrupt status
     uint32_t pi;		// 0x0C, Port implemented
@@ -218,4 +295,34 @@ typedef volatile struct tagHBA_MEM
     // 0x100 - 0x10FF, Port control registers
     HBA_PORT	ports[1];	// 1 ~ 32
 } HBA_MEM;
+
+
+typedef struct tagHBA_PRDT_ENTRY
+{
+    uint32_t dba;		// Data base address
+    uint32_t dbau;		// Data base address upper 32 bits
+    uint32_t rsv0;		// Reserved
+
+    // DW3
+    uint32_t dbc:22;		// Byte count, 4M max
+    uint32_t rsv1:9;		// Reserved
+    uint32_t i:1;		// Interrupt on completion
+} HBA_PRDT_ENTRY;
+
+typedef struct tagHBA_CMD_TBL
+{
+    // 0x00
+    uint8_t  cfis[64];	// Command FIS
+
+    // 0x40
+    uint8_t  acmd[16];	// ATAPI command, 12 or 16 bytes
+
+    // 0x50
+    uint8_t  rsv[48];	// Reserved
+
+    // 0x80
+    HBA_PRDT_ENTRY	prdt_entry[1];	// Physical region descriptor table entries, 0 ~ 65535
+} HBA_CMD_TBL;
+
+void ahci_setup(void* abar);
 #endif //NIGHTOS_AHCI_H

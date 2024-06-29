@@ -8,6 +8,7 @@
 #include "../terminal.h"
 #include "../arch/amd64/io.h"
 #include "../memmgr.h"
+#include "ahci.h"
 
 static pci_device_t pciDevices[65536];
 static uint8_t* pciBase;
@@ -479,6 +480,9 @@ void pci_init(RSDP_t* rsdp) {
                     command &= ~PCI_COMMAND_INTERRUPT_DISABLE;
 
                     pcieConfigWriteWord(device.bus, device.deviceId, device.function, 0x4, command);
+
+                    uint32_t abar = pcieConfigReadDWord(device.bus, device.deviceId, device.function, 0x24);
+                    ahci_setup((void *) abar);
                 }
             }
         }
