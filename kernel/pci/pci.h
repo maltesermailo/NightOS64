@@ -15,6 +15,11 @@
 #include <stdbool.h>
 #include "../acpi.h"
 
+#define PCI_COMMAND_IO_SPACE 1 << 0
+#define PCI_COMMAND_MEMORY_SPACE 1 << 1
+#define PCI_COMMAND_BUS_MASTER 1 << 2
+#define PCI_COMMAND_INTERRUPT_DISABLE 1 << 10
+
 typedef struct PCIDevice {
     uint8_t type;
     uint8_t subclass;
@@ -22,6 +27,7 @@ typedef struct PCIDevice {
     int bus;
     int slot;
     int function;
+    int progif;
 
     uint16_t vendorId;
     uint16_t deviceId;

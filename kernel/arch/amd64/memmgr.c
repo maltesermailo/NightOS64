@@ -19,9 +19,12 @@
 #define PAGE_WRITABLE 1 << 1
 #define PAGE_USER 1 << 2
 #define PAGE_LARGE 1 << 7
+#define PAGE_NOCACHE 1 << 4
+#define PAGE_WRITE_THROUGH 1 << 3
 
 /* Kernel memory base */
 #define KERNEL_MEMORY 0xfffffe8000000000ull
+#define MMIO_MEMORY   0xfffffe0000000000ull
 /* Defines the offset from virtual memory to physical memory */
 #define LOW_MEMORY 0x7fffffffffull
 
@@ -177,6 +180,10 @@ void* memmgr_get_from_virtual(uintptr_t virtAddr) {
  */
 void* memmgr_get_from_physical(uintptr_t physAddr) {
     return (physAddr | KERNEL_MEMORY);
+}
+
+void* memmgr_get_mmio(uintptr_t physAddr) {
+    return (physAddr | MMIO_MEMORY);
 }
 
 extern void load_page_map0(uintptr_t pageMap);
@@ -353,21 +360,21 @@ void memmgr_delete_page(uintptr_t virtualAddr) {
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
     uint64_t* pageMap = memmgr_get_current_pml4();
-    uint64_t* pageDirectoryPointer = pageMap[INDEX_PML4];
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
-    if(pageDirectoryPointer == 0 || (uintptr_t)pageDirectoryPointer & PAGE_LARGE) {
+    if(pageDirectoryPointer == 0 || (uintptr_t)pageMap[INDEX_PML4] & PAGE_LARGE) {
         return;
     }
 
-    uint64_t* pageDirectory = pageDirectoryPointer[INDEX_PDP];
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
-    if(pageDirectory == 0 ||(uintptr_t) pageDirectory & PAGE_LARGE) {
+    if(pageDirectory == 0 ||(uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
         return;
     }
 
-    uint64_t* pageTable = pageDirectory[INDEX_PD];
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
-    if(pageTable == 0 || (uintptr_t)pageTable & PAGE_LARGE) {
+    if(pageTable == 0 || (uintptr_t)pageDirectory[INDEX_PD] & PAGE_LARGE) {
         return;
     }
 
@@ -385,9 +392,9 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
     uint64_t INDEX_PT = PT_INDEX(virtual_addr);
 
     uint64_t* pageMap = memmgr_get_current_pml4();
-    uint64_t* pageDirectoryPointer = pageMap[INDEX_PML4];
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
-    if(pageDirectoryPointer == 0) {
+    if(pageMap[INDEX_PML4] == 0) {
         uintptr_t pdp_frame = kalloc_frame();
 
         if(pdp_frame == UINT64_MAX) {
@@ -396,25 +403,27 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
 
         pageMap[INDEX_PML4] = pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
-        pageDirectoryPointer = pdp_frame | KERNEL_MEMORY;
+        pageDirectoryPointer = (uint64_t*)(pdp_frame | KERNEL_MEMORY);
     }
 
-    uint64_t* pageDirectory = pageDirectoryPointer[INDEX_PDP];
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
-    if(pageDirectory == 0) {
+    if(pageDirectoryPointer[INDEX_PDP] == 0) {
         uintptr_t pd_frame = kalloc_frame();
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
-        pageDirectory = pd_frame | KERNEL_MEMORY;
+        pageDirectory = (uint64_t*)(pd_frame | KERNEL_MEMORY);
     }
 
-    uint64_t* pageTable = pageDirectory[INDEX_PD];
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
-    if(pageTable == 0) {
+    if(pageDirectory[INDEX_PD] == 0) {
         uintptr_t pt_frame = kalloc_frame();
-        pageDirectory[INDEX_PDP] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
+        pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
-        pageTable = pt_frame | KERNEL_MEMORY;
+        //printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
+
+        pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
     }
 
     pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | flags;
@@ -428,6 +437,30 @@ void memmgr_reload(uintptr_t addr) {
     asm volatile (
             "invlpg (%0)"
             : : "r"(addr));
+}
+
+void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel) {
+    if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
+        addr = (uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
+    }
+
+    int flags = PAGE_WRITABLE | PAGE_NOCACHE;
+    if(!is_kernel) flags |= PAGE_USER;
+
+    uintptr_t start_addr = MMIO_MEMORY + addr;
+
+    size_t count = len / 4096;
+    if(len % 4096 != 0) {
+        count++;
+    }
+
+    for(size_t i = 0; i < count+1; i++) {
+        memmgr_map_frame_to_virtual(addr + 0x1000 * i, start_addr + 0x1000 * i, flags);
+        memmgr_reload(start_addr + 0x1000 * i);
+        printf("Mapped %d\n", i);
+    }
+
+    return start_addr;
 }
 
 /**
@@ -613,7 +646,7 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
 
         printf("Copying PDPT %d\n", i);
 
-        if(i == 509 || i == 510) {
+        if(i == 508 || i == 509 || i == 510) {
             //Kernel space, just copy old PDP
             pageMapNew[i] = pageMapOld[i];
             continue;

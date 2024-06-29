@@ -25,6 +25,9 @@ void* memmgr_get_current_pml4();
 void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags);
 void memmgr_clear_page_map(uintptr_t pageMap);
 
+void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel);
+void* memmgr_get_mmio(uintptr_t addr);
+
 void load_page_map(uintptr_t pageMap);
 
 void* memmgr_get_from_virtual(uintptr_t virtAddr);

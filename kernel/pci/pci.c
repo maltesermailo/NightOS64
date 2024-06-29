@@ -10,6 +10,9 @@
 #include "../memmgr.h"
 
 static pci_device_t pciDevices[65536];
+static uint8_t* pciBase;
+
+/////////////////////////////LEGACY CODE/////////////////////////////////////////////
 
 uint16_t pciConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
     uint32_t address;
@@ -139,7 +142,7 @@ void checkFunction(uint8_t bus, uint8_t device, uint8_t function) {
 void checkDevice(uint8_t bus, uint8_t device) {
     uint8_t function = 0;
 
-    uint8_t vendorId = getVendorID(bus, device, function);
+    uint16_t vendorId = getVendorID(bus, device, function);
     if(vendorId == 0xFFFF) return;
     checkFunction(bus, device, function);
 
@@ -161,6 +164,29 @@ void checkBus(uint8_t bus) {
         checkDevice(bus, device);
     }
 }
+
+void pci_probe_legacy() {
+    //Probe PCI
+    uint8_t function;
+    uint8_t bus;
+    uint8_t headerType;
+
+    headerType = getHeaderType(0, 0, 0);
+    if ((headerType & 0x80) == 0) {
+        printf("[PCI] Found Single PCI Host controller\n");
+        // Single PCI host controller
+        checkBus(0);
+    } else {
+        // Multiple PCI host controllers
+        for (function = 0; function < 8; function++) {
+            if (getVendorID(0, 0, function) != 0xFFFF) break;
+            bus = function;
+            checkBus(bus);
+        }
+    }
+}
+
+/////////////////////////END LEGACY CODE/////////////////////////////////////////////
 
 pci_device_t pci_find_first_by_type(uint8_t type, uint8_t subtype) {
     for(int i = 0; i < 65536; i++) {
@@ -224,6 +250,157 @@ bool doChecksumRSDP(RSDP_t *tableHeader)
     return sum == 0;
 }
 
+uint8_t pcieConfigReadByte(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    return (*address);
+}
+
+uint16_t pcieConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    return (*address);
+}
+
+uint32_t pcieConfigReadDWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    return (*address);
+}
+
+void pcieConfigWriteByte(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint8_t value) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    *address = value;
+}
+
+void pcieConfigWriteWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint16_t value) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    *address = value;
+}
+
+void pcieConfigWriteDWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint32_t value) {
+    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+
+    *address = value;
+}
+
+uint16_t pcieGetVendorID(uint8_t bus, uint8_t device, uint8_t function) {
+    return pcieConfigReadWord(bus, device, function, 0);
+}
+
+uint8_t pcieGetHeaderType(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0xe);
+
+    //First 8 bits are header type
+    return (uint8_t)(out & 0xFF);
+}
+
+uint8_t pcieGetBaseClass(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0xa);
+
+    //Second 8 bits are base class
+    return (uint8_t)((out >> 8) & 0xFF);
+}
+
+uint8_t pcieGetSubClass(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0xa);
+
+    //First 8 bits are sub class
+    return (uint8_t)(out & 0xFF);
+}
+
+uint8_t pcieGetProgIf(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0x8);
+
+    //First 8 bits are sub class
+    return (uint8_t)((out >> 8) & 0xFF);
+}
+
+uint8_t pcieBusGetPrimary(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0x18);
+
+    //First 8 bits are primary bus
+    return (uint8_t)(out & 0xFF);
+}
+
+uint8_t pcieBusGetSecondary(uint8_t bus, uint8_t device, uint8_t function) {
+    uint16_t out;
+
+    out = pcieConfigReadWord(bus, device, function, 0x18);
+
+    //Second 8 bits are base class
+    return (uint8_t)((out >> 8) & 0xFF);
+}
+
+void checkFunctionPCIe(uint8_t bus, uint8_t device, uint8_t function) {
+    uint8_t baseClass;
+    uint8_t subClass;
+    uint8_t vendorId;
+    uint8_t progIf;
+
+    baseClass = pcieGetBaseClass(bus, device, function);
+    subClass = pcieGetSubClass(bus, device, function);
+    vendorId = pcieGetVendorID(bus, device, function);
+    progIf = pcieGetProgIf(bus, device, function);
+    if ((baseClass == 0x6) && (subClass == 0x4)) {
+        printf("test\n");
+        uint8_t primaryBus;
+        uint8_t secondaryBus;
+        secondaryBus = pcieBusGetSecondary(bus, device, function);
+        primaryBus = pcieBusGetPrimary(bus, device, function);
+
+        printf("[PCIe] Found PCI-to-PCI Bridge at primary bus%d, secondary bus %d\n", primaryBus, secondaryBus);
+        for(int device = 0; device < 32; device++) {
+            checkDevice(secondaryBus, device);
+        }
+    }
+
+    printf("[PCI] Found PCI device %d, %d, %d, %d at %d,%d,%d\n", baseClass, subClass, progIf, vendorId, bus, device, function);
+
+    pciDevices[256 * bus + 32 * device + function].type = baseClass;
+    pciDevices[256 * bus + 32 * device + function].subclass = subClass;
+    pciDevices[256 * bus + 32 * device + function].bus = bus;
+    pciDevices[256 * bus + 32 * device + function].slot = device;
+    pciDevices[256 * bus + 32 * device + function].function = function;
+    pciDevices[256 * bus + 32 * device + function].vendorId = vendorId;
+}
+
+void checkDevicePCIe(uint8_t bus, uint8_t device) {
+    uint8_t function = 0;
+
+    uint16_t vendorId = pcieGetVendorID(bus, device, function);
+    if(vendorId == 0xFFFF) return;
+    checkFunctionPCIe(bus, device, function);
+
+    uint8_t headerType = pcieGetHeaderType(bus, device, function);
+
+    if((headerType & 0x80) != 0) {
+        for(function = 1; function < 8; function++) {
+            if(getVendorID(bus, device, function) != 0xFFFF) {
+                checkFunctionPCIe(bus, device, function);
+            }
+        }
+    }
+}
+
 void pci_init(RSDP_t* rsdp) {
     if(!doChecksumRSDP(rsdp)) {
         printf("Warning: ACPI XSDP wrong checksum");
@@ -252,7 +429,9 @@ void pci_init(RSDP_t* rsdp) {
 
             uintptr_t mcfgEntries = (mcfg->h.Length - 44) / 16;
             for(uintptr_t j = 0; j < mcfgEntries; j++) {
-                printf("PCIe base address: %d\n", mcfg->csba[j].base);
+                printf("PCIe base address: %x\n", mcfg->csba[j].base);
+
+                pciBase = (uint8_t *) memmgr_get_from_physical(mcfg->csba[j].base);
             }
         }
     }
@@ -267,17 +446,41 @@ void pci_init(RSDP_t* rsdp) {
     uint8_t bus;
     uint8_t headerType;
 
-    headerType = getHeaderType(0, 0, 0);
+    headerType = pcieGetHeaderType(0, 0, 0);
     if ((headerType & 0x80) == 0) {
         printf("[PCI] Found Single PCI Host controller\n");
         // Single PCI host controller
-        checkBus(0);
+        for(int device = 0; device < 32; device++) {
+            checkDevicePCIe(0, device);
+        }
     } else {
         // Multiple PCI host controllers
         for (function = 0; function < 8; function++) {
             if (getVendorID(0, 0, function) != 0xFFFF) break;
             bus = function;
-            checkBus(bus);
+            for(int device = 0; device < 32; device++) {
+                checkDevicePCIe(bus, device);
+            }
+        }
+    }
+
+    //Setup PCI devices
+    for(int i = 0; i < 65536; i++) {
+        struct PCIDevice device = pciDevices[i];
+
+        //Mass storage
+        if(device.type == 1) {
+            //SATA
+            if(device.subclass == 6) {
+                //AHCI 1.0
+                if(device.progif == 1) {
+                    uint16_t command = pcieConfigReadWord(device.bus, device.deviceId, device.function, 0x4);
+                    command |= PCI_COMMAND_BUS_MASTER | PCI_COMMAND_MEMORY_SPACE;
+                    command &= ~PCI_COMMAND_INTERRUPT_DISABLE;
+
+                    pcieConfigWriteWord(device.bus, device.deviceId, device.function, 0x4, command);
+                }
+            }
         }
     }
 }
