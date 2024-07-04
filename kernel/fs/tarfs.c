@@ -452,6 +452,7 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
     tar_t* current = NULL;
     tar_t* previous = NULL;
 
+    char* newMem = malloc(bufsize); //Allocate new space, since old one might overlap
     char* buf = (char*) ptr;
 
     bool read = true;

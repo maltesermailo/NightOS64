@@ -24,6 +24,7 @@ extern void enter_user_2(uintptr_t rip, uintptr_t rsp);
 
 _Noreturn void idle() {
     while(1) {
+        __asm__ volatile("sti"); //Enable interrupts while waiting.
         __asm__ volatile("hlt");
     }
 }
@@ -64,12 +65,6 @@ void process_create_task(char* path, bool is_kernel) {
     process->id = 1;
     process->tgid = 0;
 
-    process->main_thread.process = process;
-    process->main_thread.priority = 0;
-    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
-    process->main_thread.kernel_stack = malloc(16384) + 16384;
-    process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
-
     process->page_directory = calloc(1, sizeof(mm_struct_t));
     process->page_directory->process_count = 1;
     process->page_directory->page_directory = 0x1000;
@@ -88,6 +83,11 @@ void process_create_task(char* path, bool is_kernel) {
         return;
     }
 
+    process->main_thread.process = process;
+    process->main_thread.priority = 0;
+    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
+    process->main_thread.kernel_stack = malloc(16384) + 16384;
+    process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
     process->main_thread.rip = (uintptr_t)elf->entrypoint;
 
     process->uid = 0;
@@ -359,6 +359,7 @@ process_t* get_next_process() {
 
 void schedule() {
     if(pcb.current_process == null) return;
+    printf("Hi scheduler");
 
     if(setjmp(&pcb.current_process->main_thread)) {
         //We are back in kernel space, resume call

@@ -1,6 +1,6 @@
 # OS Build File
-CFLAGS := -mno-avx -mno-sse -mno-sse2 -g
-LDFLAGS :=-O2
+CFLAGS := -mno-avx -mno-sse -mno-sse2 -g -fPIC
+LDFLAGS :=-O2 -fPIC
 NASM = nasm
 BUILDDIR=build
 CC=x86_64-nightos-gcc
@@ -36,7 +36,6 @@ clean:
 install: install-app
 
 install-app: init
-	cp init ../isodir/boot/nightos.kernel
-	cp grub.cfg ../isodir/boot/grub/grub.cfg
+	cp init ../initd
 
 -include $(OBJS:.o=.d)

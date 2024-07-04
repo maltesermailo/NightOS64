@@ -6,5 +6,7 @@
 #define NIGHTOS_TIMER_H
 
 void timer_init();
+void ksleep(int milliseconds);
+unsigned long get_counter();
 
 #endif //NIGHTOS_TIMER_H

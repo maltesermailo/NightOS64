@@ -9,12 +9,11 @@ setjmp:
     ; We get a structure containing all registers as a pointer, therefore we use that pointer on rdi
     ; 0 = stack pointer
     ; 8 = base pointer and so on (lookup process.h)
-    lea rax, [rsp+8]; Load stack before switch_task call
-    mov [RDI], rax ; Move stack pointer into structure
+    lea rax, [rsp+8]
+    mov [RDI], rax; Move stack pointer into structure(before this call)
     mov [RDI+8], rbp; Move base pointer into structure
-    mov rsp, rax ; Load stack (regs_t* should now be at the front)
-    mov rax, [RSP+128]
-    mov [RDI+16], rax ; Save Instruction Pointer
+    mov rax, [rsp]
+    mov [RDI+16], rax; Save Instruction Pointer(as return address)
     mov qword [RDI+24], 0
 
     mov [RDI+32], rbx ; RBX
@@ -50,7 +49,7 @@ enter_user:
     mov rax, rsi
     push qword 0x20 | 0x03 ; Push stack segment
     push rax               ; Push stack pointer
-    push 0x200             ; Push EFLAGS
+    push 0x300             ; Push EFLAGS
     push qword 0x18 | 0x03 ; Push code selector
     push qword rdi         ; Push RIP
     iretq                  ; Return to userspace

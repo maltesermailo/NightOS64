@@ -65,7 +65,7 @@ const static uintptr_t KERNEL_ENTRY = 0xffffff0000000000ull;
 extern unsigned long _bootstrap_end;
 
 //Actual kernel end, start of the kernel heap
-extern unsigned long long _end;
+static unsigned long long _end;
 
 extern void reloadPML();
 
@@ -519,7 +519,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
         }
 
         for(size_t i = 0; i < count; i++) {
-            memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, PAGE_USER);
+            memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER);
             memmgr_reload(addr + 0x1000 * i);
         }
 
@@ -771,8 +771,9 @@ void memmgr_dump() {
     }
 }
 
-void memmgr_init(struct multiboot_tag_mmap* tag) {
+void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     //printf("info loc: 0x%x\n", info);
+    _end = kernel_end;
 
     multiboot_memory_map_t* mmap;
 

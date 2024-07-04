@@ -11,7 +11,7 @@
 #include "alloc.h"
 
 
-void memmgr_init(struct multiboot_tag_mmap* info);
+void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 
 uintptr_t kalloc_frame();
 void kfree_frame(uintptr_t addr);

@@ -66,6 +66,8 @@ size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
 RSDP_t* rsdp;
+extern unsigned long long _end;
+uintptr_t kernel_end = (uintptr_t)&_end;
 
 
 void terminal_initialize(void)
@@ -354,6 +356,9 @@ void kernel_main(unsigned long magic, unsigned long header)
                         ((struct multiboot_tag_module *) tag)->mod_start,
                         ((struct multiboot_tag_module *) tag)->mod_end,
                         ((struct multiboot_tag_module *) tag)->cmdline);
+                if(((struct multiboot_tag_module *) tag)->mod_end > kernel_end) {
+                    kernel_end = ((struct multiboot_tag_module *) tag)->mod_end;
+                }
                 break;
             case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
                 printf ("mem_lower = %uKB, mem_upper = %uKB\n",
@@ -397,7 +402,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     process_set_current_pml(0x1000);
 
     //Setup Memory Management
-    memmgr_init(mmap);
+    memmgr_init(mmap, kernel_end);
 
     //Setup interrupts
     idt_install();
@@ -407,6 +412,8 @@ void kernel_main(unsigned long magic, unsigned long header)
     //timer_init();
 
     __asm__ volatile ("sti"); // set the interrupt flag
+
+    //ksleep(1000);
 
     //Init pci
     pci_init(rsdp);

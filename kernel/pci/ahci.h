@@ -271,20 +271,79 @@ typedef volatile struct tagHBA_MEM_CAP {
     uint32_t NP   : 5; //Number of ports
 } HBA_MEM_CAP;
 
+typedef volatile struct tagHBA_MEM_GHC {
+    uint32_t AE   : 1; //AHCI Enable bit
+    uint32_t res0 : 28; //Reserved
+    uint32_t MSRM : 1; //MSI Revert to Single (read only)
+    uint32_t IE   : 1; //Interrupt Enable
+    uint32_t HR   : 1; //HBA Software Reset
+} HBA_MEM_GHC;
+
+typedef volatile struct tagHBA_MEM_CCC_CTL {
+    uint32_t tv   : 16; //Timeout value
+    uint32_t cc   : 8;  //Command completions
+    uint32_t intr : 5; //Interrupt
+    uint32_t res0 : 2; //Reserved
+    uint32_t en   : 1; //Enable
+} HBA_MEM_CCC_CTL;
+
+typedef volatile struct tagHBA_MEM_EM_LOC {
+    uint32_t off  : 16; //Offset
+    uint32_t bs   : 16; //Buffer size
+} HBA_MEM_EM_LOC;
+
+typedef volatile struct tagHBA_MEM_EM_CTL {
+    uint32_t res0 : 4; //Reserved
+    uint32_t pm   : 1; //Attrib: Port Multiplier Support
+    uint32_t alhd : 1; //Attrib: Activity LED Hardware driven
+    uint32_t xmt  : 1; //Attrib: Transmit only
+    uint32_t smb  : 1; //Attrib:  Single Message Buffer
+    uint32_t res1 : 4; //Reserved
+    uint32_t sgpio: 1; //Supports SGPIO messages
+    uint32_t ses2 : 1; //Supports SES2 messages
+    uint32_t safte: 1; //Supports SAF-TE messages
+    uint32_t led  : 1; //Supports LED Messages
+    uint32_t res2 : 6; //Reserved
+    uint32_t rst  : 1; //Control: Reset
+    uint32_t tm   : 1; //Control:Transmit Message
+    uint32_t res3 : 8; //Reserved
+    uint32_t mr   : 1; //Message received
+} HBA_MEM_EM_CTL;
+
+typedef volatile struct tagHBA_MEM_CAP2 {
+    uint32_t res0 : 26;
+    uint32_t DESO : 1; //DevSleep Entrance from Slumber only
+    uint32_t SADM : 1; //Supports Aggressive Device Sleep Management
+    uint32_t SDS  : 1; //Supports Device Sleep
+    uint32_t APST : 1; //Automatic Partial to Slumber Transitions
+    uint32_t NVMP : 1; //NVMHCI Present
+    uint32_t BOH  : 1; //BIOS/OS Handoff supported
+} HBA_MEM_CAP2;
+
+typedef volatile struct tagHBA_MEM_BOHC {
+    uint32_t res0 : 27;
+    uint32_t BB   : 1; //Supports Aggressive Device Sleep Management
+    uint32_t OOC  : 1; //Supports Device Sleep
+    uint32_t SOOE : 1; //Automatic Partial to Slumber Transitions
+    uint32_t OOS  : 1; //NVMHCI Present
+    uint32_t BOS  : 1; //BIOS/OS Handoff supported
+} HBA_MEM_BOHC;
+
 typedef volatile struct tagHBA_MEM
 {
     // 0x00 - 0x2B, Generic Host Control
     HBA_MEM_CAP cap;		// 0x00, Host capability
-    uint32_t ghc;		// 0x04, Global host control
+    HBA_MEM_GHC ghc;		// 0x04, Global host control
     uint32_t is;		// 0x08, Interrupt status
     uint32_t pi;		// 0x0C, Port implemented
-    uint32_t vs;		// 0x10, Version
-    uint32_t ccc_ctl;	// 0x14, Command completion coalescing control
+    uint16_t major_vs;	// 0x10, Version
+    uint16_t minor_vs;
+    HBA_MEM_CCC_CTL ccc_ctl;	// 0x14, Command completion coalescing control
     uint32_t ccc_pts;	// 0x18, Command completion coalescing ports
-    uint32_t em_loc;		// 0x1C, Enclosure management location
-    uint32_t em_ctl;		// 0x20, Enclosure management control
-    uint32_t cap2;		// 0x24, Host capabilities extended
-    uint32_t bohc;		// 0x28, BIOS/OS handoff control and status
+    HBA_MEM_EM_LOC em_loc;		// 0x1C, Enclosure management location
+    HBA_MEM_EM_CTL em_ctl;		// 0x20, Enclosure management control
+    HBA_MEM_CAP2 cap2;		// 0x24, Host capabilities extended
+    HBA_MEM_BOHC bohc;		// 0x28, BIOS/OS handoff control and status
 
     // 0x2C - 0x9F, Reserved
     uint8_t  rsv[0xA0-0x2C];

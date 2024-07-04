@@ -35,6 +35,11 @@ void exception_handler(regs_t * regs) {
     __asm__ volatile ("cli");
 
     if(regs->int_no < 32) {
+        if(regs->int_no == 1) {
+            __asm__ volatile("sti");
+            return;
+        }
+
         printf("exception :(\n");
         printf("no: %d\n", regs->int_no);
         printf("err: 0x%x\n", regs->err_code);
@@ -48,6 +53,8 @@ void exception_handler(regs_t * regs) {
         //Syscalls baby!
         syscall_entry(regs);
     }
+
+    __asm__ volatile("sti");
 }
 
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
