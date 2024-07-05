@@ -23,7 +23,8 @@ void pit_interrupt(regs_t* regs) {
     pic_sendEOI(0);
     if(regs->cs == 0x08) return;
 
-    //schedule();
+    //We got pre-empted, so no sleep
+    schedule(false);
 }
 
 void ksleep(int milliseconds) {

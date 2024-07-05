@@ -309,6 +309,15 @@ void test_task() {
     asm volatile("hlt");
 }
 
+void panic() {
+    printf("KERNEL PANIC");
+    asm volatile("cli");
+
+    while(1) {
+        asm volatile("hlt");
+    }
+}
+
 void kernel_main(unsigned long magic, unsigned long header)
 {
 	/* Initialize terminal interface */
@@ -409,11 +418,11 @@ void kernel_main(unsigned long magic, unsigned long header)
     pic_setup();
     irq_install();
     ps2_init();
-    //timer_init();
+    timer_init();
 
     __asm__ volatile ("sti"); // set the interrupt flag
 
-    //ksleep(1000);
+    ksleep(1000);
 
     //Init pci
     pci_init(rsdp);

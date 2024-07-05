@@ -41,6 +41,22 @@ void pic_disable() {
     outb(PIC2_DATA, 0xff);
 }
 
+void pic_enableInterrupt(uint8_t irq) {
+    if(irq >= 8) {
+        uint8_t bitMask = (1 << (irq-8));
+        uint8_t data = inb(PIC2_DATA);
+
+        data &= ~bitMask;
+        outb(PIC2_DATA, data);
+    }
+
+    uint8_t bitMask = (1 << irq);
+    uint8_t data = inb(PIC1_DATA);
+
+    data &= ~bitMask;
+    outb(PIC1_DATA, data);
+}
+
 void pic_setup() {
     outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
     io_wait();

@@ -23,6 +23,7 @@ void irq_install_handler(size_t irq, irq_handler_t handler);
 
 void pic_disable();
 void pic_setup();
+void pic_enableInterrupt(uint8_t irq);
 void pic_sendEOI(uint8_t irq);
 void idt_install();
 void irq_install();

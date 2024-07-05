@@ -7,6 +7,68 @@
 
 #include <stdint.h>
 
+//***************************SATA DEFINITIONS**********************************/
+#define	SATA_SIG_ATA	0x00000101	// SATA drive
+#define	SATA_SIG_ATAPI	0xEB140101	// SATAPI drive
+#define	SATA_SIG_SEMB	0xC33C0101	// Enclosure management bridge
+#define	SATA_SIG_PM	0x96690101	// Port multiplier
+
+#define ATA_SR_BSY     0x80
+#define ATA_SR_DRDY    0x40
+#define ATA_SR_DF      0x20
+#define ATA_SR_DSC     0x10
+#define ATA_SR_DRQ     0x08
+#define ATA_SR_CORR    0x04
+#define ATA_SR_IDX     0x02
+#define ATA_SR_ERR     0x01
+
+#define ATA_ER_BBK      0x80
+#define ATA_ER_UNC      0x40
+#define ATA_ER_MC       0x20
+#define ATA_ER_IDNF     0x10
+#define ATA_ER_MCR      0x08
+#define ATA_ER_ABRT     0x04
+#define ATA_ER_TK0NF    0x02
+#define ATA_ER_AMNF     0x01
+
+#define ATA_CMD_READ_PIO          0x20
+#define ATA_CMD_READ_PIO_EXT      0x24
+#define ATA_CMD_READ_DMA          0xC8
+#define ATA_CMD_READ_DMA_EXT      0x25
+#define ATA_CMD_WRITE_PIO         0x30
+#define ATA_CMD_WRITE_PIO_EXT     0x34
+#define ATA_CMD_WRITE_DMA         0xCA
+#define ATA_CMD_WRITE_DMA_EXT     0x35
+#define ATA_CMD_CACHE_FLUSH       0xE7
+#define ATA_CMD_CACHE_FLUSH_EXT   0xEA
+#define ATA_CMD_PACKET            0xA0
+#define ATA_CMD_IDENTIFY_PACKET   0xA1
+#define ATA_CMD_IDENTIFY          0xEC
+
+#define ATAPI_CMD_READ       0xA8
+#define ATAPI_CMD_EJECT      0x1B
+
+#define ATA_IDENT_DEVICETYPE   0
+#define ATA_IDENT_CYLINDERS    2
+#define ATA_IDENT_HEADS        6
+#define ATA_IDENT_SECTORS      12
+#define ATA_IDENT_SERIAL       20
+#define ATA_IDENT_MODEL        54
+#define ATA_IDENT_CAPABILITIES 98
+#define ATA_IDENT_FIELDVALID   106
+#define ATA_IDENT_MAX_LBA      120
+#define ATA_IDENT_COMMANDSETS  164
+#define ATA_IDENT_MAX_LBA_EXT  200
+
+
+//***************************AHCI DEFINITIONS**********************************/
+
+#define AHCI_DEV_NULL 0
+#define AHCI_DEV_SATA 1
+#define AHCI_DEV_SEMB 2
+#define AHCI_DEV_PM 3
+#define AHCI_DEV_SATAPI 4
+
 typedef enum
 {
     FIS_TYPE_REG_H2D	= 0x27,	// Register FIS - host to device
@@ -224,6 +286,13 @@ typedef struct tagHBA_CMD_HEADER
     uint32_t rsv1[4];	// Reserved
 } HBA_CMD_HEADER;
 
+#define HBA_PxCMD_ST    0x0001
+#define HBA_PxCMD_FRE   0x0010
+#define HBA_PxCMD_FR    0x4000
+#define HBA_PxCMD_CR    0x8000
+#define HBA_PORT_IPM_ACTIVE 1
+#define HBA_PORT_DET_PRESENT 3
+
 typedef volatile struct tagHBA_PORT
 {
     uint32_t clb;		// 0x00, command list base address, 1K-byte aligned
@@ -247,86 +316,98 @@ typedef volatile struct tagHBA_PORT
     uint32_t vendor[4];	// 0x70 ~ 0x7F, vendor specific
 } HBA_PORT;
 
+#define HBA_MEM_CAP_S64A (1 << 31)
+#define HBA_MEM_NUM_PORTS_MASK 0x1F
+
 typedef volatile struct tagHBA_MEM_CAP {
-    uint32_t S64A : 1; //Whether 64-bit addresses are supported
-    uint32_t SNCQ : 1; //Supports native command queueing
-    uint32_t SSNTF: 1; //Supports Snotification Register
-    uint32_t SMPS : 1; //Supports Mechanical Presence Switch
-    uint32_t SSS  : 1; //Supports Staggered Spin-Up
-    uint32_t SALP : 1; //Supports Aggressive Link Power Management
-    uint32_t SAL  : 1; //Supports Activity LED
-    uint32_t SCLO : 1; //Supports Command List Override
-    uint32_t ISS  : 4; //Interface Speed Support; 0x1 = Gen1(1.5 Gpbs), 0x2 = Gen2 (3 Gbps), 0x3 = Gen3 (6 Gbps)
+    uint32_t NP   : 5;  // Number of ports
+    uint32_t SXS  : 1;  // Supports External SATA
+    uint32_t EMS  : 1;  // Enclosure Management Supported
+    uint32_t CCCS : 1;  // Command completion coalescing supported
+    uint32_t NCS  : 5;  // Number of command slots per port
+    uint32_t PSC  : 1;  // Partial state capable
+    uint32_t SSC  : 1;  // Slumber State capable
+    uint32_t PMD  : 1;  // PIO Multiple DRQ Block
+    uint32_t FBSS : 1;  // Supports FIS-based switching
+    uint32_t SPM  : 1;  // Supports Port Multiplier
+    uint32_t SAM  : 1;  // Supports only AHCI mode
     uint32_t res0 : 1;
-    uint32_t SAM  : 1; //Supports only AHCI mode
-    uint32_t SPM  : 1; //Supports Port Multiplier
-    uint32_t FBSS : 1; //Supports FIS-based switching
-    uint32_t PMD  : 1; //PIO Multiple DRQ Block
-    uint32_t SSC  : 1; //Slumber State capable
-    uint32_t PSC  : 1; //Partial state capable;
-    uint32_t NCS  : 5; //Number of command slots per port
-    uint32_t CCCS : 1; //Command completeion coalescing supported
-    uint32_t EMS  : 1; //Enclosure Managment Supported
-    uint32_t SXS  : 1; //Supports External SATA
-    uint32_t NP   : 5; //Number of ports
+    uint32_t ISS  : 4;  // Interface Speed Support; 0x1 = Gen1(1.5 Gpbs), 0x2 = Gen2 (3 Gbps), 0x3 = Gen3 (6 Gbps)
+    uint32_t SCLO : 1;  // Supports Command List Override
+    uint32_t SAL  : 1;  // Supports Activity LED
+    uint32_t SALP : 1;  // Supports Aggressive Link Power Management
+    uint32_t SSS  : 1;  // Supports Staggered Spin-Up
+    uint32_t SMPS : 1;  // Supports Mechanical Presence Switch
+    uint32_t SSNTF: 1;  // Supports SNotification Register
+    uint32_t SNCQ : 1;  // Supports native command queueing
+    uint32_t S64A : 1;  // Whether 64-bit addresses are supported
 } HBA_MEM_CAP;
 
+#define HBA_MEM_GHC_HR (1 << 0)
+#define HBA_MEM_GHC_IE (1 << 1)
+#define HBA_MEM_GHC_AE (1 << 31)
+
 typedef volatile struct tagHBA_MEM_GHC {
-    uint32_t AE   : 1; //AHCI Enable bit
-    uint32_t res0 : 28; //Reserved
-    uint32_t MSRM : 1; //MSI Revert to Single (read only)
-    uint32_t IE   : 1; //Interrupt Enable
-    uint32_t HR   : 1; //HBA Software Reset
+    uint32_t HR   : 1;  // HBA Software Reset
+    uint32_t IE   : 1;  // Interrupt Enable
+    uint32_t MSRM : 1;  // MSI Revert to Single (read only)
+    uint32_t res0 : 28; // Reserved
+    uint32_t AE   : 1;  // AHCI Enable bit
 } HBA_MEM_GHC;
 
 typedef volatile struct tagHBA_MEM_CCC_CTL {
-    uint32_t tv   : 16; //Timeout value
-    uint32_t cc   : 8;  //Command completions
-    uint32_t intr : 5; //Interrupt
-    uint32_t res0 : 2; //Reserved
-    uint32_t en   : 1; //Enable
+    uint32_t en   : 1;  // Enable
+    uint32_t res0 : 2;  // Reserved
+    uint32_t intr : 5;  // Interrupt
+    uint32_t cc   : 8;  // Command completions
+    uint32_t tv   : 16; // Timeout value
 } HBA_MEM_CCC_CTL;
 
 typedef volatile struct tagHBA_MEM_EM_LOC {
-    uint32_t off  : 16; //Offset
-    uint32_t bs   : 16; //Buffer size
+    uint32_t bs   : 16; // Buffer size
+    uint32_t off  : 16; // Offset
 } HBA_MEM_EM_LOC;
 
 typedef volatile struct tagHBA_MEM_EM_CTL {
-    uint32_t res0 : 4; //Reserved
-    uint32_t pm   : 1; //Attrib: Port Multiplier Support
-    uint32_t alhd : 1; //Attrib: Activity LED Hardware driven
-    uint32_t xmt  : 1; //Attrib: Transmit only
-    uint32_t smb  : 1; //Attrib:  Single Message Buffer
-    uint32_t res1 : 4; //Reserved
-    uint32_t sgpio: 1; //Supports SGPIO messages
-    uint32_t ses2 : 1; //Supports SES2 messages
-    uint32_t safte: 1; //Supports SAF-TE messages
-    uint32_t led  : 1; //Supports LED Messages
-    uint32_t res2 : 6; //Reserved
-    uint32_t rst  : 1; //Control: Reset
-    uint32_t tm   : 1; //Control:Transmit Message
-    uint32_t res3 : 8; //Reserved
-    uint32_t mr   : 1; //Message received
+    uint32_t mr   : 1;  // Message received
+    uint32_t res3 : 7;  // Reserved
+    uint32_t tm   : 1;  // Control: Transmit Message
+    uint32_t rst  : 1;  // Control: Reset
+    uint32_t res2 : 6;  // Reserved
+    uint32_t led  : 1;  // Supports LED Messages
+    uint32_t safte: 1;  // Supports SAF-TE messages
+    uint32_t ses2 : 1;  // Supports SES2 messages
+    uint32_t sgpio: 1;  // Supports SGPIO messages
+    uint32_t res1 : 4;  // Reserved
+    uint32_t smb  : 1;  // Attrib: Single Message Buffer
+    uint32_t xmt  : 1;  // Attrib: Transmit only
+    uint32_t alhd : 1;  // Attrib: Activity LED Hardware driven
+    uint32_t pm   : 1;  // Attrib: Port Multiplier Support
+    uint32_t res0 : 4;  // Reserved
 } HBA_MEM_EM_CTL;
 
+#define HBA_MEM_CAP2_BOH (1 << 0)
+
 typedef volatile struct tagHBA_MEM_CAP2 {
-    uint32_t res0 : 26;
-    uint32_t DESO : 1; //DevSleep Entrance from Slumber only
-    uint32_t SADM : 1; //Supports Aggressive Device Sleep Management
-    uint32_t SDS  : 1; //Supports Device Sleep
-    uint32_t APST : 1; //Automatic Partial to Slumber Transitions
-    uint32_t NVMP : 1; //NVMHCI Present
-    uint32_t BOH  : 1; //BIOS/OS Handoff supported
+    uint32_t BOH  : 1;  // BIOS/OS Handoff supported
+    uint32_t NVMP : 1;  // NVMHCI Present
+    uint32_t APST : 1;  // Automatic Partial to Slumber Transitions
+    uint32_t SDS  : 1;  // Supports Device Sleep
+    uint32_t SADM : 1;  // Supports Aggressive Device Sleep Management
+    uint32_t DESO : 1;  // DevSleep Entrance from Slumber only
+    uint32_t res0 : 26; // Reserved
 } HBA_MEM_CAP2;
 
+#define HBA_MEM_BOHC_BOS (1 << 0)
+#define HBA_MEM_BOHC_OOS (1 << 1)
+#define HBA_MEM_BOHC_BB (1 << 4)
 typedef volatile struct tagHBA_MEM_BOHC {
-    uint32_t res0 : 27;
-    uint32_t BB   : 1; //Supports Aggressive Device Sleep Management
-    uint32_t OOC  : 1; //Supports Device Sleep
-    uint32_t SOOE : 1; //Automatic Partial to Slumber Transitions
-    uint32_t OOS  : 1; //NVMHCI Present
-    uint32_t BOS  : 1; //BIOS/OS Handoff supported
+    uint32_t BOS  : 1;  // BIOS/OS Handoff supported
+    uint32_t OOS  : 1;  // NVMHCI Present
+    uint32_t SOOE : 1;  // Automatic Partial to Slumber Transitions
+    uint32_t OOC  : 1;  // Supports Device Sleep
+    uint32_t BB   : 1;  // Supports Aggressive Device Sleep Management
+    uint32_t res0 : 27; // Reserved
 } HBA_MEM_BOHC;
 
 typedef volatile struct tagHBA_MEM
@@ -338,12 +419,12 @@ typedef volatile struct tagHBA_MEM
     uint32_t pi;		// 0x0C, Port implemented
     uint16_t major_vs;	// 0x10, Version
     uint16_t minor_vs;
-    HBA_MEM_CCC_CTL ccc_ctl;	// 0x14, Command completion coalescing control
+    uint32_t ccc_ctl;	// 0x14, Command completion coalescing control
     uint32_t ccc_pts;	// 0x18, Command completion coalescing ports
-    HBA_MEM_EM_LOC em_loc;		// 0x1C, Enclosure management location
-    HBA_MEM_EM_CTL em_ctl;		// 0x20, Enclosure management control
-    HBA_MEM_CAP2 cap2;		// 0x24, Host capabilities extended
-    HBA_MEM_BOHC bohc;		// 0x28, BIOS/OS handoff control and status
+    uint32_t em_loc;		// 0x1C, Enclosure management location
+    uint32_t em_ctl;		// 0x20, Enclosure management control
+    uint32_t cap2;		// 0x24, Host capabilities extended
+    uint32_t bohc;		// 0x28, BIOS/OS handoff control and status
 
     // 0x2C - 0x9F, Reserved
     uint8_t  rsv[0xA0-0x2C];
@@ -352,7 +433,7 @@ typedef volatile struct tagHBA_MEM
     uint8_t  vendor[0x100-0xA0];
 
     // 0x100 - 0x10FF, Port control registers
-    HBA_PORT	ports[1];	// 1 ~ 32
+    HBA_PORT	ports[32];	// 1 ~ 32
 } HBA_MEM;
 
 
@@ -368,7 +449,7 @@ typedef struct tagHBA_PRDT_ENTRY
     uint32_t i:1;		// Interrupt on completion
 } HBA_PRDT_ENTRY;
 
-typedef struct tagHBA_CMD_TBL
+typedef struct __attribute__((aligned(16), packed)) tagHBA_CMD_TBL
 {
     // 0x00
     uint8_t  cfis[64];	// Command FIS
@@ -380,8 +461,8 @@ typedef struct tagHBA_CMD_TBL
     uint8_t  rsv[48];	// Reserved
 
     // 0x80
-    HBA_PRDT_ENTRY	prdt_entry[1];	// Physical region descriptor table entries, 0 ~ 65535
+    HBA_PRDT_ENTRY	prdt_entry[8];	// Physical region descriptor table entries, 0 ~ 65535
 } HBA_CMD_TBL;
 
-void ahci_setup(void* abar);
+void ahci_setup(void* abar, uint16_t interruptVector);
 #endif //NIGHTOS_AHCI_H

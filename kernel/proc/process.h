@@ -108,6 +108,6 @@ process_t* get_current_process();
 
 //Scheduler
 void schedule_process(process_t* process);
-void schedule();
+void schedule(bool sleep);
 
 #endif //NIGHTOS_PROCESS_H

@@ -266,8 +266,8 @@ uint16_t pcieConfigReadWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t of
 }
 
 uint32_t pcieConfigReadDWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
-    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
-    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+    volatile uint32_t* address = (volatile uint32_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint32_t*) ((uint64_t)address + (uint64_t)pciBase);
 
     return (*address);
 }
@@ -287,8 +287,8 @@ void pcieConfigWriteWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offse
 }
 
 void pcieConfigWriteDWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint32_t value) {
-    volatile uint16_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
-    address = (uint16_t*) ((uint64_t)address + (uint64_t)pciBase);
+    volatile uint32_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    address = (uint32_t*) ((uint64_t)address + (uint64_t)pciBase);
 
     *address = value;
 }
@@ -378,6 +378,7 @@ void checkFunctionPCIe(uint8_t bus, uint8_t device, uint8_t function) {
 
     pciDevices[256 * bus + 32 * device + function].type = baseClass;
     pciDevices[256 * bus + 32 * device + function].subclass = subClass;
+    pciDevices[256 * bus + 32 * device + function].progif = progIf;
     pciDevices[256 * bus + 32 * device + function].bus = bus;
     pciDevices[256 * bus + 32 * device + function].slot = device;
     pciDevices[256 * bus + 32 * device + function].function = function;
@@ -475,14 +476,20 @@ void pci_init(RSDP_t* rsdp) {
             if(device.subclass == 6) {
                 //AHCI 1.0
                 if(device.progif == 1) {
-                    uint16_t command = pcieConfigReadWord(device.bus, device.deviceId, device.function, 0x4);
+                    uint16_t command = pcieConfigReadWord(device.bus, device.slot, device.function, 0x4);
                     command |= PCI_COMMAND_BUS_MASTER | PCI_COMMAND_MEMORY_SPACE;
-                    command &= ~PCI_COMMAND_INTERRUPT_DISABLE;
+                    command = command & ~(1 << 10);
 
-                    pcieConfigWriteWord(device.bus, device.deviceId, device.function, 0x4, command);
+                    pcieConfigWriteWord(device.bus, device.slot, device.function, 0x4, command);
 
-                    uint32_t abar = pcieConfigReadDWord(device.bus, device.deviceId, device.function, 0x24);
-                    ahci_setup((void *) abar);
+                    uint16_t interruptLine = pcieConfigReadWord(device.bus, device.slot, device.function, 0x3C);
+                    interruptLine &= 0xFF; //Clear upper bits to only get interrupt line
+
+                    printf("Device %d, %d, %d\n", device.bus, device.slot, device.function);
+
+                    uint32_t abar = pcieConfigReadDWord(device.bus, device.slot, device.function, 0x24);
+                    uint32_t test = pciConfigReadWord(device.bus, device.slot, device.function, 0x24);
+                    ahci_setup((void *) abar, interruptLine);
                 }
             }
         }

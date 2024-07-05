@@ -817,7 +817,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
 
     PAGE_MAP[509] = (uintptr_t)IDENTITY_MAP_PD_TEMP | PAGE_PRESENT | PAGE_WRITABLE;
 
-    kernel_heap_length = 0x1000;
+    kernel_heap_length = 0x0;
 
     reloadPML();
 

@@ -357,13 +357,16 @@ process_t* get_next_process() {
     return (process_t*)entry->value;
 }
 
-void schedule() {
+void schedule(bool sleep) {
     if(pcb.current_process == null) return;
-    printf("Hi scheduler");
 
     if(setjmp(&pcb.current_process->main_thread)) {
         //We are back in kernel space, resume call
         return;
+    }
+
+    if(!sleep) {
+        schedule_process(pcb.current_process);
     }
 
     pcb.current_process = get_next_process();
