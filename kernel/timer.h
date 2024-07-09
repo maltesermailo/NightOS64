@@ -9,6 +9,7 @@
 
 void timer_init();
 void ksleep(int milliseconds);
+void sleep(int milliseconds);
 unsigned long get_counter();
 
 int wait(volatile uint32_t* mem, uint32_t bit, uint64_t timeout);

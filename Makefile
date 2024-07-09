@@ -29,6 +29,7 @@ kernel/fs/console.o \
 kernel/sys/syscall.o \
 kernel/program/elf.o \
 kernel/pci/ahci.o \
+kernel/sys/mutex.o \
 
 OBJS=\
 $(KERNEL_OBJS) \

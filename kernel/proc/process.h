@@ -2,15 +2,19 @@
 // Created by Jannik on 03.04.2024.
 //
 
+#pragma once
 #ifndef NIGHTOS_PROCESS_H
 #define NIGHTOS_PROCESS_H
 #include <stdint.h>
 #include "../fs/vfs.h"
 #include "../lock.h"
+#include "../mutex.h"
 
 #define PROC_FLAG_KERNEL 1
 #define PROC_FLAG_RUNNING 2 // whether the process is currently running
 #define PROC_FLAG_ON_CPU 3 // whether the process is currently on the cpu
+#define PROC_FLAG_SLEEP_INTERRUPTIBLE 4 // interruptable process
+#define PROC_FLAG_SLEEP_NON_INTERRUPTIBLE 5 //non interruptable
 
 typedef unsigned long long pid_t;
 
@@ -109,5 +113,8 @@ process_t* get_current_process();
 //Scheduler
 void schedule_process(process_t* process);
 void schedule(bool sleep);
+
+void wait_for_object(mutex_t* mutex);
+void wakeup_waiting(list_t* queue);
 
 #endif //NIGHTOS_PROCESS_H

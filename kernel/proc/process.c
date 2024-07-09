@@ -383,3 +383,28 @@ void schedule(bool sleep) {
 void schedule_process(process_t* process) {
     list_insert(thread_queue, process);
 }
+
+void wait_for_object(mutex_t* mutex) {
+    spin_lock(&mutex->lock);
+
+    list_insert(mutex->waiting, get_current_process());
+    __sync_and_and_fetch(&get_current_process()->flags, ~(PROC_FLAG_SLEEP_INTERRUPTIBLE));
+
+    spin_unlock(&mutex->lock);
+
+    schedule(true);
+}
+
+void wakeup_waiting(list_t* queue) {
+    while(queue->length > 0) {
+        list_entry_t* entry = queue->head;
+
+        if(entry != NULL && entry->value != NULL) {
+            process_t* process = entry->value;
+
+            schedule_process(process);
+        }
+
+        list_remove_by_index(queue, 0);
+    }
+}

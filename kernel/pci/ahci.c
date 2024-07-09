@@ -5,18 +5,76 @@
 #include "../memmgr.h"
 #include "../timer.h"
 #include "../idt.h"
+#include "../../libc/include/kernel/list.h"
 
 #include <stdio.h>
 
+list_t hard_drives;
+sata_device_t* sataDevice;
+HBA_MEM* hba;
 
 void ahci_interrupt_handler(regs_t* regs) {
 
+}
+
+int get_next_free(int portNumber) {
+    HBA_PORT* port = &hba->ports[portNumber];
+
+    uint32_t slots = (port->sact | port->ci); //Combined SACT and Command Issued register
+    for(int i = 0; i < 32; i++) {
+        if((slots & 1) == 0)
+            return i;
+
+        slots >>= 1;
+    }
+
+    return -1;
+}
+
+void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
+    HBA_PORT* port = &hba->ports[sataDevice->port];
+
+    int cmdIndex = get_next_free(sataDevice->port);
+
+    if(cmdIndex == -1) {
+        return;
+    }
+
+    uintptr_t ptrCmdHeader = ((uintptr_t)port->clbu) << 32 | port->clb;
+    HBA_CMD_HEADER* cmdHeader = (HBA_CMD_HEADER*)ptrCmdHeader;
+    cmdHeader += cmdIndex;
+
+    HBA_CMD_TBL* cmdTable = (HBA_CMD_TBL*)(((uintptr_t)cmdHeader->ctbau) << 32 | cmdHeader->ctba);
+    FIS_REG_H2D* commandFIS = (FIS_REG_H2D*)(cmdTable->cfis);
+
+    cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
+    cmdHeader->prdtl = 1;
+
+    commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
+    commandFIS->command = ataCommand; //Command
+    commandFIS->c = 1; //Command Type
+
+    cmdTable->prdt_entry[0].dba = (uintptr_t)ioRequest->buffer;
+    cmdTable->prdt_entry[0].dbau = ((uintptr_t)ioRequest->buffer >> 32);
+    cmdTable->prdt_entry[0].dbc = ioRequest->count;
+
+    port->ci |= 1 << cmdIndex;
+
+    while(true) {
+        if((port->ci & (1 << cmdIndex)) == 0) {
+            break;
+        }
+
+        //Command finished, packet in buffer
+        return;
+    }
 }
 
 void ahci_setup(void* abar, uint16_t interruptVector) {
     abar = memmgr_map_mmio((uintptr_t)abar, 0x2000, true); //ABAR needs a full page for each port and about 512 bytes for the HBA mem
 
     HBA_MEM* mem = (HBA_MEM*) abar;
+    hba = mem;
 
     if((mem->cap2 & HBA_MEM_CAP2_BOH) == 1) {
         //BIOS/OS Handoff supported
@@ -42,8 +100,6 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
     uint32_t oldPI = mem->pi;
 
     //Reset HBA
-    //mem->ghc |= HBA_MEM_GHC_AE;
-    //mem->ghc |= HBA_MEM_GHC_HR;
     mem->ghc.AE = 1;
     mem->ghc.HR = 1;
 
@@ -118,5 +174,16 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
         uint8_t det = mem->ports[i].ssts & 0x0F;
 
         printf("STATUS: %d, SIGNATURE: %d, IPM: %d, DET: %d\n", mem->ports[i].ssts, mem->ports[i].sig, ipm, det);
+
+        if(mem->ports[i].sig == SATA_SIG_ATA) {
+            sataDevice = calloc(1, sizeof(sata_device_t));
+            io_request_t ioRequest;
+            ioRequest.buffer = malloc(512);
+            ioRequest.count = 512;
+
+            ahci_send_command(&ioRequest, ATA_CMD_IDENTIFY);
+
+            //TODO: Parse Identify Packet
+        }
     }
 }

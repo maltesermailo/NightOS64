@@ -6,6 +6,7 @@
 #define NIGHTOS_AHCI_H
 
 #include <stdint.h>
+#include "io.h"
 
 //***************************SATA DEFINITIONS**********************************/
 #define	SATA_SIG_ATA	0x00000101	// SATA drive
@@ -464,5 +465,16 @@ typedef struct __attribute__((aligned(16), packed)) tagHBA_CMD_TBL
     HBA_PRDT_ENTRY	prdt_entry[8];	// Physical region descriptor table entries, 0 ~ 65535
 } HBA_CMD_TBL;
 
+typedef struct IOControlBlock {
+    io_request_t* ioRequest;
+} io_cb_t;
+
+typedef struct SATADevice {
+    int port;
+
+    io_cb_t requests[32];
+} sata_device_t;
+
 void ahci_setup(void* abar, uint16_t interruptVector);
+void ahci_send_command(io_request_t* ioRequest, int sataCommand);
 #endif //NIGHTOS_AHCI_H
