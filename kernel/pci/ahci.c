@@ -49,10 +49,20 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
 
     cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
     cmdHeader->prdtl = 1;
+    cmdHeader->w = ioRequest->type;
 
     commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
     commandFIS->command = ataCommand; //Command
     commandFIS->c = 1; //Command Type
+    commandFIS->lba0 = (uint8_t)ioRequest->offset;
+    commandFIS->lba1 = (uint8_t)(ioRequest->offset>>8);
+    commandFIS->lba2 = (uint8_t)(ioRequest->offset>>16);
+    commandFIS->device = 1<<6;  // LBA mode
+    commandFIS->lba3 = (uint8_t)(ioRequest->offset>>24);
+    commandFIS->lba4 = (uint8_t)(ioRequest->offset>>32);
+    commandFIS->lba5 = (uint8_t)(ioRequest->offset>>40);
+    commandFIS->countl = ioRequest->count & 0xFF;
+    commandFIS->counth = (ioRequest->count >> 8) & 0xFF;
 
     cmdTable->prdt_entry[0].dba = (uintptr_t)ioRequest->buffer;
     cmdTable->prdt_entry[0].dbau = ((uintptr_t)ioRequest->buffer >> 32);
