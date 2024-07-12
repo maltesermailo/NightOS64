@@ -465,12 +465,55 @@ typedef struct __attribute__((aligned(16), packed)) tagHBA_CMD_TBL
     HBA_PRDT_ENTRY	prdt_entry[8];	// Physical region descriptor table entries, 0 ~ 65535
 } HBA_CMD_TBL;
 
+typedef struct __attribute((packed)) ATADeviceInformation
+{
+    uint16_t general_config;
+    uint16_t numLogicalCylinders;
+    uint16_t res0;
+    uint16_t numLogicalHeads;
+    uint16_t ven0;
+    uint16_t ven1;
+    uint16_t numSectorsPerTrack;
+    uint16_t ven2[3];
+    uint16_t serial[10];
+    uint16_t ven3;
+    uint16_t ven4;
+    uint16_t numVendorBytesLong;
+    uint16_t firmwareRevision[4];
+    uint16_t modelNumber[20];
+    uint16_t ven5;
+    uint16_t res1;
+    uint16_t cap;
+    uint16_t res2;
+    uint16_t pioDataTransferCycleMode;
+    uint16_t dmaDataTransferCycleMode;
+    uint16_t res3;
+    uint16_t numCurrentLogicalCylinders;
+    uint16_t numCurrentLogicalHeads;
+    uint16_t numCurrentLogicalSectorsPerTrack;
+    uint32_t capacitySectors;
+    uint16_t res4;
+    uint32_t numUserAddressableSectors;
+    uint16_t singleWordDMATransfer;
+    uint16_t multiWordDMATransfer;
+    uint16_t res5;
+    uint16_t minMultiwordDMATransferCycleTime;
+    uint16_t manufacturerRecMultiwordDMATransferCycleTime;
+    uint16_t minPIOTransferCycleTime;
+    uint16_t minPIOTransferCycleTimeIORDY;
+    uint16_t advancedPIOMode[2];
+    uint16_t res6[57];
+    uint16_t ven6[32];
+    uint16_t res7[96];
+} ata_device_info_t;
+
 typedef struct IOControlBlock {
     io_request_t* ioRequest;
 } io_cb_t;
 
 typedef struct SATADevice {
     int port;
+    uint64_t size;
 
     io_cb_t requests[32];
 } sata_device_t;

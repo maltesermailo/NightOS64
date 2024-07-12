@@ -2,6 +2,8 @@
 // Created by Jannik on 20.04.2024.
 //
 #include <string.h>
+#include <stdarg.h>
+#include <limits.h>
 
 char *strcpy(char * dest, const char * src) {
     if(dest == NULL || src == NULL) {
@@ -225,4 +227,83 @@ char *strtok_r(char *str, const char *delim, char **saveptr) {
     }
 
     return str;  // Return the token
+}
+
+int snprintf(char *str, size_t size, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    int count = 0;
+    const char *ptr = format;
+    char *output = str;
+    size_t remaining = size;
+
+    while (*ptr != '\0' && remaining > 1) {
+        if (*ptr != '%') {
+            *output++ = *ptr++;
+            count++;
+            remaining--;
+        } else {
+            ptr++; // Skip '%'
+            switch (*ptr) {
+                case 'd': {
+                    int val = va_arg(args, int);
+                    char buf[20];
+                    int len = snprintf(buf, sizeof(buf), "%d", val);
+                    if (len < remaining) {
+                        for (int i = 0; i < len; i++) {
+                            *output++ = buf[i];
+                        }
+                        count += len;
+                        remaining -= len;
+                    } else {
+                        count += len;
+                    }
+                    break;
+                }
+                case 's': {
+                    char *s = va_arg(args, char*);
+                    while (*s != '\0' && remaining > 1) {
+                        *output++ = *s++;
+                        count++;
+                        remaining--;
+                    }
+                    break;
+                }
+                    // Add more format specifiers as needed
+                default:
+                    *output++ = *ptr;
+                    count++;
+                    remaining--;
+                    break;
+            }
+            ptr++;
+        }
+    }
+
+    if (size > 0) {
+        *output = '\0';
+    }
+
+    while (*ptr != '\0') {
+        if (*ptr != '%') {
+            count++;
+        } else {
+            ptr++;
+            switch (*ptr) {
+                case 'd':
+                    va_arg(args, int);
+                    count += 20; // Assume max int length
+                    break;
+                case 's':
+                    count += strlen(va_arg(args, char*));
+                    break;
+                    // Add more format specifiers as needed
+            }
+        }
+        ptr++;
+    }
+
+    va_end(args);
+    return count;
 }

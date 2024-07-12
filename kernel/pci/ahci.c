@@ -70,6 +70,37 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     }
 }
 
+int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
+    struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
+
+    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
+    ioRequest->type = IO_READ;
+    ioRequest->count = length;
+    ioRequest->offset = offset;
+    ioRequest->buffer = calloc(1, length);
+
+    ahci_send_command(ioRequest, ATA_CMD_READ_DMA_EXT);
+
+    memcpy(buf, ioRequest->buffer, length);
+
+    free(ioRequest->buffer);
+    free(ioRequest);
+
+    return length;
+}
+
+file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
+    file_node_t* node = calloc(1, sizeof(file_node_t));
+    node->type = FILE_TYPE_BLOCK_DEVICE;
+    node->fs = sataDevice;
+    node->size = sataDevice->size;
+    snprintf(node->name, 16, "hd%d", sataDevice->port);
+    node->refcount = 0;
+    node->file_ops.read = ahci_read;
+
+    return node;
+}
+
 void ahci_setup(void* abar, uint16_t interruptVector) {
     abar = memmgr_map_mmio((uintptr_t)abar, 0x2000, true); //ABAR needs a full page for each port and about 512 bytes for the HBA mem
 
@@ -184,6 +215,17 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
             ahci_send_command(&ioRequest, ATA_CMD_IDENTIFY);
 
             //TODO: Parse Identify Packet
+            ata_device_info_t* deviceInfo = (ata_device_info_t*)ioRequest.buffer;
+
+            printf("Available space: %d bytes\n", deviceInfo->capacitySectors * 512);
+
+            file_node_t* node = create_ahci_device(sataDevice);
+
+            char* path = calloc(32, sizeof(char));
+            snprintf(path, 32, "/%s/%s", "dev", node->name);
+
+            mount_directly(path, node);
+            printf("Mounted hdd at %s\n", path);
         }
     }
 }

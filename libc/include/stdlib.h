@@ -19,6 +19,8 @@ char* getenv(const char*);
 int abs(int n);
 void exit(int);
 
+int snprintf(char *str, size_t size, const char *format, ...);
+
 
 #ifdef __cplusplus
 }
