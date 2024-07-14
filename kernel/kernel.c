@@ -152,7 +152,7 @@ void terminal_resetline() {
 }
 
 void
-itoa (char *buf, int base, long d)
+itoa_k (char *buf, int base, long d)
 {
     char *p = buf;
     char *p1, *p2;
@@ -257,7 +257,7 @@ int printf(const char* restrict format, ...) {
             }
             char buf[255];
 
-            itoa(buf, *format, i);
+            itoa_k(buf, *format, i);
             format++;
 
             if(!print(buf, strlen(buf)))
@@ -424,19 +424,11 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     ksleep(1000);
 
-    //Init pci
-    pci_init(rsdp);
-
-	//terminal_writestring("Hello Kernel\n");
-
-    for(int i = 0; i < 64; i++) {
-        commandline[i] = 0;
-    }
-
-    registerKeyEventHandler(key_event);
-
     //Setup filesystem and modules
     vfs_install();
+
+    mkdir_vfs("/dev");
+    mkdir_vfs("/test");
 
     for (tag = (struct multiboot_tag *) (header + 8);
          tag->type != MULTIBOOT_TAG_TYPE_END;
@@ -459,6 +451,17 @@ void kernel_main(unsigned long magic, unsigned long header)
         }
     }
 
+    //Init pci
+    pci_init(rsdp);
+
+	//terminal_writestring("Hello Kernel\n");
+
+    for(int i = 0; i < 64; i++) {
+        commandline[i] = 0;
+    }
+
+    registerKeyEventHandler(key_event);
+
     /*if(info->mods_count > 0) {
         multiboot_module_t* module = info->mods_addr;
 
@@ -466,9 +469,6 @@ void kernel_main(unsigned long magic, unsigned long header)
             tarfs_init("/nightos/", module->mod_start, module->mod_end);
         }
     }*/
-
-    mkdir_vfs("/dev");
-    mkdir_vfs("/test");
     console_init();
 
     printf("Performing list test now...\n");
@@ -482,6 +482,9 @@ void kernel_main(unsigned long magic, unsigned long header)
     file_node_t* console0 = open("/dev/console0", 0);
     file_handle_t* hConsole = create_handle(console0);
     write(hConsole, "test", strlen("test")+1);
+
+    //Load filesystem at hd0
+    
 
     process_init();
     process_create_idle();

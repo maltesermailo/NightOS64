@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <stdlib.h>
 
 char *strcpy(char * dest, const char * src) {
     if(dest == NULL || src == NULL) {
@@ -249,7 +250,8 @@ int snprintf(char *str, size_t size, const char *format, ...) {
                 case 'd': {
                     int val = va_arg(args, int);
                     char buf[20];
-                    int len = snprintf(buf, sizeof(buf), "%d", val);
+                    itoa(val, buf, 10);  // Use itoa here
+                    int len = strlen(buf);
                     if (len < remaining) {
                         for (int i = 0; i < len; i++) {
                             *output++ = buf[i];

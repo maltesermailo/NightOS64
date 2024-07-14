@@ -8,7 +8,8 @@
 #include "../terminal.h"
 #include "../arch/amd64/io.h"
 #include "../memmgr.h"
-#include "ahci.h"
+
+extern void ahci_setup(void* abar, uint16_t interruptVector);
 
 static pci_device_t pciDevices[65536];
 static uint8_t* pciBase;

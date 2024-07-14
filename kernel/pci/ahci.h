@@ -291,6 +291,9 @@ typedef struct tagHBA_CMD_HEADER
 #define HBA_PxCMD_FRE   0x0010
 #define HBA_PxCMD_FR    0x4000
 #define HBA_PxCMD_CR    0x8000
+
+#define HBA_PxIS_TFES 0x40000000
+
 #define HBA_PORT_IPM_ACTIVE 1
 #define HBA_PORT_DET_PRESENT 3
 
@@ -514,6 +517,7 @@ typedef struct IOControlBlock {
 typedef struct SATADevice {
     int port;
     uint64_t size;
+    file_node_t* node;
 
     io_cb_t requests[32];
 } sata_device_t;

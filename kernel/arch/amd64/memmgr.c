@@ -174,6 +174,23 @@ void* memmgr_get_from_virtual(uintptr_t virtAddr) {
 }
 
 /***
+ * Returns the physical address for the given memory address
+ * @param virtaddr the virtual address
+ * @return the mapped address
+ */
+void* memmgr_get_page_physical(uintptr_t virtaddr) {
+    void* physAddr = memmgr_create_or_get_page(virtaddr, 0, 0);
+
+    if(physAddr == 0) {
+        return 0;
+    }
+
+    uintptr_t offset = virtaddr % 4096;
+
+    return physAddr + offset;
+}
+
+/***
  * Returns the identity mapping for the given memory region
  * @param physAddr the physical address
  * @return the virtual memory address for direct access by kernel
@@ -198,7 +215,7 @@ void load_page_map(uintptr_t pageMap) {
             : : "r"((uintptr_t)pageMap));
 }
 
-void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
+void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
     uint64_t INDEX_PML4 = PML4_INDEX(virtualAddr);
     uint64_t INDEX_PDP = PDP_INDEX(virtualAddr);
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
@@ -211,6 +228,10 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     if(pageMap[INDEX_PML4] == 0) {
+        if(!create) {
+            return NULL;
+        }
+
         uintptr_t pdp_frame = kalloc_frame();
 
         if(pdp_frame == UINT64_MAX) {
@@ -225,6 +246,8 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
     if(pageDirectoryPointer[INDEX_PDP] == 0) {
+        if(!create) return NULL;
+
         uintptr_t pd_frame = kalloc_frame();
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
@@ -234,6 +257,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
     if(pageDirectory[INDEX_PD] == 0) {
+        if(!create) return NULL;
         uintptr_t pt_frame = kalloc_frame();
         pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
@@ -243,6 +267,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags) {
     }
 
     if(pageTable[INDEX_PT] == 0) {
+        if(!create) return NULL;
         //printf("Creating new page\n");
         pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE | flags;
     }
@@ -477,7 +502,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
     if(addr == 0) {
         if(is_kernel) {
-            uintptr_t start_addr = (uintptr_t)(&_end);
+            uintptr_t start_addr = (uintptr_t)(_end);
             if(!((uintptr_t)start_addr & (PAGE_SIZE - 1))) {
                 start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
             }
@@ -488,7 +513,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             }
 
             for(size_t i = 1; i < count+1; i++) {
-                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER);
+                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER, 1);
                 memmgr_reload(start_addr + 0x1000 * i);
             }
 
@@ -506,7 +531,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             printf("Start addr: 0x%x, Count: %d\n", start_addr, count);
 
             for(size_t i = 0; i < count; i++) {
-                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER);
+                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER, 1);
                 memmgr_reload(start_addr + 0x1000 * i);
             }
 
@@ -519,7 +544,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
         }
 
         for(size_t i = 0; i < count; i++) {
-            memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER);
+            memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER, 1);
             memmgr_reload(addr + 0x1000 * i);
         }
 

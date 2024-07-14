@@ -22,7 +22,7 @@ void* mmap(void* addr, size_t len, bool is_kernel);
 
 void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew);
 void* memmgr_get_current_pml4();
-void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags);
+void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create);
 void memmgr_clear_page_map(uintptr_t pageMap);
 
 void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel);
@@ -32,8 +32,9 @@ void load_page_map(uintptr_t pageMap);
 
 void* memmgr_get_from_virtual(uintptr_t virtAddr);
 void* memmgr_get_from_physical(uintptr_t physAddr);
+void* memmgr_get_page_physical(uintptr_t virtaddr);
 
-        void* memcpy(void* __restrict, const void* __restrict, size_t);
+void* memcpy(void* __restrict, const void* __restrict, size_t);
 void* memset(void*, int, size_t);
 
 void* sbrk(intptr_t len);

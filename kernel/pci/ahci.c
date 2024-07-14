@@ -8,6 +8,7 @@
 #include "../../libc/include/kernel/list.h"
 
 #include <stdio.h>
+#include <string.h>
 
 list_t hard_drives;
 sata_device_t* sataDevice;
@@ -40,12 +41,13 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
         return;
     }
 
-    uintptr_t ptrCmdHeader = ((uintptr_t)port->clbu) << 32 | port->clb;
+    void* ptrCmdHeader = memmgr_get_from_physical(((uintptr_t)port->clbu) << 32 | port->clb);
     HBA_CMD_HEADER* cmdHeader = (HBA_CMD_HEADER*)ptrCmdHeader;
     cmdHeader += cmdIndex;
 
-    HBA_CMD_TBL* cmdTable = (HBA_CMD_TBL*)(((uintptr_t)cmdHeader->ctbau) << 32 | cmdHeader->ctba);
+    HBA_CMD_TBL* cmdTable = (HBA_CMD_TBL*) memmgr_get_from_physical((((uintptr_t)cmdHeader->ctbau) << 32 | cmdHeader->ctba));
     FIS_REG_H2D* commandFIS = (FIS_REG_H2D*)(cmdTable->cfis);
+    memset(commandFIS, 0, 5 * 4);
 
     cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
     cmdHeader->prdtl = 1;
@@ -54,19 +56,24 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
     commandFIS->command = ataCommand; //Command
     commandFIS->c = 1; //Command Type
+    commandFIS->featureh = 0;
+    commandFIS->featurel = 0;
     commandFIS->lba0 = (uint8_t)ioRequest->offset;
     commandFIS->lba1 = (uint8_t)(ioRequest->offset>>8);
     commandFIS->lba2 = (uint8_t)(ioRequest->offset>>16);
-    commandFIS->device = 1<<6;  // LBA mode
+    commandFIS->device = ioRequest->offset != 0 ? 1<<6 : 0;  // LBA mode
     commandFIS->lba3 = (uint8_t)(ioRequest->offset>>24);
     commandFIS->lba4 = (uint8_t)(ioRequest->offset>>32);
     commandFIS->lba5 = (uint8_t)(ioRequest->offset>>40);
     commandFIS->countl = ioRequest->count & 0xFF;
     commandFIS->counth = (ioRequest->count >> 8) & 0xFF;
+    uintptr_t bufferPhys = memmgr_get_page_physical(ioRequest->buffer);
 
-    cmdTable->prdt_entry[0].dba = (uintptr_t)ioRequest->buffer;
-    cmdTable->prdt_entry[0].dbau = ((uintptr_t)ioRequest->buffer >> 32);
-    cmdTable->prdt_entry[0].dbc = ioRequest->count;
+    cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
+    cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
+    cmdTable->prdt_entry[0].dbc = ioRequest->count - 1;
+
+    port->is = ~0;
 
     port->ci |= 1 << cmdIndex;
 
@@ -75,8 +82,12 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
             break;
         }
 
-        //Command finished, packet in buffer
-        return;
+        if(port->is & HBA_PxIS_TFES) {
+            printf("READ DISK ERROR");
+            panic();
+
+            return;
+        }
     }
 }
 
@@ -188,23 +199,23 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
             continue;
         }
 
-        HBA_CMD_HEADER* commandList = malloc(sizeof(HBA_CMD_HEADER) * 32);
+        HBA_CMD_HEADER* commandList = memmgr_get_from_physical(kalloc_frame());
         for(int j = 0; j < 32; j++) {
             commandList += j;
 
-            HBA_CMD_TBL* cmd_tbl = malloc(sizeof(HBA_CMD_TBL));
+            HBA_CMD_TBL* cmd_tbl = memmgr_get_from_physical(kalloc_frame());
 
-            commandList->ctba = ((uintptr_t)cmd_tbl) & 0xffffffff;
-            commandList->ctbau = ((uintptr_t)cmd_tbl) >> 32;
+            commandList->ctba = ((uintptr_t) memmgr_get_from_virtual((uintptr_t)cmd_tbl)) & 0xffffffff;
+            commandList->ctbau = ((uintptr_t)memmgr_get_from_virtual((uintptr_t)cmd_tbl)) >> 32;
         }
 
-        HBA_FIS* receivedFIS = malloc(sizeof(HBA_FIS));
+        HBA_FIS* receivedFIS = memmgr_get_from_physical(kalloc_frame());
 
-        mem->ports[i].clb = ((uintptr_t)commandList) & 0xffffffff;
-        mem->ports[i].clbu = ((uintptr_t)commandList) >> 32;
+        mem->ports[i].clb = ((uintptr_t) memmgr_get_from_virtual((uintptr_t)commandList)) & 0xffffffff;
+        mem->ports[i].clbu = ((uintptr_t)memmgr_get_from_virtual((uintptr_t)commandList)) >> 32;
 
-        mem->ports[i].fb = ((uintptr_t )receivedFIS) & 0xffffffff;
-        mem->ports[i].fbu = ((uintptr_t)receivedFIS) >> 32;
+        mem->ports[i].fb = ((uintptr_t ) memmgr_get_from_virtual((uintptr_t)receivedFIS)) & 0xffffffff;
+        mem->ports[i].fbu = ((uintptr_t) memmgr_get_from_virtual((uintptr_t)receivedFIS)) >> 32;
 
         while(mem->ports[i].cmd & HBA_PxCMD_CR);
 
@@ -220,21 +231,29 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
             sataDevice = calloc(1, sizeof(sata_device_t));
             io_request_t ioRequest;
             ioRequest.buffer = malloc(512);
+            memset(ioRequest.buffer, 0, 512);
             ioRequest.count = 512;
+            ioRequest.offset = 0;
 
             ahci_send_command(&ioRequest, ATA_CMD_IDENTIFY);
 
             //TODO: Parse Identify Packet
             ata_device_info_t* deviceInfo = (ata_device_info_t*)ioRequest.buffer;
 
-            printf("Available space: %d bytes\n", deviceInfo->capacitySectors * 512);
+            printf("Available space: %d bytes\n", ((uint64_t)deviceInfo->numUserAddressableSectors) * 512);
 
             file_node_t* node = create_ahci_device(sataDevice);
 
             char* path = calloc(32, sizeof(char));
             snprintf(path, 32, "/%s/%s", "dev", node->name);
+            char* pathDup = strdup(path);
 
-            mount_directly(path, node);
+            sataDevice->node = node;
+            sataDevice->port = i;
+            sataDevice->size = deviceInfo->capacitySectors * 512;
+
+            mount_directly(pathDup, node);
+            free(pathDup);
             printf("Mounted hdd at %s\n", path);
         }
     }

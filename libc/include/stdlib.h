@@ -15,6 +15,7 @@ void     *calloc(size_t, size_t);		//< The standard function.
 void      free(void *);					//< The standard function.
 int atexit(void (*func) (void));
 int atoi(const char*);
+void itoa (int d, char * buf, int base);
 char* getenv(const char*);
 int abs(int n);
 void exit(int);
