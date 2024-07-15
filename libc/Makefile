@@ -43,6 +43,7 @@ string/strdup.o \
 string/string.o \
 kernel/list.o \
 kernel/tree.o \
+kernel/hashtable.o \
 
 HOSTEDOBJS=\
 $(ARCH_HOSTEDOBJS) \

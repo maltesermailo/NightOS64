@@ -82,4 +82,13 @@ void* brk(size_t len);
 
 size_t get_heap_length();
 
+#define EXPORT_SYMBOL(sym)                                \
+    static const char __ksymtab_##sym[]                   \
+    __attribute__((section("__ksymtab_strings")))         \
+    = #sym;                                               \
+    static const struct kernel_symbol __ksymtab_##sym     \
+    __attribute__((section("__ksymtab"))) = {             \
+        (unsigned long)&sym, __ksymtab_##sym              \
+    }
+
 #endif //NIGHTOS_MEMMGR_H
