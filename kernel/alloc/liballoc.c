@@ -202,10 +202,10 @@ static inline struct boundary_tag* absorb_right( struct boundary_tag *tag )
 
 static inline struct boundary_tag* split_tag( struct boundary_tag* tag )
 {
-    unsigned int remainder = tag->real_size - sizeof(struct boundary_tag) - tag->size;
+    unsigned long long remainder = tag->real_size - sizeof(struct boundary_tag) - tag->size;
 
     struct boundary_tag *new_tag =
-            (struct boundary_tag*)((unsigned int)tag + sizeof(struct boundary_tag) + tag->size);
+            (struct boundary_tag*)((unsigned long long)tag + sizeof(struct boundary_tag) + tag->size);
 
     new_tag->magic = LIBALLOC_MAGIC;
     new_tag->real_size = remainder;
@@ -401,7 +401,7 @@ void free(void *ptr)
     liballoc_lock();
 
 
-    tag = (struct boundary_tag*)((unsigned int)ptr - sizeof( struct boundary_tag ));
+    tag = (struct boundary_tag*)((unsigned long long)ptr - sizeof( struct boundary_tag ));
 
     if ( tag->magic != LIBALLOC_MAGIC )
     {
@@ -490,7 +490,7 @@ void free(void *ptr)
 
 void* calloc(size_t nobj, size_t size)
 {
-    long long real_size;
+    unsigned long long real_size;
     void *p;
 
     real_size = nobj * size;

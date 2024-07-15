@@ -503,7 +503,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
     if(addr == 0) {
         if(is_kernel) {
             uintptr_t start_addr = (uintptr_t)(_end);
-            if(!((uintptr_t)start_addr & (PAGE_SIZE - 1))) {
+            if((((uintptr_t)start_addr % PAGE_SIZE) != 0)) {
                 start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
             }
 
