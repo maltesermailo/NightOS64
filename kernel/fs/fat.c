@@ -32,7 +32,7 @@ file_node_t* fat_mount(char* device, char* name) {
     printf("FAT: Number of bytes per sector %d\n", fatFs->fatBpb.bytes_per_sector);
     printf("FAT: Sectors per cluster: %d\n", fatFs->fatBpb.sectors_per_cluster);
     printf("FAT: Number of FATs: %d\n", fatFs->fatBpb.table_count);
-    printf("FAT: Number of root dir entries: %d", fatFs->fatBpb.root_entry_count);
+    printf("FAT: Number of root dir entries: %d\n", fatFs->fatBpb.root_entry_count);
     printf("FAT: Sector count 16: %d\n", fatFs->fatBpb.total_sectors_16);
     printf("FAT: Extended sector count: %d\n", fatFs->fatBpb.total_sectors_32);
 

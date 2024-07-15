@@ -61,12 +61,12 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     commandFIS->lba0 = (uint8_t)ioRequest->offset;
     commandFIS->lba1 = (uint8_t)(ioRequest->offset>>8);
     commandFIS->lba2 = (uint8_t)(ioRequest->offset>>16);
-    commandFIS->device = ioRequest->offset != 0 ? 1<<6 : 0;  // LBA mode
+    commandFIS->device = ataCommand != ATA_CMD_IDENTIFY ? 1<<6 : 0;  // LBA mode
     commandFIS->lba3 = (uint8_t)(ioRequest->offset>>24);
     commandFIS->lba4 = (uint8_t)(ioRequest->offset>>32);
     commandFIS->lba5 = (uint8_t)(ioRequest->offset>>40);
-    commandFIS->countl = ataCommand != ATA_CMD_IDENTIFY ? ioRequest->count & 0xFF : 0;
-    commandFIS->counth = ataCommand != ATA_CMD_IDENTIFY ? (ioRequest->count >> 8) & 0xFF : 0;
+    commandFIS->countl = ataCommand != ATA_CMD_IDENTIFY ? (ioRequest->count / 512) & 0xFF : 0;
+    commandFIS->counth = ataCommand != ATA_CMD_IDENTIFY ? ((ioRequest->count / 512) >> 8) & 0xFF : 0;
 
     //TODO: Allow buffers larger than 8k
     uintptr_t bufferPhys = memmgr_get_page_physical(ioRequest->buffer);
@@ -74,6 +74,18 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
     cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
     cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
+
+    unsigned long spin = 0;
+
+    while ((port->tfd & (ATA_SR_BSY | ATA_SR_DRQ)) && spin < 1000000)
+    {
+        spin++;
+    }
+    if (spin == 1000000)
+    {
+        printf("Port is hung\n");
+        return;
+    }
 
     port->is = ~0;
 
