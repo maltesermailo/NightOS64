@@ -36,6 +36,12 @@ file_node_t* fat_mount(char* device, char* name) {
     printf("FAT: Sector count 16: %d\n", fatFs->fatBpb.total_sectors_16);
     printf("FAT: Extended sector count: %d\n", fatFs->fatBpb.total_sectors_32);
 
+    fatFs->fatPointer = fatFs->fatBpb.reserved_sector_count;
+    fatFs->sectorSize = fatFs->fatBpb.bytes_per_sector;
+    fatFs->clusterSize = fatFs->fatBpb.sectors_per_cluster;
+    fatFs->capacity = fatFs->fatBpb.total_sectors_32;
+    fatFs->dataPointer = fatFs->fatPointer + fatFs->fatBpb.table_count * fatFs->fatEbr32.table_size_32;
+
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
 }

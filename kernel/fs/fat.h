@@ -90,9 +90,12 @@ typedef struct FatFilesystem {
     uint32_t sectorSize; //In bytes
     uint32_t clusterSize;
 
-    file_node_t* physicalDevice;
+    uint32_t capacity; //In sectors
 
-    uint32_t * FAT;
+    uint64_t fatPointer; //Pointer to the fat
+    uint64_t dataPointer; //First data sector
+
+    file_node_t* physicalDevice;
 } fat_fs_t;
 
 file_node_t* fat_mount(char* device, char* name);
