@@ -49,7 +49,7 @@ enter_user:
     mov rax, rsi
     push qword 0x20 | 0x03 ; Push stack segment
     push rax               ; Push stack pointer
-    push 0x300             ; Push EFLAGS
+    push 0x200             ; Push EFLAGS
     push qword 0x18 | 0x03 ; Push code selector
     push qword rdi         ; Push RIP
     iretq                  ; Return to userspace

@@ -67,6 +67,7 @@ SECTIONS
    }
 
    _end = .;
+   _physical_end = . - KERNEL_VMA + KERNEL_LMA;
 
    /DISCARD/ :
    {

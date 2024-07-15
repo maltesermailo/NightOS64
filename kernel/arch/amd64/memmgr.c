@@ -512,8 +512,8 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 count++;
             }
 
-            for(size_t i = 1; i < count+1; i++) {
-                memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER, 1);
+            for(size_t i = 0; i < count; i++) {
+                memmgr_create_or_get_page(start_addr + 0x1000 * i, 0, 1);
                 memmgr_reload(start_addr + 0x1000 * i);
             }
 
@@ -798,7 +798,7 @@ void memmgr_dump() {
 
 void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     //printf("info loc: 0x%x\n", info);
-    _end = kernel_end;
+    _end = kernel_end | 0xffffff0000000000ull;
 
     multiboot_memory_map_t* mmap;
 
@@ -820,7 +820,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     }
 
     //Map kernel low memory
-    for(int i = 0x0; i < 0x401000; i += 0x1000) {
+    for(int i = 0x0; i < 0x801000; i += 0x1000) {
         memmgr_phys_mark_page(ADDRESS_TO_PAGE(i));
     }
     spin_unlock(&PHYS_MEM_LOCK);

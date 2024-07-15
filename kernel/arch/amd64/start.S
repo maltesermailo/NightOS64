@@ -214,9 +214,10 @@ PAGE_WRITABLE equ 1 << 1
 PAGE_USER     equ 1 << 2
 
 .LongMode:
+    mov rax, 0
     mov rdi, 0x6000
-    mov rcx, 4096 ; Clear the next 4096*8 byte
-    rep stosd
+    mov rcx, 4096; Clear the next 4096*8 byte
+    rep stosq
 
     mov rdi, 0x1FF0
     mov QWORD [rdi], 0x6007

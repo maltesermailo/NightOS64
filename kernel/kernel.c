@@ -18,6 +18,7 @@
 #include "serial.h"
 #include "fs/tarfs.h"
 #include "fs/console.h"
+#include "fs/fat.h"
 #include "acpi.h"
 
 /* Hardware text mode color constants. */
@@ -66,8 +67,8 @@ size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
 RSDP_t* rsdp;
-extern unsigned long long _end;
-uintptr_t kernel_end = (uintptr_t)&_end;
+extern unsigned long long _physical_end;
+uintptr_t kernel_end = 0;
 
 
 void terminal_initialize(void)
@@ -333,6 +334,8 @@ void kernel_main(unsigned long magic, unsigned long header)
         return;
     }
 
+    kernel_end = (uintptr_t) &_physical_end;
+
     struct multiboot_tag* tag;
     unsigned size;
 
@@ -341,7 +344,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     size = *(unsigned *) header;
 
     serial_printf("Colonel version 0.0.0 starting up...\n");
-    printf("Colonel version 0.0.0 starting up...\n");
+    printf("Colonel version 0.0.0-2 starting up...\n");
 
     //Multiboot parsing
     for (tag = (struct multiboot_tag *) (header + 8);
@@ -422,8 +425,6 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     __asm__ volatile ("sti"); // set the interrupt flag
 
-    ksleep(1000);
-
     //Setup filesystem and modules
     vfs_install();
 
@@ -484,7 +485,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     write(hConsole, "test", strlen("test")+1);
 
     //Load filesystem at hd0
-    
+    fat_mount("/dev/hd0", "/fatfs");
 
     process_init();
     process_create_idle();

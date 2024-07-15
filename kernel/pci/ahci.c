@@ -51,7 +51,7 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
 
     cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
     cmdHeader->prdtl = 1;
-    cmdHeader->w = ioRequest->type;
+    cmdHeader->w = 0;
 
     commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
     commandFIS->command = ataCommand; //Command
@@ -65,13 +65,15 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     commandFIS->lba3 = (uint8_t)(ioRequest->offset>>24);
     commandFIS->lba4 = (uint8_t)(ioRequest->offset>>32);
     commandFIS->lba5 = (uint8_t)(ioRequest->offset>>40);
-    commandFIS->countl = ioRequest->count & 0xFF;
-    commandFIS->counth = (ioRequest->count >> 8) & 0xFF;
+    commandFIS->countl = ataCommand != ATA_CMD_IDENTIFY ? ioRequest->count & 0xFF : 0;
+    commandFIS->counth = ataCommand != ATA_CMD_IDENTIFY ? (ioRequest->count >> 8) & 0xFF : 0;
+
+    //TODO: Allow buffers larger than 8k
     uintptr_t bufferPhys = memmgr_get_page_physical(ioRequest->buffer);
 
     cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
     cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
-    cmdTable->prdt_entry[0].dbc = ioRequest->count - 1;
+    cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
 
     port->is = ~0;
 
@@ -88,6 +90,11 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
 
             return;
         }
+    }
+
+    if(port->tfd & (ATA_SR_ERR | ATA_SR_DF)) {
+        printf("IDENTIFY command failed. Status: 0x%02X, Error: 0x%02X\n", port->tfd & 0xFF, (port->tfd >> 8) & 0xFF);
+        return;
     }
 }
 
@@ -198,6 +205,11 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
         if(!isPortActive) {
             continue;
         }
+
+        //mem->ports[i].cmd &= ~HBA_PxCMD_ST;
+        //mem->ports[i].cmd &= ~HBA_PxCMD_FRE;
+
+        //while(mem->ports[i].cmd & HBA_PxCMD_CR);
 
         HBA_CMD_HEADER* commandList = memmgr_get_from_physical(kalloc_frame());
         for(int j = 0; j < 32; j++) {
