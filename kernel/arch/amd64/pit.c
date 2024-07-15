@@ -17,6 +17,10 @@
 
 static volatile uint64_t counter = 0;
 
+/**
+ * This function is called every 10 milliseconds and starts the context switch with schedule(false);
+ * @param regs
+ */
 void pit_interrupt(regs_t* regs) {
     counter++;
 
@@ -27,6 +31,10 @@ void pit_interrupt(regs_t* regs) {
     schedule(false);
 }
 
+/**
+ * Sleeps for x milliseconds in busy-waiting, thereby blocking the cpu
+ * @param milliseconds the milliseconds to wait
+ */
 void ksleep(int milliseconds) {
     int endCounter = (milliseconds / 10) + 1 + counter;
 
@@ -43,6 +51,9 @@ unsigned long get_counter() {
     return counter;
 }
 
+/**
+ * This function initializes the PIT timer with a scale of approximately every 10 milliseconds
+ */
 void timer_init() {
     irq_install_handler(0, pit_interrupt);
 

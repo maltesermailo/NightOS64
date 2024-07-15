@@ -57,6 +57,9 @@ void pic_enableInterrupt(uint8_t irq) {
     outb(PIC1_DATA, data);
 }
 
+/**
+ * This function sets up the Programmable Interrupt Controller. It enables the keyboard, pit and hdd interrupt on line 10
+ */
 void pic_setup() {
     outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
     io_wait();

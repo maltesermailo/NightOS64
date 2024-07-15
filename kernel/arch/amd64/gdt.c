@@ -10,6 +10,10 @@ static tss_entry_t tss;
 extern void* stack_top;
 extern void reloadSegments();
 
+/**
+ * This functions loads the installed GDT from start.S and modifies the TSS to point towards our kernel stack
+ * and also make it accessible for context switch
+ */
 void gdt_install() {
     __asm__("sgdt %0" : "=m"(pointer) : : "memory");
 
