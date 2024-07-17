@@ -67,7 +67,7 @@ file_node_t* fat_mount(char* device, char* name) {
 
         printf("File name: %s\n", fatDirPointer->filename);
         printf("File type: %d\n", fatDirPointer->attributes);
-        printf("Cluster: %d\n", (fatDirPointer->clusterHigh << 32) | fatDirPointer->clusterLow);
+        printf("Cluster: %d\n", (uint64_t)((uint64_t)fatDirPointer->clusterHigh << 32) | fatDirPointer->clusterLow);
     }
 
     __asm__ volatile("cli");
