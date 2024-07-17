@@ -71,9 +71,34 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     //TODO: Allow buffers larger than 8k
     uintptr_t bufferPhys = memmgr_get_page_physical(ioRequest->buffer);
 
-    cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
-    cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
-    cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
+    if(ioRequest->count < 4096) {
+        cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
+        cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
+        cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
+    } else {
+        //PRDT supports 8K byte reads per PRDT, but since we are using paging and our physical pages might be scattered, we do 4K per PRDT. Easier to manage.
+        int countOfPRDTs = ioRequest->count / 4096;
+
+        if(countOfPRDTs > 8) {
+            printf("WARNING: ATA Read tried to read more than 32 KB!");
+            //Not supported
+            return;
+        }
+
+        int remaining = ioRequest->count;
+
+        for(int i = 0; i < countOfPRDTs; i++) {
+            int count = remaining > 4096 ? 4096 : remaining;
+
+            cmdTable->prdt_entry[0].dba = (uintptr_t)memmgr_get_page_physical(
+                    (uintptr_t) (ioRequest->buffer + i * 4096));
+            cmdTable->prdt_entry[0].dbau = ((uintptr_t)memmgr_get_page_physical(
+                    (uintptr_t) (ioRequest->buffer + i * 4096)) >> 32);
+            cmdTable->prdt_entry[0].dbc = (count - 1) | 1;
+
+            remaining -= count;
+        }
+    }
 
     unsigned long spin = 0;
 

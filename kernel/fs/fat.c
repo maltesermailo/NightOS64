@@ -40,7 +40,35 @@ file_node_t* fat_mount(char* device, char* name) {
     fatFs->sectorSize = fatFs->fatBpb.bytes_per_sector;
     fatFs->clusterSize = fatFs->fatBpb.sectors_per_cluster;
     fatFs->capacity = fatFs->fatBpb.total_sectors_32;
-    fatFs->dataPointer = fatFs->fatPointer + fatFs->fatBpb.table_count * fatFs->fatEbr32.table_size_32;
+    fatFs->dataPointer = fatFs->fatPointer + fatFs->fatBpb.table_count * fatFs->fatEbr32.table_size_32; //This is the location of the first sector
+
+    char* dirEntryBytes = calloc(1, fatFs->sectorSize * fatFs->clusterSize);
+    struct fatDirEntry* fatDirPointer = (struct fatDirEntry*) dirEntryBytes;
+
+    //read root cluster
+    deviceNode->file_ops.read(deviceNode, dirEntryBytes, (fatFs->dataPointer * fatFs->sectorSize) + fatFs->sectorSize * fatFs->clusterSize * (fatFs->fatEbr32.root_cluster - 2), fatFs->sectorSize * fatFs->clusterSize);
+
+    while(1) {
+        //Read dir entries
+        if(fatDirPointer->filename[0] == 0x00) {
+            //End of files
+            break;
+        }
+
+        if(fatDirPointer->filename[0] == 0xE5) {
+            //Reserved entry
+            continue;
+        }
+
+        if(fatDirPointer->attributes == 0x0F) {
+            printf("WARNING: Long file names not supported by driver.");
+            continue;
+        }
+
+        printf("File name: %s\n", fatDirPointer->filename);
+        printf("File type: %d\n", fatDirPointer->attributes);
+        printf("Cluster: %d\n", (fatDirPointer->clusterHigh << 32) | fatDirPointer->clusterLow);
+    }
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
