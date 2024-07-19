@@ -35,6 +35,8 @@ int get_next_free(int portNumber) {
 void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     HBA_PORT* port = &hba->ports[sataDevice->port];
 
+    uint64_t offset = ioRequest->offset / 512; //Convert to LBA
+
     int cmdIndex = get_next_free(sataDevice->port);
 
     if(cmdIndex == -1) {
@@ -58,13 +60,13 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     commandFIS->c = 1; //Command Type
     commandFIS->featureh = 0;
     commandFIS->featurel = 0;
-    commandFIS->lba0 = (uint8_t)ioRequest->offset;
-    commandFIS->lba1 = (uint8_t)(ioRequest->offset>>8);
-    commandFIS->lba2 = (uint8_t)(ioRequest->offset>>16);
+    commandFIS->lba0 = (uint8_t)offset;
+    commandFIS->lba1 = (uint8_t)(offset>>8);
+    commandFIS->lba2 = (uint8_t)(offset>>16);
     commandFIS->device = ataCommand != ATA_CMD_IDENTIFY ? 1<<6 : 0;  // LBA mode
-    commandFIS->lba3 = (uint8_t)(ioRequest->offset>>24);
-    commandFIS->lba4 = (uint8_t)(ioRequest->offset>>32);
-    commandFIS->lba5 = (uint8_t)(ioRequest->offset>>40);
+    commandFIS->lba3 = (uint8_t)(offset>>24);
+    commandFIS->lba4 = (uint8_t)(offset>>32);
+    commandFIS->lba5 = (uint8_t)(offset>>40);
     commandFIS->countl = ataCommand != ATA_CMD_IDENTIFY ? (ioRequest->count / 512) & 0xFF : 0;
     commandFIS->counth = ataCommand != ATA_CMD_IDENTIFY ? ((ioRequest->count / 512) >> 8) & 0xFF : 0;
 

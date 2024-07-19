@@ -82,10 +82,35 @@ typedef struct fatDirEntry {
     unsigned int size;
 };
 
+typedef struct PartitionEntry {
+    unsigned char bootFlag;
+    unsigned char startHead;
+    unsigned short startSector : 6;
+    unsigned short startCylinder: 10;
+    unsigned char systemId;
+    unsigned char endingHead;
+    unsigned short endingSector : 6;
+    unsigned short endingCylinder: 10;
+    unsigned int startLBA;
+    unsigned int totalSectors;
+} __attribute__((packed)) partition_entry_t;
+
+#define MBR_SIGNATURE 0xAA55
+
+typedef struct MBR {
+    unsigned char boot_code[440];
+    unsigned int driveId;
+    unsigned short res0;
+    partition_entry_t partitionEntries[4];
+    unsigned short signature;
+} mbr_t;
+
 typedef struct FatFilesystem {
     fatBPB_t fatBpb;
     fatEBR32_t fatEbr32;
     fatFSInfo_t fatFsInfo;
+
+    uint32_t baseOffset;
 
     uint32_t sectorSize; //In bytes
     uint32_t clusterSize;
