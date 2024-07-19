@@ -472,20 +472,22 @@ void kernel_main(unsigned long magic, unsigned long header)
     }*/
     console_init();
 
+    //Load filesystem at hd0
+    mount_directly("/fatfs", fat_mount("/dev/hd0", "/fatfs"));
+
     printf("Performing list test now...\n");
     //list_test();
     printf("Performing tree test now...\n");
     //tree_test();
     printf("Performing VFS test now...\n");
     vfs_test();
+    printf("Performing FAT test now...\n");
+    fat_test();
 
     //Try opening console
     file_node_t* console0 = open("/dev/console0", 0);
     file_handle_t* hConsole = create_handle(console0);
     write(hConsole, "test", strlen("test")+1);
-
-    //Load filesystem at hd0
-    fat_mount("/dev/hd0", "/fatfs");
 
     process_init();
     process_create_idle();

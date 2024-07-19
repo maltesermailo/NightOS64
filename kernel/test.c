@@ -111,7 +111,7 @@ void vfs_test() {
     //Now do the same with read_dir in the root directory
     int count = get_size(root);
 
-    list_dir_t* ptr = null;
+    list_dir_t* ptr = NULL;
     int readCount = getdents(root, &ptr, count);
 
     printf("Read %d entries from root directory\n", readCount);
@@ -134,4 +134,20 @@ void vfs_test() {
     printf("%s: %s\n", test->name, bytes);
 
     printf("Test successful if output is correct.\n");
+}
+
+void fat_test() {
+    file_node_t* fatRoot = open("/fatfs", 0);
+
+    int count = get_size(fatRoot);
+    printf("Fat Root Directory: %d entries\n", count);
+
+    list_dir_t* ptr = NULL;
+    int readCount = getdents(fatRoot, &ptr, count);
+
+    printf("Read %d entries from root directory\n", readCount);
+
+    for(int i = 0; i < readCount; i++) {
+        printf("Entry: %s, %d, %d\n", ptr[i].name, ptr[i].type, ptr[i].size);
+    }
 }

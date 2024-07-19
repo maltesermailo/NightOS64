@@ -69,6 +69,13 @@ bool vfs_create(struct FILE* parent, char* filename, int mode) {
 int mount_directly(char* name, file_node_t* node) {
     if(strlen(name) == 1 && memcmp(name, "/", strlen(name)) == 0) {
         //Root file system, just load directories
+        if(root_node != null)  {
+            //We just add the size for mapped directories.
+            //Probably should do this different later
+            //TODO: Proper cleanup on umount
+            node->size += root_node->size;
+        }
+
         root_node = node;
 
         file_tree->head->value = node;
@@ -90,6 +97,9 @@ int mount_directly(char* name, file_node_t* node) {
     if(treeNode == null) {
         return 2;
     }
+
+    file_node_t* parentNode = (file_node_t*)treeNode->value;
+    parentNode->size++;
 
     tree_insert_child(file_tree, treeNode, node);
 
@@ -345,6 +355,9 @@ file_node_t* open(char* filename, int mode) {
     }
 
     file_node_t* node = resolve_path("/", filename, NULL, NULL);
+    if(node->file_ops.open) {
+        node->file_ops.open(node);
+    }
 
     return node;
 }
