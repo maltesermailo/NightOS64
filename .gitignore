@@ -5,4 +5,5 @@
 *.kernel
 rootfs.tar
 initd
+init/init
 .*
