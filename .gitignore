@@ -1,0 +1,8 @@
+*.d
+*.o
+*.vhdx
+*.iso
+*.kernel
+rootfs.tar
+initd
+.*
