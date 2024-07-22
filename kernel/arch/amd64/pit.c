@@ -28,7 +28,7 @@ void pit_interrupt(regs_t* regs) {
     if(regs->cs == 0x08) return;
 
     //We got pre-empted, so no sleep
-    schedule(false);
+    //schedule(false);
 }
 
 /**

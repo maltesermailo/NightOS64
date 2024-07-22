@@ -52,11 +52,11 @@ static uint64_t* IDENTITY_MAP_PD[512] __attribute__((aligned(4096)));
 /****************************************************************/
 
 //Static location of the identity boot page map
-static uint64_t* PAGE_MAP = 0x1000;
+static uint64_t* PAGE_MAP = (uint64_t*)0x1000;
 //Base location of the entire memory accessible for kernel
-static uint64_t* KERNEL_MEMORY_BASE_PTR = KERNEL_MEMORY;
+static uint64_t* KERNEL_MEMORY_BASE_PTR = (uint64_t*)KERNEL_MEMORY;
 //Static location of runtime identity page map
-static uint64_t* KERNEL_PAGE_MAP = KERNEL_MEMORY + 0x1000;
+static uint64_t* KERNEL_PAGE_MAP = (uint64_t*)KERNEL_MEMORY + 0x1000;
 
 const static size_t PAGE_SIZE = 4096;
 const static uintptr_t KERNEL_ENTRY = 0xffffff0000000000ull;
@@ -161,7 +161,7 @@ void kfree_frame(uintptr_t addr) {
  * @return
  */
 void* memmgr_get_current_pml4() {
-    return process_get_current_pml();
+    return (void*)process_get_current_pml();
 }
 
 /***
@@ -170,7 +170,7 @@ void* memmgr_get_current_pml4() {
  * @return the physical address
  */
 void* memmgr_get_from_virtual(uintptr_t virtAddr) {
-    return (virtAddr & LOW_MEMORY);
+    return (void*)(virtAddr & LOW_MEMORY);
 }
 
 /***
@@ -196,11 +196,11 @@ void* memmgr_get_page_physical(uintptr_t virtaddr) {
  * @return the virtual memory address for direct access by kernel
  */
 void* memmgr_get_from_physical(uintptr_t physAddr) {
-    return (physAddr | KERNEL_MEMORY);
+    return (void*)(physAddr | KERNEL_MEMORY);
 }
 
 void* memmgr_get_mmio(uintptr_t physAddr) {
-    return (physAddr | MMIO_MEMORY);
+    return (void*)(physAddr | MMIO_MEMORY);
 }
 
 extern void load_page_map0(uintptr_t pageMap);
@@ -224,7 +224,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
     //printf("Virtual addr: 0x%x\n", virtualAddr);
     //printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
 
-    uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     //If PDP doesnt exist, either return or try to create
@@ -281,7 +281,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
 }
 
 void* get_free_page(size_t len) {
-    uint64_t* pageMap = memmgr_get_from_physical(memmgr_get_current_pml4());
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0] & PAGE_MASK);
 
     //printf("Page map loc: 0x%x\n", pageMap);
@@ -289,7 +289,7 @@ void* get_free_page(size_t len) {
 
     if(pageDirectoryPointer == 0) {
         //No memory???
-        return UINT64_MAX;
+        return (void*)UINT64_MAX;
     }
 
     //We use these to calculate the baseAddress and space of the minimum-largest memory pocket we can find.
@@ -315,7 +315,7 @@ void* get_free_page(size_t len) {
             freeMemory += 0x40000000UL;
 
             if(freeMemory > len) {
-                return baseAddress;
+                return (void*)baseAddress;
             }
 
             continue;
@@ -347,7 +347,7 @@ void* get_free_page(size_t len) {
 
                 if(freeMemory > len) {
                     printf("cool: 0x%x\n", baseAddress);
-                    return baseAddress;
+                    return (void*)baseAddress;
                 }
 
                 continue;
@@ -377,13 +377,13 @@ void* get_free_page(size_t len) {
 
                 if(freeMemory > len) {
                     printf("cool2: 0x%x\n", baseAddress);
-                    return baseAddress;
+                    return (void*)baseAddress;
                 }
             }
         }
     }
 
-    return UINT64_MAX;
+    return (void*)UINT64_MAX;
 }
 
 void memmgr_delete_page(uintptr_t virtualAddr) {
@@ -494,7 +494,7 @@ void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel) {
         printf("Mapped %d\n", i);
     }
 
-    return start_addr;
+    return (void*)start_addr;
 }
 
 /**
@@ -506,7 +506,7 @@ void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel) {
 void* mmap(void* addr, size_t len, bool is_kernel) {
     //Page-align
     if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
-        addr = (uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
+        addr = (void*)((uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1));
     }
 
     if(addr == 0) {
@@ -528,11 +528,11 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 memmgr_reload(start_addr + 0x1000 * i);
             }
 
-            return start_addr;
+            return (void*)start_addr;
         } else {
             printf("Get next free page...\n");
             //Search new space
-            uintptr_t start_addr = get_free_page(len);
+            uintptr_t start_addr = (uintptr_t) get_free_page(len);
 
             //Divide by pages, so we get to count of pages to create
             size_t count = len / 4096;
@@ -548,7 +548,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 memmgr_reload(start_addr + 0x1000 * i);
             }
 
-            return start_addr;
+            return (void*)start_addr;
         }
     } else {
         //Divide by pages, so we get to count of pages to create
@@ -559,8 +559,15 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
         //Create the actual pages and reload the TLB at that location
         for(size_t i = 0; i < count; i++) {
+            if(memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER, 0)) {
+                return 0;
+            }
+        }
+
+        //Create the actual pages and reload the TLB at that location
+        for(size_t i = 0; i < count; i++) {
             memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER, 1);
-            memmgr_reload(addr + 0x1000 * i);
+            memmgr_reload((uintptr_t)addr + 0x1000 * i);
         }
 
         return addr;
@@ -570,7 +577,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 void munmap(void* addr, size_t len) {
     //Page-align
     if(!((size_t)addr & (PAGE_SIZE - 1))) {
-        addr = (size_t)((size_t*)addr + PAGE_SIZE) & (PAGE_SIZE - 1);
+        addr = (void*)((size_t)((size_t*)addr + PAGE_SIZE) & (PAGE_SIZE - 1));
     }
 
     size_t count = len / 4096;
@@ -580,7 +587,7 @@ void munmap(void* addr, size_t len) {
 
     for(size_t i = 1; i < count+1; i++) {
         memmgr_delete_page((uintptr_t)addr + 0x1000 * i);
-        memmgr_reload(addr + 0x1000 * i);
+        memmgr_reload((uintptr_t)addr + 0x1000 * i);
     }
 }
 
@@ -783,7 +790,7 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
         }
     }
 
-    pageMapNew[511] = memmgr_get_from_virtual(pageMapNew);
+    pageMapNew[511] = (uint64_t) memmgr_get_from_virtual((uintptr_t) pageMapNew);
 
     //Dump new page map
     for(int i = 0; i < 512; i++) {
@@ -859,7 +866,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     spin_unlock(&PHYS_MEM_LOCK);
 
     //Apply Identity Mapping for the entire supported address space
-    uint64_t* IDENTITY_MAP_PD_TEMP = (uintptr_t)IDENTITY_MAP_PD - 0xffffff0000000000ull;
+    uint64_t* IDENTITY_MAP_PD_TEMP = (uint64_t *) ((uintptr_t) IDENTITY_MAP_PD - 0xffffff0000000000ull);
 
     printf("IDENTITY MAP LOC: 0x%x\n", IDENTITY_MAP_PD_TEMP);
 

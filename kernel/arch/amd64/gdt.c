@@ -18,7 +18,7 @@ void gdt_install() {
     __asm__("sgdt %0" : "=m"(pointer) : : "memory");
 
     struct gdt* gdt;
-    gdt = pointer.base;
+    gdt = (struct gdt *) pointer.base;
 
     uintptr_t addr = (uintptr_t)&tss;
 

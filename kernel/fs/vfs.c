@@ -4,7 +4,7 @@
 #include "vfs.h"
 #include "../proc/process.h"
 #include "../../libc/include/kernel/list.h"
-#include <string.h>
+#include "../../libc/include/string.h"
 #include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
 #include "../terminal.h"
@@ -16,10 +16,10 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
 static int id_generator = 1;
 
-int vfs_read_dir(struct FILE* node, struct list_dir** buffer, int count) {
+int vfs_read_dir(struct FILE* node, struct list_dir* buffer, int count) {
     int i = 0;
 
-    list_dir_t* ptr = *buffer;
+    list_dir_t* ptr = buffer;
 
     tree_node_t* treeNode = tree_find_child_root(file_tree, node);
 
@@ -167,11 +167,11 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
         if(fCwd == NULL) {
             tree_node_t* current = file_tree->head;
 
-            char* pch = NULL;
+            char* pch = (char *) NULL;
             char* save = NULL;
             printf("Resolving cwd: %s\n", cwd);
 
-            pch = strtok_r(cwd, "/", &save);
+            pch = (char *) strtok_r(cwd, "/", &save);
 
             do {
                 if(strcmp(pch, "..") == 0) {
@@ -184,11 +184,11 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                         current = current->parent;
                     }
 
-                    pch = strtok_r(NULL, "/", &save);
+                    pch = (char *) strtok_r(NULL, "/", &save);
 
                     continue;
                 } else if(strcmp(pch, ".") == 0) {
-                    pch = strtok_r(NULL, "/", &save);
+                    pch = (char *) strtok_r(NULL, "/", &save);
 
                     continue;
                 } else {
@@ -231,11 +231,11 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     tree_node_t* current = fCwd;
     tree_node_t* fParent = NULL;
 
-    char* pch = NULL;
+    char* pch = (char *) NULL;
     char* save = NULL;
     printf("Resolving path: %s\n", file);
 
-    pch = strtok_r(file, "/", &save);
+    pch = (char *) strtok_r(file, "/", &save);
 
     do {
         if(strcmp(pch, "..") == 0) {
@@ -248,11 +248,11 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                 current = current->parent;
             }
 
-            pch = strtok_r(NULL, "/", &save);
+            pch = (char *) strtok_r(NULL, "/", &save);
 
             continue;
         } else if(strcmp(pch, ".") == 0) {
-            pch = strtok_r(NULL, "/", &save);
+            pch = (char *) strtok_r(NULL, "/", &save);
 
             continue;
         } else {
@@ -262,7 +262,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
             current = get_child(current, name);
 
-            pch = strtok_r(NULL, "/", &save);
+            pch = (char *) strtok_r(NULL, "/", &save);
 
             if(current == NULL) {
                 //No node found, try fs

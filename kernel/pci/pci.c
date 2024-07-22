@@ -288,7 +288,7 @@ void pcieConfigWriteWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offse
 }
 
 void pcieConfigWriteDWord(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint32_t value) {
-    volatile uint32_t* address = (volatile uint16_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
+    volatile uint32_t* address = (volatile uint32_t *) ((((bus * 256) + (slot * 8) + func) * 4096) + offset);
     address = (uint32_t*) ((uint64_t)address + (uint64_t)pciBase);
 
     *address = value;

@@ -73,6 +73,8 @@ install-kernel: nightos.kernel
 	mkdir -p isodir/boot/grub/
 	cp nightos.kernel isodir/boot/nightos.kernel
 	cp grub.cfg isodir/boot/grub/grub.cfg
+	tar -cvf rootfs.tar initd test.txt
+	cp rootfs.tar isodir/boot/
 
 build: install-kernel nightos.kernel
 	grub-mkrescue -o myos.iso isodir

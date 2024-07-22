@@ -12,6 +12,9 @@
 
 #define PORT 0x3f8          // COM1
 
+extern void
+itoa_k (char *buf, int base, long d);
+
 int serial_init() {
     outb(PORT + 1, 0x00);    // Disable all interrupts
     outb(PORT + 3, 0x80);    // Enable DLAB (set baud rate divisor)
@@ -117,7 +120,7 @@ int serial_printf(const char* restrict format, ...) {
             }
             char buf[255];
 
-            itoa(buf, *format, i);
+            itoa_k(buf, *format, i);
             format++;
 
             if(!serial_print(buf, strlen(buf)))

@@ -1,6 +1,6 @@
 # OS Build File
-CFLAGS := -mno-avx -mno-sse -mno-sse2 -g -fPIC
-LDFLAGS :=-O2 -fPIC
+CFLAGS := -mno-avx -mno-sse -mno-sse2 -g -fno-PIC -fno-PIE
+LDFLAGS :=-O2 -static -no-pie
 NASM = nasm
 BUILDDIR=build
 CC=x86_64-nightos-gcc

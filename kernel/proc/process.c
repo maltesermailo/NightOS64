@@ -10,6 +10,12 @@
 #include "../../libc/include/kernel/tree.h"
 #include "../program/elf.h"
 
+#define PUSH_PTR(stack, type, value) { \
+            stack -= sizeof(type);     \
+            while (stack & (sizeof(type)-1)) stack--; \
+            *((type*)stack) = (value);\
+}
+
 static struct process_control_block pcb; //currently the only one, we're running single core
 static int id_generator = 1;
 list_t* process_list;
@@ -85,9 +91,8 @@ void process_create_task(char* path, bool is_kernel) {
 
     process->main_thread.process = process;
     process->main_thread.priority = 0;
-    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
-    process->main_thread.kernel_stack = malloc(16384) + 16384;
-    process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
+    process->main_thread.user_stack = (uintptr_t) (mmap(0, 16384, false) + 16384);
+    process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
     process->main_thread.rip = (uintptr_t)elf->entrypoint;
 
     process->uid = 0;
@@ -106,6 +111,20 @@ void process_create_task(char* path, bool is_kernel) {
 
     list_insert(process_list, process);
     tree_insert_child(process_tree, NULL, process);
+
+    unsigned long userStack = process->main_thread.user_stack;
+
+    printf("Before 0x%x\n", userStack);
+
+    PUSH_PTR(userStack, uintptr_t, 0); //ENVP ZERO
+    PUSH_PTR(userStack, uintptr_t, 0); //ENVP
+    PUSH_PTR(userStack, uintptr_t, 0); //ARGV ZERO
+    PUSH_PTR(userStack, uintptr_t, 0); //ARGC
+
+    printf("After 0x%x\n", userStack);
+
+    process->main_thread.user_stack = userStack;
+    process->main_thread.rsp = is_kernel ? process->main_thread.kernel_stack : process->main_thread.user_stack;
 
     printf("Executing at 0x%x with stack 0x%x\n", process->main_thread.rip, process->main_thread.rsp);
 
@@ -171,7 +190,7 @@ pid_t process_fork() {
     process->main_thread.r14 = parent->main_thread.r14;
     process->main_thread.r15 = parent->main_thread.r15;
     process->main_thread.user_stack = parent->main_thread.user_stack;
-    process->main_thread.kernel_stack = malloc(16384) + 16384;
+    process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
     process->main_thread.rsp = parent->flags & PROC_FLAG_KERNEL ? process->main_thread.kernel_stack : process->main_thread.user_stack;
 
     process->uid = parent->uid;
@@ -254,7 +273,7 @@ int execve(char* path, char* argv, char* envp) {
     memmgr_clone_page_map((uint64_t *) 0x1000, (uint64_t *) process->page_directory->page_directory); //Clone from init pml
     load_page_map(process->page_directory->page_directory);
 
-    process->main_thread.user_stack = mmap(0, 16384, false) + 16384;
+    process->main_thread.user_stack = (uintptr_t) (mmap(0, 16384, false) + 16384);
 
     process->flags = PROC_FLAG_RUNNING;
 

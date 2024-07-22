@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <kernel/tree.h>
+#include "../../libc/include/kernel/tree.h"
 
 #define FILE_TYPE_FILE 0x0
 #define FILE_TYPE_BLOCK_DEVICE 0x3

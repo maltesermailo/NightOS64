@@ -387,7 +387,7 @@ void kernel_main(unsigned long magic, unsigned long header)
             {
                 printf ("mmap\n");
 
-                mmap = tag;
+                mmap = (struct multiboot_tag_mmap *) tag;
             }
                 break;
             case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:

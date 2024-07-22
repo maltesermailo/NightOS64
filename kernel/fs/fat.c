@@ -74,11 +74,11 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
             char filename[12];
             memset(&filename, 0, 12);
-            clean_fat_filename(&fatDirPointer->filename, &filename);
+            clean_fat_filename((char*)&fatDirPointer->filename, (char*)&filename);
 
             if(strcmp(filename, name) == 0) {
                 file_node_t* newNode = calloc(1, sizeof(file_node_t));
-                strcpy(newNode->name, fatDirPointer->filename);
+                clean_fat_filename(newNode->name, filename);
 
                 newNode->type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
                 newNode->size = fatDirPointer->size;
@@ -129,7 +129,7 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
         char filename[12];
         memset(&filename, 0, 12);
-        clean_fat_filename(&fatDirPointer->filename, &filename);
+        clean_fat_filename((char*)&fatDirPointer->filename, (char*)&filename);
 
         if(strcmp(filename, name) == 0) {
             file_node_t* newNode = calloc(1, sizeof(file_node_t));
@@ -191,7 +191,7 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
             }
 
             file_node_t* newNode = calloc(1, sizeof(file_node_t));
-            clean_fat_filename(&fatDirPointer->filename ,&entries[i].name);
+            clean_fat_filename((char*)&fatDirPointer->filename, (char*)&entries[i].name);
 
             entries[i].type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
             entries[i].size = fatDirPointer->size;
@@ -235,7 +235,7 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
         }
 
         file_node_t* newNode = calloc(1, sizeof(file_node_t));
-        clean_fat_filename(&fatDirPointer->filename ,&entries[i].name);
+        clean_fat_filename((char*)&fatDirPointer->filename, (char*)&entries[i].name);
 
         entries[i].type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
         entries[i].size = fatDirPointer->size;
@@ -412,7 +412,7 @@ file_node_t* fat_mount(char* device, char* name) {
 
         char filename[12];
         memset(&filename, 0, 12);
-        clean_fat_filename(&fatDirPointer->filename, &filename);
+        clean_fat_filename((char*)&fatDirPointer->filename, (char*)&filename);
 
         printf("File name: %s\n", filename);
         printf("File type: %d\n", fatDirPointer->attributes);

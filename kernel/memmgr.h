@@ -10,6 +10,13 @@
 #include <stdbool.h>
 #include "alloc.h"
 
+#define MAP_PRIVATE 2
+
+#define PROT_EXEC 1<<0
+#define PROT_READ 1<<1
+#define PROT_WRITE 1<<2
+#define PROT_NONE 0
+
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 

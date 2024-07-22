@@ -8,7 +8,7 @@
 #include "../../libc/include/kernel/list.h"
 
 #include <stdio.h>
-#include <string.h>
+#include "../../libc/include/string.h"
 
 list_t hard_drives;
 sata_device_t* sataDevice;
@@ -71,7 +71,7 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     commandFIS->counth = ataCommand != ATA_CMD_IDENTIFY ? ((ioRequest->count / 512) >> 8) & 0xFF : 0;
 
     //TODO: Allow buffers larger than 8k
-    uintptr_t bufferPhys = memmgr_get_page_physical(ioRequest->buffer);
+    uintptr_t bufferPhys = (uintptr_t) memmgr_get_page_physical((uintptr_t) ioRequest->buffer);
 
     if(ioRequest->count < 4096) {
         cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;

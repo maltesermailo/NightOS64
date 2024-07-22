@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "../memmgr.h"
+#include "../../mlibc/abis/linux/errno.h"
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -102,7 +103,8 @@ long sys_brk(long increment, long size) {
 
         return size;
     } else {
-        return (uintptr_t) mmap(proc->page_directory->heap, size - proc->page_directory->heap, false);
+        uintptr_t result = (uintptr_t) mmap((void *) proc->page_directory->heap, size - proc->page_directory->heap, false);
+        return result == UINT64_MAX;
     }
 }
 
@@ -124,6 +126,37 @@ pid_t sys_fork() {
     return pid;
 }
 
+long sys_mmap(unsigned long address, unsigned long length, long prot, long flags, long fd, long offset) {
+    //PROT, FLAGS, FD and OFFSET are ignored currently
+    //SPECIFYING A DIFFERENT VALUE THAN 0 FOR FD AND OFFSET WILL RESULT IN AN ERROR
+    if(fd != 0 || offset != 0) {
+        return -ENOSYS;
+    }
+
+    uintptr_t result = (uintptr_t) mmap((void *) address, length, 0);
+
+    return result;
+}
+
+long sys_mprotect(unsigned long address, unsigned long size, long prot) {
+    return -ENOSYS;
+}
+
+long sys_munmap(unsigned long address, unsigned long length)  {
+    munmap((void *) address, length);
+
+    return 0;
+}
+
+long sys_tcb_set(uintptr_t tcb) {
+    uint32_t high = tcb >> 32;
+    uint32_t low = tcb & 0xFFFFFFFF;
+
+    __asm__ volatile("wrmsr" : : "a"(low), "d"(high), "c"(0xC0000100));
+
+    return 0;
+}
+
 //Stub for unimplemented syscalls to fill
 int sys_stub() {
     return -1;
@@ -139,9 +172,9 @@ syscall_t syscall_table[63] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_lseek,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        (syscall_t)sys_mmap,
+        (syscall_t)sys_mprotect,
+        (syscall_t)sys_munmap,
         (syscall_t)sys_brk,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
@@ -159,7 +192,7 @@ syscall_t syscall_table[63] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        (syscall_t)sys_tcb_set,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
