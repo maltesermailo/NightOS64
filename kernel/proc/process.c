@@ -9,6 +9,7 @@
 #include "../gdt.h"
 #include "../../libc/include/kernel/tree.h"
 #include "../program/elf.h"
+#include "../timer.h"
 
 #define PUSH_PTR(stack, type, value) { \
             stack -= sizeof(type);     \
@@ -425,5 +426,76 @@ void wakeup_waiting(list_t* queue) {
         }
 
         list_remove_by_index(queue, 0);
+    }
+}
+
+void process_terminate(process_t* process) {
+
+}
+
+void process_exit(int retval) {
+    process_t* process = get_current_process();
+
+    if(process->id == 1) {
+        printf("PANIC: Init process tried to exit!!");
+        panic();
+    }
+
+    process->status = retval;
+
+    if(process->fd_table->length > 0) {
+        spin_lock(&process->fd_table->lock);
+
+        int length = process->fd_table->length;
+        int capacity = process->fd_table->capacity;
+        int i = 0;
+        while(length > 0) {
+            if(!process->fd_table->handles[i]) {
+                i++;
+                continue;
+            }
+
+            free(process->fd_table->handles[i]);
+            process->fd_table->handles[i] = NULL;
+
+            i++;
+            length--;
+
+            if(i > capacity) {
+                break;
+            }
+        }
+
+        spin_unlock(&process->fd_table->lock);
+
+        free(process->fd_table);
+        process->fd_table = NULL;
+    }
+
+    if(process->tgid != process->id) {
+        //Not the parent
+
+    } else {
+        //Kill other processes
+        if(process_list->length > 1) {
+            tree_node_t* parent = tree_find_child_root(process_tree, process);
+
+            if(parent->children->length > 0) {
+                //Kill em
+                for(list_entry_t* entry = parent->children->head; entry; entry = entry->next) {
+                    process_t* other = (process_t*)entry->value;
+
+                    //This is a direct thread
+                    if(other->tgid == process->id) {
+                        process_terminate(other);
+                    }
+                }
+            }
+        }
+
+        process->flags = PROC_FLAG_FINISHED;
+        //Now we wait until someone cleans it up.
+
+        schedule(true);
     }
 }

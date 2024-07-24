@@ -3,7 +3,7 @@
 //
 #include "../idt.h"
 #include "../proc/process.h"
-#include <string.h>
+#include "../../libc/include/string.h"
 #include <stdio.h>
 #include "../memmgr.h"
 #include "../../mlibc/abis/linux/errno.h"
@@ -157,52 +157,62 @@ long sys_tcb_set(uintptr_t tcb) {
     return 0;
 }
 
+long sys_ioctl() {
+    return 0;
+}
+
+long sys_yield() {
+    schedule(false);
+
+    return 0;
+}
+
 //Stub for unimplemented syscalls to fill
 int sys_stub() {
     return -1;
 }
 
 syscall_t syscall_table[63] = {
-        (syscall_t)sys_read,
-        (syscall_t)sys_write,
-        (syscall_t)sys_open,
-        (syscall_t)sys_close,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_lseek,
-        (syscall_t)sys_mmap,
-        (syscall_t)sys_mprotect,
-        (syscall_t)sys_munmap,
-        (syscall_t)sys_brk,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_tcb_set,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_getpid,
+        (syscall_t)sys_read,    //SYS_READ
+        (syscall_t)sys_write,   //SYS_WRITE
+        (syscall_t)sys_open,    //SYS_OPEN
+        (syscall_t)sys_close,   //SYS_CLOSE
+        (syscall_t)sys_stub,    //SYS_STAT
+        (syscall_t)sys_stub,    //SYS_FSTAT
+        (syscall_t)sys_stub,    //SYS_LSTAT
+        (syscall_t)sys_stub,    //SYS_POLL
+        (syscall_t)sys_lseek,   //SYS_LSEEK
+        (syscall_t)sys_mmap,    //SYS_MMAP
+        (syscall_t)sys_mprotect,//SYS_MPROTECT
+        (syscall_t)sys_munmap,  //SYS_MUNMAP
+        (syscall_t)sys_brk,     //SYS_BRK
+        (syscall_t)sys_stub,    //SYS_RT_SIGACTION
+        (syscall_t)sys_stub,    //SYS_SIGPROCMASK
+        (syscall_t)sys_stub,    //SYS_RT_SIGRETURN
+        (syscall_t)sys_ioctl,   //SYS_IOCTL
+        (syscall_t)sys_stub,    //SYS_PREAD64
+        (syscall_t)sys_stub,    //SYS_PWRITE64
+        (syscall_t)sys_stub,    //SYS_READV
+        (syscall_t)sys_stub,    //SYS_WRITEV
+        (syscall_t)sys_stub,    //SYS_ACCESS
+        (syscall_t)sys_stub,    //SYS_PIPE
+        (syscall_t)sys_stub,    //SYS_SELECT
+        (syscall_t)sys_yield,   //SYS_SCHED_YIELD
+        (syscall_t)sys_stub,    //SYS_MREMAP
+        (syscall_t)sys_stub,    //SYS_MYSYNC
+        (syscall_t)sys_stub,    //SYS_MINCORE
+        (syscall_t)sys_stub,    //SYS_MADVISE
+        (syscall_t)sys_tcb_set, //SYS_TEMP_TCB_SET(will be replaced later)
+        (syscall_t)sys_stub,    //SYS_SHMAT
+        (syscall_t)sys_stub,    //SYS_SHMCTL
+        (syscall_t)sys_stub,    //SYS_DUP
+        (syscall_t)sys_stub,    //SYS_DUP2
+        (syscall_t)sys_stub,    //SYS_PAUSE
+        (syscall_t)sys_stub,    //SYS_NANOSLEEP
+        (syscall_t)sys_stub,    //SYS_GETITIMER
+        (syscall_t)sys_stub,    //SYS_ALARM
+        (syscall_t)sys_stub,    //SYS_SETITIMER
+        (syscall_t)sys_getpid,  //SYS_GETPID
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,

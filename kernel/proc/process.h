@@ -10,11 +10,12 @@
 #include "../lock.h"
 #include "../mutex.h"
 
-#define PROC_FLAG_KERNEL 1
-#define PROC_FLAG_RUNNING 2 // whether the process is currently running
-#define PROC_FLAG_ON_CPU 3 // whether the process is currently on the cpu
-#define PROC_FLAG_SLEEP_INTERRUPTIBLE 4 // interruptable process
-#define PROC_FLAG_SLEEP_NON_INTERRUPTIBLE 5 //non interruptable
+#define PROC_FLAG_KERNEL 1<<0
+#define PROC_FLAG_RUNNING 1<<1 // whether the process is currently running
+#define PROC_FLAG_ON_CPU 1<<2 // whether the process is currently on the cpu
+#define PROC_FLAG_SLEEP_INTERRUPTIBLE 1<<3 // interruptable process
+#define PROC_FLAG_SLEEP_NON_INTERRUPTIBLE 1<<4 //non interruptable
+#define PROC_FLAG_FINISHED 1<<5
 
 typedef unsigned long long pid_t;
 
@@ -72,6 +73,8 @@ typedef struct process {
     pid_t parent;
 
     int flags;
+
+    int status;
 
     mm_struct_t* page_directory;
     kernel_thread_t main_thread; // this is the thread that started the process, if it is killed, the process is dead and all threads are killed
