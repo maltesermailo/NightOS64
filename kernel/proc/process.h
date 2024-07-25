@@ -75,6 +75,7 @@ typedef struct process {
     int flags;
 
     int status;
+    uint64_t sleepTick; //The tick until the process sleeps
 
     mm_struct_t* page_directory;
     kernel_thread_t main_thread; // this is the thread that started the process, if it is killed, the process is dead and all threads are killed
@@ -113,11 +114,20 @@ void process_close_fd(int fd);
 //Current process state
 process_t* get_current_process();
 
+int execve(char* path, char** argv, char** envp);
+
 //Scheduler
 void schedule_process(process_t* process);
 void schedule(bool sleep);
 
 void wait_for_object(mutex_t* mutex);
 void wakeup_waiting(list_t* queue);
+
+/***
+ * This method waits until x milliseconds passed
+ * @param milliseconds the amount of milliseconds passed since call
+ */
+void sleep(int milliseconds);
+void wakeup_sleeping();
 
 #endif //NIGHTOS_PROCESS_H

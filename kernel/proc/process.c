@@ -22,6 +22,11 @@ static int id_generator = 1;
 list_t* process_list;
 tree_t* process_tree;
 list_t* thread_queue; //Queue of threads for the scheduler
+list_t* sleeping_queue;
+
+spin_t* sleep_lock; //Lock for the sleep queue
+spin_t* process_lock; //Lock for the process list and tree
+spin_t* queue_lock; //Lock for the scheduler queue
 
 extern void longjmp(kernel_thread_t* thread);
 extern int setjmp(kernel_thread_t* thread);
@@ -52,9 +57,18 @@ void* copy_app_memory(void* address, size_t len, bool is_kernel) {
 }
 
 void process_init() {
+    sleep_lock = calloc(1, sizeof(spin_t));
+    process_lock = calloc(1, sizeof(spin_t));
+    queue_lock = calloc(1, sizeof(spin_t));
+
+    spin_unlock(sleep_lock);
+    spin_unlock(process_lock);
+    spin_unlock(queue_lock);
+
     process_list = list_create();
     process_tree = tree_create();
     thread_queue = list_create();
+    sleeping_queue = list_create();
 }
 
 void process_create_task(char* path, bool is_kernel) {
@@ -240,7 +254,7 @@ void process_free_pml(uintptr_t pml) {
     memmgr_clear_page_map(pml);
 }
 
-int execve(char* path, char* argv, char* envp) {
+int execve(char* path, char** argv, char** envp) {
     process_t* process = get_current_process();
 
     if(process == NULL) return -1;
@@ -256,7 +270,7 @@ int execve(char* path, char* argv, char* envp) {
         return -1;
     }
 
-    file_handle_t* handle = create_handle(node);
+    file_handle_t* handleElf = create_handle(node);
 
     spin_lock(&process->page_directory->lock);
     if(process->page_directory->process_count == 1) {
@@ -303,7 +317,7 @@ int execve(char* path, char* argv, char* envp) {
     memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
     spin_unlock(&process->fd_table->lock);
 
-    elf_t* elf = load_elf(handle);
+    elf_t* elf = load_elf(handleElf);
     if(exec_elf(elf, 0, 0, 0)) {
         printf("Error while loading elf file.\n");
         return -1;
@@ -498,4 +512,37 @@ void process_exit(int retval) {
 
         schedule(true);
     }
+}
+
+void sleep(int milliseconds) {
+    unsigned long counter = get_counter();
+
+    unsigned long until = counter + (milliseconds / 10) + 1;
+
+    process_t* process = get_current_process();
+    process->sleepTick = until;
+
+    spin_lock(sleep_lock);
+    list_insert(sleeping_queue, process);
+    spin_unlock(sleep_lock);
+
+    schedule(true);
+}
+
+void wakeup_sleeping() {
+    unsigned long counter = get_counter();
+
+    spin_lock(sleep_lock);
+    if(sleeping_queue->length > 0) {
+        for(list_entry_t* entry = sleeping_queue->head; entry; entry = entry->next) {
+            process_t* proc = (process_t*)entry->value;
+
+            if(proc->sleepTick <= counter) {
+                list_delete(sleeping_queue, entry);
+
+                schedule_process(proc);
+            }
+        }
+    }
+    spin_unlock(sleep_lock);
 }

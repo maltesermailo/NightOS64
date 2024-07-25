@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "../memmgr.h"
 #include "../../mlibc/abis/linux/errno.h"
+#include "../timer.h"
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -16,6 +17,10 @@ int sys_read(long fd, long buffer, long size) {
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR(buffer)) {
         return -1;
     }
 
@@ -30,6 +35,10 @@ int sys_write(long fd, long buffer, long size) {
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR(buffer)) {
         return -1;
     }
 
@@ -149,6 +158,10 @@ long sys_munmap(unsigned long address, unsigned long length)  {
 }
 
 long sys_tcb_set(uintptr_t tcb) {
+    if(!CHECK_PTR(tcb)) {
+        return -EINVAL;
+    }
+
     uint32_t high = tcb >> 32;
     uint32_t low = tcb & 0xFFFFFFFF;
 
@@ -167,12 +180,86 @@ long sys_yield() {
     return 0;
 }
 
+long sys_execve(long pathname, long argv, long envp) {
+    if(CHECK_PTR(pathname) || CHECK_PTR(argv) || CHECK_PTR(envp)) {
+        return -EINVAL;
+    }
+
+    if((void *) pathname == NULL) {
+        return -EINVAL;
+    }
+
+    char* path = (char*)pathname;
+    char** args = (char**)argv;
+    char** env = (char**)envp;
+
+    if(args != NULL) {
+        char* arg = NULL;
+        int i = 0;
+
+        arg = args[0];
+
+        while(arg != NULL) {
+            if(i > 65536) {
+                return -EINVAL;
+            }
+
+            i++;
+            arg = args[i];
+        }
+    }
+
+    if(env != NULL) {
+        char* arg = NULL;
+        int i = 0;
+
+        arg = env[0];
+
+        while(arg != NULL) {
+            if(i > 65536) {
+                return -EINVAL;
+            }
+
+            i++;
+            arg = env[i];
+        }
+    }
+
+    return execve(path, args, env);
+}
+
+#define FUTEX_WAIT 0
+#define FUTEX_WAKE 1
+
+long sys_futex(long pointer, long action, long val, long timeout) {
+    if(!CHECK_PTR(pointer)) {
+        return -EINVAL;
+    }
+
+    //check if pointer is mapped
+    if(memmgr_create_or_get_page(pointer, 0, 0) == 0) {
+        return -EINVAL;
+    }
+
+    uint32_t* ptr = (uint32_t*)pointer;
+
+    if(action == FUTEX_WAIT) {
+        if(__sync_fetch_and_add(ptr, 0) == val) {
+            sleep(10); //We're just gonna sleep for 10 milliseconds then reschedule; User space shall carry first
+        } else {
+            return -EAGAIN;
+        }
+    } else if(action == FUTEX_WAKE) {
+        return 0;
+    }
+}
+
 //Stub for unimplemented syscalls to fill
 int sys_stub() {
     return -1;
 }
 
-syscall_t syscall_table[63] = {
+syscall_t syscall_table[202] = {
         (syscall_t)sys_read,    //SYS_READ
         (syscall_t)sys_write,   //SYS_WRITE
         (syscall_t)sys_open,    //SYS_OPEN
@@ -232,10 +319,149 @@ syscall_t syscall_table[63] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_fork,
         (syscall_t)sys_stub,
+        (syscall_t)sys_execve, //SYS_EXECVE
+        (syscall_t)sys_exit, //SYS_EXIT
+        (syscall_t)sys_stub, //SYS_WAIT4
+        (syscall_t)sys_stub,  //SYS_KILL
         (syscall_t)sys_stub,
-        (syscall_t)sys_exit,
         (syscall_t)sys_stub,
-        (syscall_t)sys_stub
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_futex,
 };
 
 void syscall_entry(regs_t* regs) {

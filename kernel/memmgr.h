@@ -17,6 +17,8 @@
 #define PROT_WRITE 1<<2
 #define PROT_NONE 0
 
+#define CHECK_PTR(ptr) (ptr < 0xfffffe0000000000ull)
+
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 
