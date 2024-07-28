@@ -4,12 +4,17 @@
 #include "../idt.h"
 #include "../proc/process.h"
 #include "../../libc/include/string.h"
+#include "../../libc/include/kernel/hashtable.h"
 #include <stdio.h>
 #include "../memmgr.h"
 #include "../../mlibc/abis/linux/errno.h"
 #include "../timer.h"
+#include <bits/ansi/time_t.h>
 
 typedef int (*syscall_t)(long,long,long,long,long);
+
+spin_t* futex_lock;
+struct hashtable* futex_queue;
 
 int sys_read(long fd, long buffer, long size) {
     process_t* proc = get_current_process();
@@ -231,8 +236,20 @@ long sys_execve(long pathname, long argv, long envp) {
 #define FUTEX_WAIT 0
 #define FUTEX_WAKE 1
 
+char* long_to_string(long id) {
+    // Maximum number of digits in a long (including sign and null terminator)
+    int max_digits = snprintf(NULL, 0, "%ld", id) + 1;
+    char* str = malloc(max_digits);
+    if (str == NULL) {
+        // Handle memory allocation failure
+        return NULL;
+    }
+    snprintf(str, max_digits, "%ld", id);
+    return str;
+}
+
 long sys_futex(long pointer, long action, long val, long timeout) {
-    if(!CHECK_PTR(pointer)) {
+    if(!CHECK_PTR(pointer) || !CHECK_PTR(timeout)) {
         return -EINVAL;
     }
 
@@ -242,16 +259,45 @@ long sys_futex(long pointer, long action, long val, long timeout) {
     }
 
     uint32_t* ptr = (uint32_t*)pointer;
+    struct timespec* timespec = (struct timespec*)timeout;
 
     if(action == FUTEX_WAIT) {
         if(__sync_fetch_and_add(ptr, 0) == val) {
-            sleep(10); //We're just gonna sleep for 10 milliseconds then reschedule; User space shall carry first
+            long nanosecondsToMs = timespec->tv_nsec / 1000000;
+
+            char* id = long_to_string(pointer);
+
+            spin_lock(futex_lock);
+            ht_insert(futex_queue, id, get_current_process());
+            spin_unlock(futex_lock);
+
+            sleep(timespec->tv_sec * 1000 + nanosecondsToMs + 1); //We're just gonna sleep for 10 milliseconds then reschedule; User space shall carry first
+
+            spin_lock(futex_lock);
+            ht_remove_by_key_and_value(futex_queue, id, get_current_process());
+            spin_unlock(futex_lock);
+
+            free(id);
         } else {
             return -EAGAIN;
         }
     } else if(action == FUTEX_WAKE) {
-        return 0;
+        char* id = long_to_string(pointer);
+
+        value_list* list = ht_get_all_values(futex_queue, id);
+        if (list != NULL) {
+            for (int i = 0; i < list->count; i++) {
+                wakeup_now((process_t*)list->values[i]);
+            }
+            free_value_list(list);
+        }
+
+        free(id);
+
+        return -EAGAIN;
     }
+
+    return -ENOSYS;
 }
 
 //Stub for unimplemented syscalls to fill
@@ -316,13 +362,13 @@ syscall_t syscall_table[202] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,   //SYS_CLONE
         (syscall_t)sys_fork,
         (syscall_t)sys_stub,
         (syscall_t)sys_execve, //SYS_EXECVE
-        (syscall_t)sys_exit, //SYS_EXIT
-        (syscall_t)sys_stub, //SYS_WAIT4
-        (syscall_t)sys_stub,  //SYS_KILL
+        (syscall_t)sys_exit,   //SYS_EXIT
+        (syscall_t)sys_stub,   //SYS_WAIT4
+        (syscall_t)sys_stub,   //SYS_KILL
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
@@ -478,5 +524,7 @@ void syscall_entry(regs_t* regs) {
 }
 
 void syscall_init() {
-
+    futex_queue = ht_create(32);
+    futex_lock = calloc(1, sizeof(spin_t));
+    spin_unlock(futex_lock);
 }

@@ -42,4 +42,14 @@ void ht_delete(struct hashtable* table, const char* key);
 // table: The hash table to free
 void ht_free(struct hashtable* table);
 
+bool ht_remove_by_key_and_value(struct hashtable* table, const char* key, void* value);
+
+typedef struct {
+    void** values;
+    int count;
+} value_list;
+
+value_list* ht_get_all_values(struct hashtable* table, const char* key);
+void free_value_list(value_list* list);
+
 #endif //NIGHTOS_HASHTABLE_H

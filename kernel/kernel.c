@@ -20,6 +20,7 @@
 #include "fs/console.h"
 #include "fs/fat.h"
 #include "acpi.h"
+#include "symbol.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -70,6 +71,34 @@ RSDP_t* rsdp;
 extern unsigned long long _physical_end;
 uintptr_t kernel_end = 0;
 
+
+#define MAX_SYMBOLS 512  // Adjust as needed
+
+static struct kernel_symbol ksymtab[MAX_SYMBOLS];
+static unsigned int num_symbols = 0;
+
+void init_kernel_symbols(void) {
+    extern struct kernel_symbol __start___ksymtab[];
+    extern struct kernel_symbol __stop___ksymtab[];
+
+    struct kernel_symbol *sym;
+
+    for (sym = __start___ksymtab; sym < __stop___ksymtab; sym++) {
+        register_symbol(sym->name, sym->value);
+    }
+}
+
+int register_symbol(const char *name, unsigned long value) {
+    if (num_symbols >= MAX_SYMBOLS) {
+        return -1;
+    }
+
+    ksymtab[num_symbols].name = name;
+    ksymtab[num_symbols].value = value;
+    num_symbols++;
+
+    return 0;
+}
 
 void terminal_initialize(void)
 {
@@ -319,6 +348,8 @@ void panic() {
     }
 }
 
+extern void syscall_init();
+
 void kernel_main(unsigned long magic, unsigned long header)
 {
 	/* Initialize terminal interface */
@@ -344,7 +375,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     size = *(unsigned *) header;
 
     serial_printf("Colonel version 0.0.0 starting up...\n");
-    printf("Colonel version 0.0.0-2 starting up...\n");
+    printf("Colonel version 0.0.0-3 starting up...\n");
 
     //Multiboot parsing
     for (tag = (struct multiboot_tag *) (header + 8);
@@ -471,6 +502,7 @@ void kernel_main(unsigned long magic, unsigned long header)
         }
     }*/
     console_init();
+    syscall_init();
 
     //Load filesystem at hd0
     mount_directly("/fatfs", fat_mount("/dev/hd0", "/fatfs"));
@@ -527,3 +559,5 @@ void kernel_main(unsigned long magic, unsigned long header)
         }
     }*/
 }
+
+EXPORT_SYMBOL(terminal_write);

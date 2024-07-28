@@ -92,6 +92,27 @@ typedef struct process_control_block {
     uintptr_t current_page_map;
 } pcb_t;
 
+struct clone_args {
+    uint64_t flags;        /* Flags bit mask */
+    uint64_t pidfd;        /* Where to store PID file descriptor
+                                    (int *) */
+    uint64_t child_tid;    /* Where to store child TID,
+                                    in child's memory (pid_t *) */
+    uint64_t parent_tid;   /* Where to store child TID,
+                                    in parent's memory (pid_t *) */
+    uint64_t exit_signal;  /* Signal to deliver to parent on
+                                    child termination */
+    uint64_t stack;        /* Pointer to lowest byte of stack */
+    uint64_t stack_size;   /* Size of stack */
+    uint64_t tls;          /* Location of new TLS */
+    uint64_t set_tid;      /* Pointer to a pid_t array
+                                    (since Linux 5.5) */
+    uint64_t set_tid_size; /* Number of elements in set_tid
+                                    (since Linux 5.5) */
+    uint64_t cgroup;       /* File descriptor for target cgroup
+                                    of child (since Linux 5.7) */
+};
+
 void process_init();
 
 //Process creation functions
@@ -99,6 +120,7 @@ void process_create_task(char* path, bool is_kernel); //used by the kernel at lo
 void process_create_thread(void* address); //Creates kernel thread
 void process_create_idle();
 pid_t process_fork();
+pid_t process_clone(struct clone_args* args, size_t size);
 
 //Process management functions
 void process_exit(int retval);
@@ -127,7 +149,8 @@ void wakeup_waiting(list_t* queue);
  * This method waits until x milliseconds passed
  * @param milliseconds the amount of milliseconds passed since call
  */
-void sleep(int milliseconds);
+void sleep(long milliseconds);
 void wakeup_sleeping();
+bool wakeup_now(process_t* proc);
 
 #endif //NIGHTOS_PROCESS_H

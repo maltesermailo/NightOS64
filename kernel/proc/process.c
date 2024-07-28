@@ -514,7 +514,7 @@ void process_exit(int retval) {
     }
 }
 
-void sleep(int milliseconds) {
+void sleep(long milliseconds) {
     unsigned long counter = get_counter();
 
     unsigned long until = counter + (milliseconds / 10) + 1;
@@ -545,4 +545,25 @@ void wakeup_sleeping() {
         }
     }
     spin_unlock(sleep_lock);
+}
+
+bool wakeup_now(process_t* proc) {
+    spin_lock(sleep_lock);
+
+    if(proc->cpu != pcb.core || proc->cpu != -1) {
+        return false;
+    }
+
+    list_entry_t* entry = list_find(sleeping_queue, proc);
+
+    if(entry != NULL) {
+        proc->sleepTick = 0;
+        list_delete(sleeping_queue, entry);
+
+        schedule_process(proc);
+    }
+
+    spin_unlock(sleep_lock);
+
+    return true;
 }

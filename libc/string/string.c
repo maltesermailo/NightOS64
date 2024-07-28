@@ -230,6 +230,48 @@ char *strtok_r(char *str, const char *delim, char **saveptr) {
     return str;  // Return the token
 }
 
+// Add this helper function to convert long to string
+void long_to_str(long d, char* buf, int base) {
+    char *p = buf;
+    char *p1, *p2;
+    unsigned long ud = d;
+    int divisor = 10;
+
+    /* If %d is specified and D is minus, put ‘-’ in the head. */
+    if (base == 'd' && d < 0)
+    {
+        *p++ = '-';
+        buf++;
+        ud = -d;
+    }
+    else if (base == 'x')
+        divisor = 16;
+
+    /* Divide UD by DIVISOR until UD == 0. */
+    do
+    {
+        int remainder = ud % divisor;
+
+        *p++ = (remainder < 10) ? remainder + '0' : remainder + 'a' - 10;
+    }
+    while (ud /= divisor);
+
+    /* Terminate BUF. */
+    *p = 0;
+
+    /* Reverse BUF. */
+    p1 = buf;
+    p2 = p - 1;
+    while (p1 < p2)
+    {
+        char tmp = *p1;
+        *p1 = *p2;
+        *p2 = tmp;
+        p1++;
+        p2--;
+    }
+}
+
 int snprintf(char *str, size_t size, const char *format, ...) {
     va_list args;
     va_start(args, format);
@@ -247,10 +289,11 @@ int snprintf(char *str, size_t size, const char *format, ...) {
         } else {
             ptr++; // Skip '%'
             switch (*ptr) {
-                case 'd': {
-                    int val = va_arg(args, int);
-                    char buf[20];
-                    itoa(val, buf, 10);  // Use itoa here
+                case 'd':
+                case 'l': {
+                    long val = va_arg(args, long);
+                    char buf[21]; // Increased buffer size for long
+                    long_to_str(val, buf, 10);
                     int len = strlen(buf);
                     if (len < remaining) {
                         for (int i = 0; i < len; i++) {
@@ -261,6 +304,7 @@ int snprintf(char *str, size_t size, const char *format, ...) {
                     } else {
                         count += len;
                     }
+                    if (*ptr == 'l') ptr++; // Skip 'd' in "ld"
                     break;
                 }
                 case 's': {
@@ -294,8 +338,10 @@ int snprintf(char *str, size_t size, const char *format, ...) {
             ptr++;
             switch (*ptr) {
                 case 'd':
-                    va_arg(args, int);
-                    count += 20; // Assume max int length
+                case 'l':
+                    va_arg(args, long);
+                    count += 21; // Assume max long length
+                    if (*ptr == 'l') ptr++;
                     break;
                 case 's':
                     count += strlen(va_arg(args, char*));

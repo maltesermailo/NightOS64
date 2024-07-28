@@ -3,6 +3,7 @@
 //
 #include "../include/kernel/tree.h"
 #include "../include/stdlib.h"
+#include "../include/stdio.h"
 
 tree_t* tree_create() {
     tree_t* tree = calloc(1, sizeof(tree_t));

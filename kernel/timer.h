@@ -6,9 +6,16 @@
 #define NIGHTOS_TIMER_H
 
 #include <stdint.h>
+#include <bits/ansi/time_t.h>
+
+
+struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+};
 
 void timer_init();
-void ksleep(int milliseconds);
+void ksleep(long milliseconds);
 unsigned long get_counter();
 
 int wait(volatile uint32_t* mem, uint32_t bit, uint64_t timeout);

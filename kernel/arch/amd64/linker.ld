@@ -52,6 +52,13 @@ SECTIONS
         . = ALIGN(4096);
    }
 
+   .ksymtab : AT(ADDR(.ksymtab) + _bootstrap_end - KERNEL_VMA) {
+        __start___ksymtab = .;
+        *(__ksymtab)
+        __stop___ksymtab = .;
+        *(__ksymtab_strings)
+   }
+
    .bss : AT(ADDR(.bss) + _bootstrap_end - KERNEL_VMA)
    {
        _bss = .;

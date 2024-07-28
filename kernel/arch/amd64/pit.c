@@ -36,7 +36,7 @@ void pit_interrupt(regs_t* regs) {
  * Sleeps for x milliseconds in busy-waiting, thereby blocking the cpu
  * @param milliseconds the milliseconds to wait
  */
-void ksleep(int milliseconds) {
+void ksleep(long milliseconds) {
     int endCounter = (milliseconds / 10) + 1 + counter;
 
     while(1) {

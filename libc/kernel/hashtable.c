@@ -3,6 +3,7 @@
 //
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "../include/kernel/hashtable.h"
 
 unsigned int hash(const char* key, int table_size) {
@@ -109,4 +110,74 @@ void ht_free(struct hashtable* table) {
     }
     free(table->entries);
     free(table);
+}
+
+bool ht_remove_by_key_and_value(struct hashtable* table, const char* key, void* value) {
+    unsigned int slot = hash(key, table->size);
+    struct ht_entry** entry = &(table->entries[slot]);
+
+    while (*entry != NULL) {
+        if (strcmp((*entry)->key, key) == 0 && (*entry)->value == value) {
+            // Found matching key and value, remove this entry
+            struct ht_entry* to_remove = *entry;
+            *entry = (*entry)->next;
+            free(to_remove->key);
+            free(to_remove);
+            return true;  // Entry removed successfully
+        }
+        entry = &((*entry)->next);
+    }
+
+    return false;  // Key-value pair not found
+}
+
+value_list* ht_get_all_values(struct hashtable* table, const char* key) {
+    unsigned int slot = hash(key, table->size);
+    struct ht_entry* entry = table->entries[slot];
+
+    // First, count the number of matching entries
+    int count = 0;
+    struct ht_entry* current = entry;
+    while (current != NULL) {
+        if (strcmp(current->key, key) == 0) {
+            count++;
+        }
+        current = current->next;
+    }
+
+    if (count == 0) {
+        return NULL;  // No matching entries found
+    }
+
+    // Allocate the value_list structure and the array of value pointers
+    value_list* result = malloc(sizeof(value_list));
+    if (result == NULL) {
+        return NULL;  // Memory allocation failed
+    }
+    result->values = malloc(count * sizeof(void*));
+    if (result->values == NULL) {
+        free(result);
+        return NULL;  // Memory allocation failed
+    }
+    result->count = count;
+
+    // Fill the array with the matching values
+    int index = 0;
+    current = entry;
+    while (current != NULL) {
+        if (strcmp(current->key, key) == 0) {
+            result->values[index++] = current->value;
+        }
+        current = current->next;
+    }
+
+    return result;
+}
+
+// Don't forget to provide a function to free the value_list
+void free_value_list(value_list* list) {
+    if (list != NULL) {
+        free(list->values);
+        free(list);
+    }
 }

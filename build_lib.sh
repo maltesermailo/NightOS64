@@ -2,8 +2,8 @@ set -e
 . ./config.sh
 cd ./libc/
 
-#make clean
-#make install-libs
+make clean
+make install-libs
 
 cd ../mlibc/
 #Build mlibc
