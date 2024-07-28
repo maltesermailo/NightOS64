@@ -561,3 +561,4 @@ void kernel_main(unsigned long magic, unsigned long header)
 }
 
 EXPORT_SYMBOL(terminal_write);
+EXPORT_SYMBOL(panic);

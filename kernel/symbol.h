@@ -14,12 +14,12 @@ int register_symbol(const char *name, unsigned long value);
 struct kernel_symbol *find_symbol(const char *name);
 
 #define EXPORT_SYMBOL(sym)                                \
-    static const char __ksymtab_##sym_name[]              \
+    static const char __ksymtab_name_##sym[]              \
     __attribute__((section("__ksymtab_strings")))         \
     = #sym;                                               \
     static const struct kernel_symbol __ksymtab_##sym     \
     __attribute__((section("__ksymtab"))) = {             \
-        (unsigned long)&sym, __ksymtab_##sym_name         \
+        (unsigned long)&sym, __ksymtab_name_##sym         \
     }
 
 #endif //NIGHTOS_SYMBOL_H
