@@ -13,7 +13,7 @@
 #include "timer.h"
 #include "proc/process.h"
 #include "pci/pci.h"
-#include "../libc/include/kernel/list.h"
+#include "../libc/include/kernel/hashtable.h"
 #include "test.h"
 #include "serial.h"
 #include "fs/tarfs.h"
@@ -72,14 +72,16 @@ extern unsigned long long _physical_end;
 uintptr_t kernel_end = 0;
 
 
-#define MAX_SYMBOLS 512  // Adjust as needed
+#define MAX_SYMBOLS 1024  // Adjust as needed
 
-static struct kernel_symbol ksymtab[MAX_SYMBOLS];
+static struct hashtable* ksymtab;
 static unsigned int num_symbols = 0;
 
 void init_kernel_symbols(void) {
     extern struct kernel_symbol __start___ksymtab[];
     extern struct kernel_symbol __stop___ksymtab[];
+
+    ksymtab = ht_create(MAX_SYMBOLS);
 
     struct kernel_symbol *sym;
 
@@ -93,11 +95,18 @@ int register_symbol(const char *name, unsigned long value) {
         return -1;
     }
 
-    ksymtab[num_symbols].name = name;
-    ksymtab[num_symbols].value = value;
+    struct kernel_symbol* kernelSymbol = calloc(1, sizeof(struct kernel_symbol));
+    kernelSymbol->name = name;
+    kernelSymbol->value = value;
+    ht_insert(ksymtab, name, kernelSymbol);
+
     num_symbols++;
 
     return 0;
+}
+
+struct kernel_symbol *find_symbol(const char *name) {
+    return ht_lookup(ksymtab, name);
 }
 
 void terminal_initialize(void)
@@ -453,6 +462,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     irq_install();
     ps2_init();
     timer_init();
+    init_kernel_symbols();
 
     __asm__ volatile ("sti"); // set the interrupt flag
 
