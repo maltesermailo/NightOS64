@@ -57,6 +57,7 @@ jobs:
       run: |
         chmod +x $HOME/work/NightOS64/NightOS64/config.sh
         chmod +x headers.sh
+        chmod +x default-host.sh
         ./headers.sh
         cd $HOME/work/NightOS64/NightOS64
         mkdir -p /tmp/cross-compiler
@@ -98,7 +99,6 @@ jobs:
         chmod +x build_lib.sh
         sudo -E PATH="$PATH" ./build_lib.sh
         chmod +x headers.sh
-        ./headers.sh
         chmod +x build.sh
         ./build.sh
 
