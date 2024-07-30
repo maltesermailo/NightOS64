@@ -36,7 +36,7 @@ jobs:
       run: echo $GITHUB_PATH && echo $PATH
       
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm xorriso mtools
+      run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm xorriso mtools meson
     
     - uses: actions/checkout@v4
 
