@@ -55,10 +55,17 @@ jobs:
     - name: Compile cross compiler
       if: steps.cache-compiler.outputs.cache-hit != 'true'
       run: |
+        chmod +x $HOME/NightOS64/config.sh
+        cd $HOME/NightOS64/config.sh
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
         wget https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
         tar -xzf binutils-2.42.tar.gz
+        
+        cd binutils-2.42/
+        git apply $HOME/NightOS64/binutils.patch
+        cd ..
+        
         mkdir build-binutils
         cd build-binutils
         ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
@@ -68,12 +75,16 @@ jobs:
         cd /tmp/cross-compiler
         which -- $TARGET-as || echo $TARGET-as is not in the PATH
 
-        wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
-        tar -xzf gcc-13.2.0.tar.gz
+        wget https://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.gz
+        tar -xzf gcc-14.1.0.tar.gz
+        
+        cd gcc-14.1.0/
+        git apply $HOME/NightOS64/gcc.patch
+        cd ..
         
         mkdir build-gcc
         cd build-gcc
-        ../gcc-13.2.0/configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c,c++ --without-headers
+        ../gcc-14.1.0/configure --target=x86_64-nightos --prefix="$PREFIX" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-shared --enable-linker-build-id --enable-gnu-unique-object --enable-plugin --with-system-zlib --enable-checking=release --enable-default-pie
         sudo make all-gcc -j4
         sudo make all-target-libgcc -j4
         sudo make install-gcc
@@ -81,7 +92,6 @@ jobs:
 
     - name: Run build
       run: |
-        chmod +x config.sh
         chmod +x default-host.sh
         chmod +x build_lib.sh
         sudo -E PATH="$PATH" ./build_lib.sh
