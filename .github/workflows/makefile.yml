@@ -32,6 +32,7 @@ jobs:
       with:
         args: >
           -Djavax.net.ssl.trustStore=$JAVA_HOME/jre/lib/security/cacerts
+          -X
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
