@@ -56,6 +56,8 @@ jobs:
       if: steps.cache-compiler.outputs.cache-hit != 'true'
       run: |
         chmod +x $HOME/work/NightOS64/NightOS64/config.sh
+        chmod +x headers.sh
+        ./headers.sh
         cd $HOME/work/NightOS64/NightOS64
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
