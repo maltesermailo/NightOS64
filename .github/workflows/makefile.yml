@@ -39,6 +39,8 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm xorriso mtools meson
     
     - uses: actions/checkout@v4
+      with:
+        submodules: true
 
     - name: root suid tar because github actions doesnt support sudo on cache
       run: sudo chown root:root /bin/tar && sudo chmod u+s /bin/tar
