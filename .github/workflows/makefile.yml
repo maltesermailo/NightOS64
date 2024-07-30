@@ -12,6 +12,18 @@ env:
   SYSROOT: "$HOME/sysroot/"
 
 jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   build:
 
     runs-on: ubuntu-latest
@@ -27,14 +39,6 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo nasm xorriso mtools
     
     - uses: actions/checkout@v4
-
-    - uses: sonarsource/sonarqube-scan-action@master
-      with:
-        args: >
-          -X
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
     - name: root suid tar because github actions doesnt support sudo on cache
       run: sudo chown root:root /bin/tar && sudo chmod u+s /bin/tar
