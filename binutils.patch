@@ -20147,9 +20147,16 @@ index 0000000..49c6288
 +$as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 +fi
 +
+diff --git a/binutils-2.42/autom4te.cache/output.0t b/binutils-2.42/autom4te.cache/output.0t
+new file mode 100644
+index 0000000..ec88dfd
+--- /dev/null
++++ b/binutils-2.42/autom4te.cache/output.0t
+@@ -0,0 +1 @@
++@%:@! /bin/sh
 diff --git a/binutils-2.42/autom4te.cache/requests b/binutils-2.42/autom4te.cache/requests
 new file mode 100644
-index 0000000..05ccfad
+index 0000000..5034518
 --- /dev/null
 +++ b/binutils-2.42/autom4te.cache/requests
 @@ -0,0 +1,78 @@
@@ -20169,64 +20176,64 @@ index 0000000..05ccfad
 +                        'configure.ac'
 +                      ],
 +                      {
-+                        '_LT_AC_TAGCONFIG' => 1,
-+                        'LT_INIT' => 1,
-+                        'AM_POT_TOOLS' => 1,
-+                        'AC_SUBST_TRACE' => 1,
-+                        'AC_SUBST' => 1,
-+                        '_AM_COND_ELSE' => 1,
-+                        'm4_pattern_allow' => 1,
-+                        'AC_FC_PP_SRCEXT' => 1,
-+                        '_m4_warn' => 1,
-+                        'AC_LIBSOURCE' => 1,
-+                        'm4_pattern_forbid' => 1,
-+                        'AM_AUTOMAKE_VERSION' => 1,
-+                        'AM_PATH_GUILE' => 1,
-+                        'AC_CANONICAL_SYSTEM' => 1,
-+                        'AC_DEFINE_TRACE_LITERAL' => 1,
-+                        'AC_FC_PP_DEFINE' => 1,
-+                        'AC_REQUIRE_AUX_FILE' => 1,
-+                        'AM_PROG_F77_C_O' => 1,
-+                        'AM_SILENT_RULES' => 1,
-+                        'AM_XGETTEXT_OPTION' => 1,
-+                        'AC_CONFIG_AUX_DIR' => 1,
-+                        'AM_GNU_GETTEXT' => 1,
-+                        'AC_FC_SRCEXT' => 1,
-+                        'AC_FC_FREEFORM' => 1,
-+                        'AM_PROG_LIBTOOL' => 1,
-+                        'AM_PROG_FC_C_O' => 1,
-+                        '_AM_SUBST_NOTMAKE' => 1,
-+                        '_AM_COND_IF' => 1,
-+                        'AM_MAINTAINER_MODE' => 1,
-+                        'AM_PROG_MOC' => 1,
-+                        'm4_include' => 1,
-+                        'AC_CANONICAL_HOST' => 1,
-+                        'AM_PROG_CXX_C_O' => 1,
-+                        'AC_CONFIG_HEADERS' => 1,
-+                        'AH_OUTPUT' => 1,
 +                        'AC_PROG_LIBTOOL' => 1,
-+                        'LT_CONFIG_LTDL_DIR' => 1,
-+                        'AC_CONFIG_FILES' => 1,
-+                        'AM_GNU_GETTEXT_INTL_SUBDIR' => 1,
++                        'sinclude' => 1,
 +                        'AM_PROG_CC_C_O' => 1,
-+                        'AM_INIT_AUTOMAKE' => 1,
-+                        'm4_sinclude' => 1,
-+                        'AC_CONFIG_LIBOBJ_DIR' => 1,
-+                        'include' => 1,
-+                        'AC_INIT' => 1,
-+                        'AM_ENABLE_MULTILIB' => 1,
-+                        'LT_SUPPORTED_TAG' => 1,
-+                        'AM_NLS' => 1,
++                        'AM_PROG_LIBTOOL' => 1,
++                        '_m4_warn' => 1,
++                        'AM_PROG_FC_C_O' => 1,
 +                        'AM_MAKEFILE_INCLUDE' => 1,
++                        'AM_POT_TOOLS' => 1,
++                        'AM_INIT_AUTOMAKE' => 1,
++                        'AH_OUTPUT' => 1,
++                        'AC_DEFINE_TRACE_LITERAL' => 1,
++                        'AM_XGETTEXT_OPTION' => 1,
++                        'LT_INIT' => 1,
++                        'include' => 1,
++                        'AC_FC_PP_SRCEXT' => 1,
 +                        'AC_CONFIG_LINKS' => 1,
 +                        'AM_CONDITIONAL' => 1,
-+                        'AC_CANONICAL_TARGET' => 1,
-+                        'AC_CONFIG_SUBDIRS' => 1,
-+                        'AM_PROG_AR' => 1,
-+                        'AC_CANONICAL_BUILD' => 1,
-+                        '_AM_COND_ENDIF' => 1,
++                        'AM_MAINTAINER_MODE' => 1,
++                        'm4_pattern_forbid' => 1,
++                        'm4_sinclude' => 1,
++                        'AC_CONFIG_LIBOBJ_DIR' => 1,
++                        'AC_REQUIRE_AUX_FILE' => 1,
++                        'AC_CANONICAL_HOST' => 1,
++                        'AC_SUBST_TRACE' => 1,
++                        'AC_CANONICAL_SYSTEM' => 1,
++                        'AC_LIBSOURCE' => 1,
++                        'AC_FC_SRCEXT' => 1,
++                        'LT_SUPPORTED_TAG' => 1,
++                        'AC_INIT' => 1,
++                        'AC_SUBST' => 1,
++                        'AM_GNU_GETTEXT' => 1,
++                        'AM_ENABLE_MULTILIB' => 1,
 +                        '_AM_MAKEFILE_INCLUDE' => 1,
-+                        'sinclude' => 1
++                        'AM_AUTOMAKE_VERSION' => 1,
++                        'AM_PROG_F77_C_O' => 1,
++                        'LT_CONFIG_LTDL_DIR' => 1,
++                        'AC_CONFIG_SUBDIRS' => 1,
++                        '_AM_SUBST_NOTMAKE' => 1,
++                        '_AM_COND_ENDIF' => 1,
++                        'AC_CONFIG_FILES' => 1,
++                        'm4_include' => 1,
++                        '_AM_COND_ELSE' => 1,
++                        'AC_CANONICAL_BUILD' => 1,
++                        '_AM_COND_IF' => 1,
++                        'AM_PROG_MOC' => 1,
++                        'AC_CONFIG_AUX_DIR' => 1,
++                        'AC_FC_FREEFORM' => 1,
++                        '_LT_AC_TAGCONFIG' => 1,
++                        'AM_GNU_GETTEXT_INTL_SUBDIR' => 1,
++                        'AC_CANONICAL_TARGET' => 1,
++                        'AM_SILENT_RULES' => 1,
++                        'm4_pattern_allow' => 1,
++                        'AM_PROG_CXX_C_O' => 1,
++                        'AC_CONFIG_HEADERS' => 1,
++                        'AM_PROG_AR' => 1,
++                        'AC_FC_PP_DEFINE' => 1,
++                        'AM_PATH_GUILE' => 1,
++                        'AM_NLS' => 1
 +                      }
 +                    ], 'Autom4te::Request' )
 +           );
@@ -21499,6 +21506,175 @@ index 0000000..aef0d6a
 +m4trace:configure.ac:4006: -1- AC_SUBST_TRACE([abs_builddir])
 +m4trace:configure.ac:4006: -1- AC_SUBST_TRACE([abs_top_builddir])
 +m4trace:configure.ac:4006: -1- AC_SUBST_TRACE([INSTALL])
+diff --git a/binutils-2.42/autom4te.cache/traces.0t b/binutils-2.42/autom4te.cache/traces.0t
+new file mode 100644
+index 0000000..aed0f70
+--- /dev/null
++++ b/binutils-2.42/autom4te.cache/traces.0t
+@@ -0,0 +1,163 @@
++m4trace:configure.ac:22: -1- m4_include([config/acx.m4])
++m4trace:configure.ac:23: -1- m4_include([config/override.m4])
++m4trace:configure.ac:24: -1- m4_include([config/proginstall.m4])
++m4trace:configure.ac:25: -1- m4_include([config/elf.m4])
++m4trace:configure.ac:26: -1- m4_include([config/ax_cxx_compile_stdcxx.m4])
++m4trace:configure.ac:27: -1- m4_include([config/gcc-plugin.m4])
++m4trace:configure.ac:28: -1- m4_include([libtool.m4])
++m4trace:configure.ac:29: -1- m4_include([ltoptions.m4])
++m4trace:configure.ac:30: -1- m4_include([ltsugar.m4])
++m4trace:configure.ac:31: -1- m4_include([ltversion.m4])
++m4trace:configure.ac:32: -1- m4_include([lt~obsolete.m4])
++m4trace:configure.ac:33: -1- m4_include([config/isl.m4])
++m4trace:configure.ac:35: -1- AC_INIT([move-if-change])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([^_?A[CHUM]_])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([_AC_])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([^LIBOBJS$], [do not use LIBOBJS directly, use AC_LIBOBJ (see section `AC_LIBOBJ vs LIBOBJS'])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^AS_FLAGS$])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([^_?m4_])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([^dnl$])
++m4trace:configure.ac:35: -1- m4_pattern_forbid([^_?AS_])
++m4trace:configure.ac:35: -1- AC_SUBST([SHELL])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([SHELL])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^SHELL$])
++m4trace:configure.ac:35: -1- AC_SUBST([PATH_SEPARATOR])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PATH_SEPARATOR])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PATH_SEPARATOR$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_NAME], [m4_ifdef([AC_PACKAGE_NAME],      ['AC_PACKAGE_NAME'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_NAME])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_NAME$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_TARNAME], [m4_ifdef([AC_PACKAGE_TARNAME],   ['AC_PACKAGE_TARNAME'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_TARNAME])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_TARNAME$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_VERSION], [m4_ifdef([AC_PACKAGE_VERSION],   ['AC_PACKAGE_VERSION'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_VERSION])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_VERSION$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_STRING], [m4_ifdef([AC_PACKAGE_STRING],    ['AC_PACKAGE_STRING'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_STRING])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_STRING$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_BUGREPORT], [m4_ifdef([AC_PACKAGE_BUGREPORT], ['AC_PACKAGE_BUGREPORT'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_BUGREPORT])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_BUGREPORT$])
++m4trace:configure.ac:35: -1- AC_SUBST([PACKAGE_URL], [m4_ifdef([AC_PACKAGE_URL],       ['AC_PACKAGE_URL'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([PACKAGE_URL])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_URL$])
++m4trace:configure.ac:35: -1- AC_SUBST([exec_prefix], [NONE])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([exec_prefix])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^exec_prefix$])
++m4trace:configure.ac:35: -1- AC_SUBST([prefix], [NONE])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([prefix])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^prefix$])
++m4trace:configure.ac:35: -1- AC_SUBST([program_transform_name], [s,x,x,])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([program_transform_name])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^program_transform_name$])
++m4trace:configure.ac:35: -1- AC_SUBST([bindir], ['${exec_prefix}/bin'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([bindir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^bindir$])
++m4trace:configure.ac:35: -1- AC_SUBST([sbindir], ['${exec_prefix}/sbin'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([sbindir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^sbindir$])
++m4trace:configure.ac:35: -1- AC_SUBST([libexecdir], ['${exec_prefix}/libexec'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([libexecdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^libexecdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([datarootdir], ['${prefix}/share'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([datarootdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^datarootdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([datadir], ['${datarootdir}'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([datadir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^datadir$])
++m4trace:configure.ac:35: -1- AC_SUBST([sysconfdir], ['${prefix}/etc'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([sysconfdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^sysconfdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([sharedstatedir], ['${prefix}/com'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([sharedstatedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^sharedstatedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([localstatedir], ['${prefix}/var'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([localstatedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^localstatedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([runstatedir], ['${localstatedir}/run'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([runstatedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^runstatedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([includedir], ['${prefix}/include'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([includedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^includedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([oldincludedir], ['/usr/include'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([oldincludedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^oldincludedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([docdir], [m4_ifset([AC_PACKAGE_TARNAME],
++				     ['${datarootdir}/doc/${PACKAGE_TARNAME}'],
++				     ['${datarootdir}/doc/${PACKAGE}'])])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([docdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^docdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([infodir], ['${datarootdir}/info'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([infodir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^infodir$])
++m4trace:configure.ac:35: -1- AC_SUBST([htmldir], ['${docdir}'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([htmldir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^htmldir$])
++m4trace:configure.ac:35: -1- AC_SUBST([dvidir], ['${docdir}'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([dvidir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^dvidir$])
++m4trace:configure.ac:35: -1- AC_SUBST([pdfdir], ['${docdir}'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([pdfdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^pdfdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([psdir], ['${docdir}'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([psdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^psdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([libdir], ['${exec_prefix}/lib'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([libdir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^libdir$])
++m4trace:configure.ac:35: -1- AC_SUBST([localedir], ['${datarootdir}/locale'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([localedir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^localedir$])
++m4trace:configure.ac:35: -1- AC_SUBST([mandir], ['${datarootdir}/man'])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([mandir])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^mandir$])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_NAME])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_NAME$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_NAME], [/* Define to the full name of this package. */
++@%:@undef PACKAGE_NAME])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_TARNAME])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_TARNAME$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_TARNAME], [/* Define to the one symbol short name of this package. */
++@%:@undef PACKAGE_TARNAME])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_VERSION])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_VERSION$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_VERSION], [/* Define to the version of this package. */
++@%:@undef PACKAGE_VERSION])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_STRING])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_STRING$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_STRING], [/* Define to the full name and version of this package. */
++@%:@undef PACKAGE_STRING])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_BUGREPORT])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_BUGREPORT$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_BUGREPORT], [/* Define to the address where bug reports for this package should be sent. */
++@%:@undef PACKAGE_BUGREPORT])
++m4trace:configure.ac:35: -1- AC_DEFINE_TRACE_LITERAL([PACKAGE_URL])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^PACKAGE_URL$])
++m4trace:configure.ac:35: -1- AH_OUTPUT([PACKAGE_URL], [/* Define to the home page for this package. */
++@%:@undef PACKAGE_URL])
++m4trace:configure.ac:35: -1- AC_SUBST([DEFS])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([DEFS])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^DEFS$])
++m4trace:configure.ac:35: -1- AC_SUBST([ECHO_C])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([ECHO_C])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^ECHO_C$])
++m4trace:configure.ac:35: -1- AC_SUBST([ECHO_N])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([ECHO_N])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^ECHO_N$])
++m4trace:configure.ac:35: -1- AC_SUBST([ECHO_T])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([ECHO_T])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^ECHO_T$])
++m4trace:configure.ac:35: -1- AC_SUBST([LIBS])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([LIBS])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^LIBS$])
++m4trace:configure.ac:35: -1- AC_SUBST([build_alias])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([build_alias])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^build_alias$])
++m4trace:configure.ac:35: -1- AC_SUBST([host_alias])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([host_alias])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^host_alias$])
++m4trace:configure.ac:35: -1- AC_SUBST([target_alias])
++m4trace:configure.ac:35: -1- AC_SUBST_TRACE([target_alias])
++m4trace:configure.ac:35: -1- m4_pattern_allow([^target_alias$])
 diff --git a/binutils/binutils-2.42/bfd/config.bfd b/binutils-2.42/bfd/config.bfd
 index bbf1244..42b0082 100644
 --- a/binutils/binutils-2.42/bfd/config.bfd
@@ -61035,7 +61211,7 @@ index 0000000..ec88dfd
 +@%:@! /bin/sh
 diff --git a/binutils-2.42/ld/autom4te.cache/requests b/binutils-2.42/ld/autom4te.cache/requests
 new file mode 100644
-index 0000000..079bae2
+index 0000000..a9680ef
 --- /dev/null
 +++ b/binutils-2.42/ld/autom4te.cache/requests
 @@ -0,0 +1,81 @@
@@ -61056,66 +61232,66 @@ index 0000000..079bae2
 +                        'configure.ac'
 +                      ],
 +                      {
-+                        'AC_FC_PP_DEFINE' => 1,
-+                        'include' => 1,
-+                        'AM_PROG_F77_C_O' => 1,
-+                        '_AM_COND_ENDIF' => 1,
-+                        'LT_SUPPORTED_TAG' => 1,
-+                        'AC_FC_FREEFORM' => 1,
-+                        'm4_pattern_forbid' => 1,
-+                        'AM_PROG_CC_C_O' => 1,
++                        'AM_PROG_LIBTOOL' => 1,
 +                        'AC_SUBST' => 1,
-+                        'AC_INIT' => 1,
-+                        'm4_include' => 1,
++                        'AC_CONFIG_LIBOBJ_DIR' => 1,
++                        'AM_SILENT_RULES' => 1,
++                        'AC_FC_PP_DEFINE' => 1,
++                        'AC_CONFIG_AUX_DIR' => 1,
++                        '_AM_COND_ENDIF' => 1,
++                        'AM_PROG_F77_C_O' => 1,
++                        'AM_EXTRA_RECURSIVE_TARGETS' => 1,
++                        'AM_CONDITIONAL' => 1,
 +                        'AC_FC_SRCEXT' => 1,
-+                        'AC_CONFIG_HEADERS' => 1,
-+                        'AC_CONFIG_FILES' => 1,
++                        'AC_PROG_LIBTOOL' => 1,
++                        'include' => 1,
++                        'AC_INIT' => 1,
++                        '_AM_COND_IF' => 1,
 +                        'AC_CANONICAL_BUILD' => 1,
-+                        'AC_CANONICAL_SYSTEM' => 1,
-+                        '_AM_COND_ELSE' => 1,
++                        'AM_PROG_FC_C_O' => 1,
++                        'AC_CONFIG_LINKS' => 1,
++                        'AC_DEFINE_TRACE_LITERAL' => 1,
++                        '_AM_MAKEFILE_INCLUDE' => 1,
++                        'AM_PROG_CXX_C_O' => 1,
++                        'AM_XGETTEXT_OPTION' => 1,
++                        'm4_pattern_allow' => 1,
++                        'm4_include' => 1,
++                        'AM_MAKEFILE_INCLUDE' => 1,
++                        'AC_LIBSOURCE' => 1,
++                        'AM_POT_TOOLS' => 1,
++                        'AM_PROG_MKDIR_P' => 1,
++                        'AC_CANONICAL_HOST' => 1,
++                        'AM_AUTOMAKE_VERSION' => 1,
++                        'AC_CANONICAL_TARGET' => 1,
++                        'AM_ENABLE_MULTILIB' => 1,
++                        'AM_PROG_CC_C_O' => 1,
++                        'AM_GNU_GETTEXT_INTL_SUBDIR' => 1,
++                        'AM_INIT_AUTOMAKE' => 1,
++                        'AM_GNU_GETTEXT' => 1,
++                        'AC_FC_FREEFORM' => 1,
++                        'AM_PROG_AR' => 1,
++                        '_m4_warn' => 1,
++                        'AH_OUTPUT' => 1,
++                        'AC_CONFIG_FILES' => 1,
++                        'AM_NLS' => 1,
++                        'AM_PATH_GUILE' => 1,
++                        'AC_FC_PP_SRCEXT' => 1,
++                        'AC_REQUIRE_AUX_FILE' => 1,
++                        '_AM_SUBST_NOTMAKE' => 1,
++                        'LT_INIT' => 1,
 +                        '_LT_AC_TAGCONFIG' => 1,
++                        'AM_PROG_MOC' => 1,
++                        '_AM_COND_ELSE' => 1,
++                        'AC_CONFIG_SUBDIRS' => 1,
++                        'AC_CANONICAL_SYSTEM' => 1,
++                        'AM_MAINTAINER_MODE' => 1,
 +                        'AC_SUBST_TRACE' => 1,
++                        'AC_CONFIG_HEADERS' => 1,
++                        'm4_pattern_forbid' => 1,
++                        'sinclude' => 1,
 +                        'LT_CONFIG_LTDL_DIR' => 1,
 +                        'm4_sinclude' => 1,
-+                        'sinclude' => 1,
-+                        'AM_PROG_MKDIR_P' => 1,
-+                        'AC_FC_PP_SRCEXT' => 1,
-+                        'AC_CANONICAL_HOST' => 1,
-+                        'AM_NLS' => 1,
-+                        'AC_CONFIG_LINKS' => 1,
-+                        'AM_PATH_GUILE' => 1,
-+                        'AC_DEFINE_TRACE_LITERAL' => 1,
-+                        'AM_PROG_CXX_C_O' => 1,
-+                        'AM_INIT_AUTOMAKE' => 1,
-+                        'AM_CONDITIONAL' => 1,
-+                        'AM_ENABLE_MULTILIB' => 1,
-+                        'LT_INIT' => 1,
-+                        'AC_REQUIRE_AUX_FILE' => 1,
-+                        'AM_MAKEFILE_INCLUDE' => 1,
-+                        'AM_EXTRA_RECURSIVE_TARGETS' => 1,
-+                        'AC_CONFIG_SUBDIRS' => 1,
-+                        'm4_pattern_allow' => 1,
-+                        'AC_PROG_LIBTOOL' => 1,
-+                        '_AM_COND_IF' => 1,
-+                        'AC_CANONICAL_TARGET' => 1,
-+                        'AC_CONFIG_LIBOBJ_DIR' => 1,
-+                        'AH_OUTPUT' => 1,
-+                        'AM_PROG_MOC' => 1,
-+                        'AM_GNU_GETTEXT' => 1,
-+                        'AM_POT_TOOLS' => 1,
-+                        'AM_PROG_FC_C_O' => 1,
-+                        'AM_XGETTEXT_OPTION' => 1,
-+                        'AC_CONFIG_AUX_DIR' => 1,
-+                        '_AM_MAKEFILE_INCLUDE' => 1,
-+                        '_AM_SUBST_NOTMAKE' => 1,
-+                        'AC_LIBSOURCE' => 1,
-+                        'AM_AUTOMAKE_VERSION' => 1,
-+                        'AM_PROG_LIBTOOL' => 1,
-+                        'AM_MAINTAINER_MODE' => 1,
-+                        '_m4_warn' => 1,
-+                        'AM_PROG_AR' => 1,
-+                        'AM_SILENT_RULES' => 1,
-+                        'AM_GNU_GETTEXT_INTL_SUBDIR' => 1
++                        'LT_SUPPORTED_TAG' => 1
 +                      }
 +                    ], 'Autom4te::Request' )
 +           );
@@ -62644,11 +62820,13 @@ index f937f78..83604cf 100644
  			;;
 diff --git a/binutils-2.42/ld/emulparams/elf_i386_nightos.sh b/binutils-2.42/ld/emulparams/elf_i386_nightos.sh
 new file mode 100644
-index 0000000..08cd1ff
+index 0000000..c2a6ef5
 --- /dev/null
 +++ b/binutils-2.42/ld/emulparams/elf_i386_nightos.sh
-@@ -0,0 +1,2 @@
+@@ -0,0 +1,4 @@
 +source_sh ${srcdir}/emulparams/elf_i386.sh
++GENERATE_PIE_SCRIPT=yes
++GENERATE_SHLIB_SCRIPT=yes
 +TEXT_START_ADDR=0x08000000
 \ No newline at end of file
 diff --git a/binutils/binutils-2.42/ld/emulparams/elf_x86_64.sh b/binutils-2.42/ld/emulparams/elf_x86_64.sh
@@ -62656,10 +62834,12 @@ old mode 100644
 new mode 100755
 diff --git a/binutils-2.42/ld/emulparams/elf_x86_64_nightos.sh b/binutils-2.42/ld/emulparams/elf_x86_64_nightos.sh
 new file mode 100644
-index 0000000..2336245
+index 0000000..3de5cd7
 --- /dev/null
 +++ b/binutils-2.42/ld/emulparams/elf_x86_64_nightos.sh
-@@ -0,0 +1,2 @@
+@@ -0,0 +1,4 @@
 +source_sh ${srcdir}/emulparams/elf_x86_64.sh
++GENERATE_PIE_SCRIPT=yes
++GENERATE_SHLIB_SCRIPT=yes
 +TEXT_START_ADDR=0x08000000
 \ No newline at end of file
