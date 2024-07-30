@@ -9,6 +9,7 @@ for PROJECT in $SYSTEM_HEADER_PROJECTS; do
 done
 
 #Build mlibc
+cd ./mlibc/
 meson setup --wipe --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=true build
 meson build
 cd ./build/
