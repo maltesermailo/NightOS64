@@ -62,7 +62,7 @@ jobs:
         chmod +x $HOME/work/NightOS64/NightOS64/config.sh
         chmod +x headers.sh
         chmod +x default-host.sh
-        ./headers.sh
+        sudo -E PATH="$PATH" ./headers.sh
         cd $HOME/work/NightOS64/NightOS64
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
