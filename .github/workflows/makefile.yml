@@ -91,7 +91,7 @@ jobs:
         
         mkdir build-gcc
         cd build-gcc
-        ../gcc-14.1.0/configure --target=x86_64-nightos --prefix="$PREFIX" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-shared --enable-linker-build-id --enable-gnu-unique-object --enable-plugin --with-system-zlib --enable-checking=release --enable-default-pie
+        ../gcc-14.1.0/configure --target=x86_64-nightos --prefix="$PREFIX" --with-sysroot="$SYSROOT" --enable-languages=c,c++ --enable-shared --enable-linker-build-id --enable-gnu-unique-object --enable-plugin --with-system-zlib --enable-checking=release --enable-default-pie
         sudo make all-gcc -j4
         sudo make all-target-libgcc -j4
         sudo make install-gcc
