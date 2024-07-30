@@ -29,6 +29,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - uses: sonarsource/sonarqube-scan-action@master
+      with:
+        args: >
+          -Djavax.net.ssl.trustStore=$JAVA_HOME/jre/lib/security/cacerts
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
