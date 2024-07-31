@@ -9,7 +9,7 @@ env:
   PREFIX: "/usr/local/cross"
   TARGET: "x86_64-elf"
   CROSS_PATH: "/usr/local/cross/x86_64-elf"
-  SYSROOT: "$HOME/sysroot/"
+  SYSROOT: "${{ env.HOME }}/NightOS64/NightOS64/sysroot/"
 
 jobs:
   sonarcloud:
