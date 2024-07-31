@@ -25,7 +25,7 @@ index df90720b716..030378419b6 100755
      i?86-*-mingw32* | \
      x86_64-*-mingw32* | \
 diff --git a/gcc/config.gcc b/gcc/config.gcc
-index 95c91ee02be..de0c00b3426 100644
+index 95c91ee02be..c12cb782aac 100644
 --- a/gcc/config.gcc
 +++ b/gcc/config.gcc
 @@ -722,6 +722,12 @@ x86_cpus="generic intel"
@@ -46,20 +46,20 @@ index 95c91ee02be..de0c00b3426 100644
  
  case ${target} in
 +i[34567]86-*-nightos*)
-+    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h nightos.h"
++    tm_file="${tm_file} i386/unix.h i386/att.h gnu-user.h elfos.h glibc-stdint.h i386/gnu-user-common.h nightos.h"
 +    ;;
 +x86_64-*-nightos*)
-+    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h nightos.h"
++    tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h gnu-user.h i386/x86-64.h i386/gnu-user-common.h i386/gnu-user64.h  nightos.h"
 +    ;;
  aarch64*-*-elf | aarch64*-*-fuchsia* | aarch64*-*-rtems*)
  	tm_file="${tm_file} elfos.h newlib-stdint.h"
  	tm_file="${tm_file} aarch64/aarch64-elf.h aarch64/aarch64-errata.h aarch64/aarch64-elf-raw.h"
 diff --git a/gcc/config/nightos.h b/gcc/config/nightos.h
 new file mode 100644
-index 00000000000..ef17d17ac76
+index 00000000000..752719103a6
 --- /dev/null
 +++ b/gcc/config/nightos.h
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,36 @@
 +/* Useful if you wish to make target-specific GCC changes. */
 +#undef TARGET_NIGHTOS
 +#define TARGET_NIGHTOS 1
@@ -72,11 +72,19 @@ index 00000000000..ef17d17ac76
 +/* Files that are linked before user code.
 +   The %s tells GCC to look for these files in the library directory. */
 +#undef STARTFILE_SPEC
-+#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
++#define STARTFILE_SPEC "%{!shared:crt0.o%s} crti.o%s %{shared|static-pie|pie|!no-pie:crtbeginS.o%s;:crtbegin.o%s}"
 +
 +/* Files that are linked after user code. */
 +#undef ENDFILE_SPEC
-+#define ENDFILE_SPEC "crtend.o%s crtn.o%s"
++#define ENDFILE_SPEC "%{shared|static-pie|pie|!no-pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++#define GNU_USER_LINK_EMULATION32 "elf_i386"
++#define GNU_USER_LINK_EMULATION64 "elf_x86_64"
++#define GNU_USER_LINK_EMULATIONX32 "elf32_x86_64"
++#undef GNU_USER_DYNAMIC_LINKER
++#define GNU_USER_DYNAMIC_LINKER32 "/lib/ld.so"
++#define GNU_USER_DYNAMIC_LINKER64 "/lib/ld-x86-64.so"
++#define GNU_USER_DYNAMIC_LINKERX32 "/lib/ld-x32.so"
 +
 +/* Additional predefined macros. */
 +#undef TARGET_OS_CPP_BUILTINS
