@@ -58,13 +58,13 @@ jobs:
     - name: Compile cross compiler
       if: steps.cache-compiler.outputs.cache-hit != 'true'
       run: |
+        set -xe
+        echo "SYSROOT=${{ env.HOME }}/NightOS64/NightOS64/sysroot/" >> $GITHUB_ENV
         chmod +x $HOME/work/NightOS64/NightOS64/config.sh
         chmod +x headers.sh
         chmod +x default-host.sh
         sudo -E PATH="$PATH" ./headers.sh
         cd $HOME/work/NightOS64/NightOS64
-        
-        echo "${{ env.HOME }}/NightOS64/NightOS64/sysroot/" >> $GITHUB_ENV
         
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
