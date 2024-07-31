@@ -77,7 +77,7 @@ jobs:
         
         mkdir build-binutils
         cd build-binutils
-        ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
+        ../binutils-2.42/configure --target=$TARGET --prefix=$PREFIX --with-sysroot="$SYSROOT" --disable-nls --disable-werror
         sudo make -j4
         sudo make install
 
