@@ -1,6 +1,6 @@
 # OS Build File
 CFLAGS :=-ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -g
-LDFLAGS :=-ffreestanding -O2 -nostdlib -z max-page-size=0x1000
+LDFLAGS :=-ffreestanding -O2 -nostdlib -z max-page-size=0x1000 -no-pie
 NASM = nasm
 BUILDDIR=build
 CC?=x86_64-elf-gcc
