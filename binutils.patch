@@ -186,3 +186,25 @@ index f937f78b876..83604cfe7d0 100644
  x86_64-*-redox*)	targ_emul=elf_x86_64
  			targ_extra_emuls=elf_i386
  			;;
+diff --git a/ld/emulparams/elf_i386_nightos.sh b/ld/emulparams/elf_i386_nightos.sh
+new file mode 100644
+index 00000000000..c2a6ef5a04f
+--- /dev/null
++++ b/ld/emulparams/elf_i386_nightos.sh
+@@ -0,0 +1,4 @@
++source_sh ${srcdir}/emulparams/elf_i386.sh
++GENERATE_PIE_SCRIPT=yes
++GENERATE_SHLIB_SCRIPT=yes
++TEXT_START_ADDR=0x08000000
+\ No newline at end of file
+diff --git a/ld/emulparams/elf_x86_64_nightos.sh b/ld/emulparams/elf_x86_64_nightos.sh
+new file mode 100644
+index 00000000000..3de5cd7cae2
+--- /dev/null
++++ b/ld/emulparams/elf_x86_64_nightos.sh
+@@ -0,0 +1,4 @@
++source_sh ${srcdir}/emulparams/elf_x86_64.sh
++GENERATE_PIE_SCRIPT=yes
++GENERATE_SHLIB_SCRIPT=yes
++TEXT_START_ADDR=0x08000000
+\ No newline at end of file
