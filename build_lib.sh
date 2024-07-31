@@ -1,7 +1,7 @@
 set -e
 . ./config.sh
 
-cd ../mlibc/
+cd mlibc/
 #Build mlibc
 meson setup --wipe --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=true build
 meson build
@@ -15,6 +15,7 @@ make clean
 make install-libs
 
 #cd ../
+cd ../mlibc/
 meson setup --wipe --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=false -Ddefault_library=both build
 meson build
 cd ./build/
