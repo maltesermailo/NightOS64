@@ -9,7 +9,6 @@ env:
   PREFIX: "/usr/local/cross"
   TARGET: "x86_64-elf"
   CROSS_PATH: "/usr/local/cross/x86_64-elf"
-  SYSROOT: "${{ env.HOME }}/NightOS64/NightOS64/sysroot/"
 
 jobs:
   sonarcloud:
@@ -64,6 +63,9 @@ jobs:
         chmod +x default-host.sh
         sudo -E PATH="$PATH" ./headers.sh
         cd $HOME/work/NightOS64/NightOS64
+        
+        echo "${{ env.HOME }}/NightOS64/NightOS64/sysroot/" >> $GITHUB_ENV
+        
         mkdir -p /tmp/cross-compiler
         cd /tmp/cross-compiler
         wget https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.gz
