@@ -1,6 +1,5 @@
 set -e
 . ./config.sh
-cd ./libc/
 
 cd ../mlibc/
 #Build mlibc
@@ -9,6 +8,8 @@ meson build
 cd ./build/
 ninja
 ninja install
+
+cd ../../libc/
 
 make clean
 make install-libs
