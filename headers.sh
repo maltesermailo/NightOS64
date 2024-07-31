@@ -10,7 +10,7 @@ done
 
 #Build mlibc
 cd ./mlibc/
-meson setup --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=true build
+meson setup --cross-file ../nightos-meson-target.txt --prefix="$SYSROOT" -Dheaders_only=true build
 meson build
 cd ./build/
 ninja
