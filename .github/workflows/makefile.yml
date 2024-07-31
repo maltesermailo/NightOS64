@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 env:
   PREFIX: "/usr/local/cross"
-  TARGET: "x86_64-elf"
+  TARGET: "x86_64-nightos"
   CROSS_PATH: "/usr/local/cross/x86_64-elf"
 
 jobs:
