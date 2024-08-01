@@ -4,61 +4,127 @@
 #include "../../memmgr.h"
 #include "../../lock.h"
 
-/*extern unsigned long _end;
+#define MAX_SIZE_CLASSES 32
 
-static unsigned long KERNEL_HEAP_START_PTR;
-static free_memory_block_t* free_memory_map;
+static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
 
-void* memset(void* bufptr, int value, size_t size) {
-    unsigned char* buf = (unsigned char*) bufptr;
-    for (size_t i = 0; i < size; i++)
-        buf[i] = (unsigned char) value;
-    return bufptr;
+struct slab* kmalloc_for_size(struct size_class* sizeClass) {
+    uint8_t perPage = (4096 / sizeClass->size);
+    uint8_t bitmapSize = perPage / 8;
+    if(bitmapSize % 8 != 0) {
+        bitmapSize = (bitmapSize + 8) & ~(8 - 1);
+    }
+
+    struct slab* slab = malloc(sizeof(struct slab));
+    memset(slab, 0, sizeof(struct slab));
+
+    slab->total_objects = perPage;
+    slab->free_objects = perPage;
+    slab->object_size = sizeClass->size;
+
+    slab->memory = sbrk(4096);
+    slab->bitmap = malloc(bitmapSize);
+
+    struct slab* ptr = sizeClass->slabs;
+    if(ptr == NULL) {
+        sizeClass->slabs = slab;
+    } else {
+        while(ptr->next) {
+            ptr = ptr->next;
+        }
+
+        ptr->next = slab;
+    }
+
+    return slab;
 }
 
 void* kmalloc(size_t size) {
-    if(size > free_memory_map->len) {
-        //Not enough memory, we need to allocate more.
+    for(int i = 0; i < MAX_SIZE_CLASSES; i++) {
+        if(registeredSizeClasses[i].size == size) {
+            struct slab* slab = registeredSizeClasses[i].slabs;
+
+            while(slab) {
+                if(slab->free_objects > 0) {
+                    for(int j = 0; j < slab->total_objects; j++) {
+                        int index = (j / 64);
+                        int bit = (j % 64);
+
+                        unsigned long bitmap = slab->bitmap[index];
+
+                        if((bitmap & (1 << bit)) == 0) {
+                            slab->bitmap[index] |= (1 << bit);
+                            slab->free_objects--;
+
+                            return slab->memory + (64 * index * slab->object_size) + (bit * slab->object_size);
+                        }
+                    }
+                } else {
+                    slab = slab->next;
+                }
+            }
+
+            //If we got here, no slabs are free
+            slab = registeredSizeClasses[i].slabs;
+            while(slab->next) {
+                slab = slab->next;
+            }
+
+            slab->next = kmalloc_for_size(&registeredSizeClasses[i]);
+            slab->bitmap[0] |= 1 << 0;
+            slab->free_objects--;
+
+            return slab->memory;
+        }
     }
 
-    memory_alloc_t* mem_block = free_memory_map->base;
-    memset(mem_block, 0, sizeof(memory_alloc_t));
-
-    mem_block->magic = MEM_BLOCK_MAGIC;
-    mem_block->len = size;
-
-    free_memory_map->base = free_memory_map->base + size;
-    free_memory_map->len = free_memory_map->len - size;
-
-    void* addr = mem_block + sizeof(memory_alloc_t);
-
-    return addr;
+    return NULL;
 }
 
 void kfree(void* ptr) {
-    //mem_alloc_t is at ptr minus sizeof(memory_alloc_t)
+    if (ptr == NULL) return;
 
-    memory_alloc_t* mem_block = (ptr - sizeof(memory_alloc_t));
+    for (int i = 0; i < MAX_SIZE_CLASSES; i++) {
+        if (registeredSizeClasses[i].size > 0) {
+            struct slab* slab = registeredSizeClasses[i].slabs;
 
-    if(mem_block->magic != MEM_BLOCK_MAGIC) {
-        //INVALID POINTER
-        return;
+            while (slab) {
+                if (ptr >= slab->memory && ptr < slab->memory + 4096) {
+                    // Found the correct slab
+                    ptrdiff_t offset = (char*)ptr - (char*)slab->memory;
+                    int objectIndex = offset / slab->object_size;
+                    int bitmapIndex = objectIndex / 64;
+                    int bitOffset = objectIndex % 64;
+
+                    // Clear the bit in the bitmap
+                    slab->bitmap[bitmapIndex] &= ~(1UL << bitOffset);
+
+                    slab->free_objects++;
+
+                    return;
+                }
+                slab = slab->next;
+            }
+        }
     }
 }
 
-void init_kernel_heap() {
-    KERNEL_HEAP_START_PTR = _end;
+void alloc_register_object_size(size_t size) {
+    for(int i = 0; i < MAX_SIZE_CLASSES; i++) {
+        if(registeredSizeClasses[i].size == size) {
+            return;
+        }
+    }
 
-    /*if(!(KERNEL_HEAP_START_PTR & (PAGE_SIZE - 1))) {
-        KERNEL_HEAP_START_PTR = (KERNEL_HEAP_START_PTR + PAGE_SIZE) & (PAGE_SIZE - 1);
-    }*/
+    for(int i = 0; i < MAX_SIZE_CLASSES; i++) {
+        if(registeredSizeClasses[i].size == 0) {
+            registeredSizeClasses[i].size = size;
+            registeredSizeClasses[i].slabs = NULL;
 
-    //Init free_memory_block list
-    /*memset(KERNEL_HEAP_START_PTR, 0, sizeof(free_memory_block_t));
-    free_memory_map = KERNEL_HEAP_START_PTR;
-    free_memory_map->base = KERNEL_HEAP_START_PTR + sizeof(free_memory_block_t);
-    free_memory_map->len = KERNEL_HEAP_START_PTR + 0x200000 - (KERNEL_HEAP_START_PTR - _end) - sizeof(free_memory_block_t);
-}*/
+            kmalloc_for_size(&registeredSizeClasses[i]);
+        }
+    }
+}
 
 const static int page_size = 0x1000;
 const static spin_t LOCK = ATOMIC_FLAG_INIT;

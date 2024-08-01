@@ -16,6 +16,29 @@
 #define PROC_FLAG_SLEEP_INTERRUPTIBLE 1<<3 // interruptable process
 #define PROC_FLAG_SLEEP_NON_INTERRUPTIBLE 1<<4 //non interruptable
 #define PROC_FLAG_FINISHED 1<<5
+/**
+ * System server is a special case process.
+ * There exists only one on the entire system in userspace and it holds various services for the kernel
+ * The system server always has full access to the machine and all resources, but runs in userspace
+ * A system server can't be manipulated by user-space processes.
+ * User-space processes can only communicate using the syscall SYS_SRVCTL
+ *
+ * Non-exhaustive list of System Server:
+ * - Internal File System Drivers
+ * - Device Drivers(e.g. audio, network and more)
+ */
+#define PROC_FLAG_SYSTEM_SERVER 1<<6
+/**
+ * A trusted server is a special case process.
+ * It is a server that can be trusted with access to hardware for the user context
+ */
+#define PROC_FLAG_TRUSTED_SERVER 1<<7
+/**
+ * Server is a service process
+ * A server can be any user process.
+ * It doesn't have access to memory mapped I/O
+ */
+#define PROC_FLAG_SERVER 1<<8
 
 typedef unsigned long long pid_t;
 
