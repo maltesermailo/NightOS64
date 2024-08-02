@@ -5,6 +5,8 @@
 #ifndef NIGHTOS_ALLOC_H
 #define NIGHTOS_ALLOC_H
 
+#define _HAVE_SIZE_T
+
 #include <stddef.h>
 #include "alloc/liballoc.h"
 
