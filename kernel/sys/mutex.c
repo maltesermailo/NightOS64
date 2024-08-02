@@ -30,6 +30,18 @@ void mutex_acquire(mutex_t* mutex) {
     spin_unlock(&mutex->lock);
 }
 
+void mutex_wait(mutex_t* mutex) {
+    spin_lock(&mutex->lock);
+
+    while(mutex->owner) {
+        spin_unlock(&mutex->lock);
+        wait_for_object(mutex);
+        spin_lock(&mutex->lock);
+    }
+
+    spin_unlock(&mutex->lock);
+}
+
 bool mutex_acquire_if_free(mutex_t* mutex) {
     spin_lock(&mutex->lock);
 
@@ -48,11 +60,13 @@ bool mutex_acquire_if_free(mutex_t* mutex) {
 void mutex_release(mutex_t* mutex) {
     spin_lock(&mutex->lock);
 
-    if(mutex->owner != get_current_process()) {
-        printf("Non-owner tried to clear mutex");
-        panic();
-        return;
-    }
+    //Mutexes in kernel context will never clear if not owner
+    //Mutexes in user space will use the futex api
+    //if(mutex->owner != get_current_process()) {
+    //    printf("Non-owner tried to clear mutex");
+    //    panic();
+    //    return;
+    //}
 
     mutex->owner = NULL;
     wakeup_waiting(mutex->waiting);

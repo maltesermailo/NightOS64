@@ -18,6 +18,7 @@ typedef struct mutex {
 
 mutex_t* create_mutex();
 void mutex_acquire(mutex_t* mutex);
+void mutex_wait(mutex_t* mutex);
 bool mutex_acquire_if_free(mutex_t* mutex);
 void mutex_release(mutex_t* mutex);
 

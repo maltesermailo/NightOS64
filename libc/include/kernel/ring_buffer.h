@@ -6,8 +6,8 @@
 #define NIGHTOS_RING_BUFFER_H
 #include <stdint.h>
 #include <stdbool.h>
-
 #include <stdatomic.h>
+#include "mutex.h"
 typedef atomic_flag spin_t;
 
 typedef struct circular_buffer {
@@ -17,6 +17,8 @@ typedef struct circular_buffer {
     uint64_t max;
 
     spin_t lock;
+    mutex_t wait_queue_write;
+    mutex_t wait_queue_read;
 } circular_buffer_t;
 
 /***
@@ -55,5 +57,7 @@ int ring_buffer_read(circular_buffer_t* circularBuffer, int size, uint8_t* buffe
  * @return the amount left
  */
 int ring_buffer_available(circular_buffer_t* buffer);
+
+void ring_buffer_discard_readable(circular_buffer_t* buffer);
 
 #endif //NIGHTOS_RING_BUFFER_H
