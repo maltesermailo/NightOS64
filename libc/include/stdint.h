@@ -5,6 +5,6 @@
 #ifndef NIGHTOS_STDINT_H
 #define NIGHTOS_STDINT_H
 
-#include <stdint-gcc.h>
+#include_next <stdint.h>
 
 #endif //NIGHTOS_STDINT_H

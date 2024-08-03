@@ -21,7 +21,7 @@ void list_destroy(list_t* list) {
 
         listEntry = listEntry->next;
 
-        free(listEntryOld);
+        kfree(listEntryOld);
     }
 
     free(list);
@@ -36,7 +36,7 @@ void list_free(list_t* list) {
 
         listEntry = listEntry->next;
 
-        free(listEntryOld);
+        kfree(listEntryOld);
     }
 
     free(list);
@@ -59,7 +59,7 @@ void list_append(list_t* list, list_entry_t* entry) {
 }
 
 void list_insert(list_t* list, void* item) {
-    list_entry_t * entry = calloc(1, sizeof(list_entry_t));
+    list_entry_t * entry = kcalloc(1, sizeof(list_entry_t));
     entry->value = item;
 
     list_append(list, entry);
@@ -141,7 +141,7 @@ void list_delete(list_t* list, list_entry_t* entry) {
     entry->next = 0;
     entry->prev = 0;
 
-    free(entry);
+    kfree(entry);
 
     list->length--;
 }
@@ -175,7 +175,7 @@ void list_append_after(list_t* list, list_entry_t* before, list_entry_t* after) 
 }
 
 list_entry_t* list_insert_after(list_t* list, list_entry_t* before, void* item) {
-    list_entry_t* entry = calloc(1, sizeof(list_entry_t));
+    list_entry_t* entry = kcalloc(1, sizeof(list_entry_t));
     entry->value = item;
 
     list_append_after(list, before, entry);
@@ -203,7 +203,7 @@ void list_append_before(list_t* list, list_entry_t* after, list_entry_t* before)
 }
 
 list_entry_t* list_insert_before(list_t* list, list_entry_t* after, void* item) {
-    list_entry_t* entry = calloc(1, sizeof(list_entry_t));
+    list_entry_t* entry = kcalloc(1, sizeof(list_entry_t));
     entry->value = item;
 
     list_append_before(list, after, entry);

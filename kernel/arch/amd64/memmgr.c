@@ -886,7 +886,10 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     //Reload PML to apply our mappings
     reloadPML();
 
-    printf("end\n");
+    //Register commonly used memory structures
+    alloc_register_object_size(sizeof(list_entry_t));
+    alloc_register_object_size(sizeof(list_t));
+    alloc_register_object_size(sizeof(process_t));
 
     //memmgr_dump();
 }

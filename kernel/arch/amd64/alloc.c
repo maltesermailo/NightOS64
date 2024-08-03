@@ -4,7 +4,7 @@
 #include "../../memmgr.h"
 #include "../../lock.h"
 
-#define MAX_SIZE_CLASSES 32
+#define MAX_SIZE_CLASSES 512
 
 static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
 
@@ -107,6 +107,19 @@ void kfree(void* ptr) {
             }
         }
     }
+}
+
+void* kcalloc(int nobj, size_t size) {
+    unsigned long long real_size;
+    void *p;
+
+    real_size = nobj * size;
+
+    p = kmalloc( real_size );
+
+    memset( p, 0, real_size );
+
+    return p;
 }
 
 void alloc_register_object_size(size_t size) {

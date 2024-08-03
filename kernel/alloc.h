@@ -8,6 +8,7 @@
 #define _HAVE_SIZE_T
 
 #include <stddef.h>
+#include <stdint.h>
 #include "alloc/liballoc.h"
 
 /**
@@ -16,6 +17,7 @@
  * @return a memory region
  */
 void* kmalloc(size_t size);
+void* kcalloc(int nobj, size_t size);
 /**
  * This returns a known memory size region to a slab
  * @param ptr the ptr

@@ -1,9 +1,10 @@
 #include "liballoc.h"
+#include "../terminal.h"
 
 /**  Durand's Ridiculously Amazing Super Duper Memory functions.  */
 
 #define LIBALLOC_MAGIC	0xc001c0de
-#define MAXCOMPLETE		5
+#define MAXCOMPLETE		65536
 #define MAXEXP	32
 #define MINEXP	8
 
@@ -444,7 +445,7 @@ void free(void *ptr)
     // A whole, empty block?
     // Removed this, since kernel heap will always prevail. Is easier to manage like this. The kernel will always need space.
     //TODO: Rework get_free_page to return another address for kernel space and dynamically allocate stuff.
-    /*if ( (tag->split_left == NULL) && (tag->split_right == NULL) )
+    if ( (tag->split_left == NULL) && (tag->split_right == NULL) )
     {
 
         if ( l_completePages[ index ] == MAXCOMPLETE )
@@ -455,13 +456,17 @@ void free(void *ptr)
             if ( (tag->real_size % l_pageSize) != 0 ) pages += 1;
             if ( pages < l_pageCount ) pages = l_pageCount;
 
-            liballoc_free( tag, pages );
+            //liballoc_free( tag, pages );
 
 #ifdef DEBUG
             l_allocated -= pages * l_pageSize;
 				printf("Resource freeing %x of %d pages\n", tag, pages );
 				dump_array();
 #endif
+            while(1) {
+                printf("LIBALLOC: TOO MUCH PAGES\n");
+                ;;
+            }
 
             liballoc_unlock();
             return;
@@ -469,7 +474,7 @@ void free(void *ptr)
 
 
         l_completePages[ index ] += 1;	// Increase the count of complete pages.
-    }*/
+    }
 
 
     // ..........
