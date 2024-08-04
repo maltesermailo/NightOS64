@@ -325,6 +325,14 @@ pid_t process_clone(struct clone_args* args, size_t size) {
         spin_unlock(&process->fd_table->lock);
     }
 
+    if(args->flags & CLONE_SETTLS) {
+        process->main_thread.tls_base = args->tls;
+    }
+
+    if(args->parent_tid != 0) {
+        *((unsigned long*) args->parent_tid) = process->id;
+    }
+
     list_insert(process_list, process);
     tree_insert_child(process_tree, NULL, process);
     list_insert(thread_queue, process);

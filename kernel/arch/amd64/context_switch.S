@@ -15,7 +15,10 @@ setjmp:
     mov [RDI+8], rbp; Move base pointer into structure
     mov rax, [rsp]
     mov [RDI+16], rax; Save Instruction Pointer(as return address)
-    mov qword [RDI+24], 0
+    mov rcx, 0xC0000100
+    rdmsr
+    mov dword [RDI+24], eax
+    mov dword [RDI+28], edx
 
     mov [RDI+32], rbx ; RBX
     mov [RDI+40], r12 ; R12
@@ -34,6 +37,12 @@ longjmp:
     mov r13, [RDI+48] ; R13
     mov r14, [RDI+56] ; R14
     mov r15, [RDI+64] ; R15
+
+    mov rcx, 0xC0000100
+    mov eax, dword [RDI+24]
+    mov edx, dword [RDI+28]
+    wrmsr
+
     mov rax, 1
 
     jmp qword [RDI+16] ; Jump to process

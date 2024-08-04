@@ -220,6 +220,8 @@ long sys_tcb_set(uintptr_t tcb) {
     uint32_t high = tcb >> 32;
     uint32_t low = tcb & 0xFFFFFFFF;
 
+    get_current_process()->main_thread.tls_base = tcb;
+
     __asm__ volatile("wrmsr" : : "a"(low), "d"(high), "c"(0xC0000100));
 
     return 0;
@@ -246,6 +248,10 @@ long sys_yield() {
 }
 
 long sys_clone(unsigned long flags, unsigned long stack, unsigned long parent_tid, unsigned long child_tid, unsigned long tls) {
+    if(!(CHECK_PTR(flags) && CHECK_PTR(stack) && CHECK_PTR(parent_tid) && CHECK_PTR(child_tid) && CHECK_PTR(tls))) {
+        return -EINVAL;
+    }
+
     struct clone_args args;
     args.flags = flags;
     args.stack = stack;
@@ -253,9 +259,7 @@ long sys_clone(unsigned long flags, unsigned long stack, unsigned long parent_ti
     args.child_tid = child_tid;
     args.tls = tls;
 
-    process_clone(&args, sizeof(struct clone_args));
-
-    return 0;
+    return process_clone(&args, sizeof(struct clone_args));
 }
 
 long sys_execve(long pathname, long argv, long envp) {
