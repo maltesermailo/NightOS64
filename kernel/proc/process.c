@@ -84,7 +84,7 @@ void process_create_task(char* path, bool is_kernel) {
     process_t* process = calloc(1, sizeof(process_t));
 
     process->id = 1;
-    process->tgid = 0;
+    process->tgid = 1;
 
     process->page_directory = calloc(1, sizeof(mm_struct_t));
     process->page_directory->process_count = 1;
@@ -121,6 +121,11 @@ void process_create_task(char* path, bool is_kernel) {
     process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
     memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
     spin_unlock(&process->fd_table->lock);
+
+    file_node_t* console = open("/dev/console0", 0);
+    process_open_fd(console, 0);
+    process_open_fd(console, 0);
+    process_open_fd(console, 0);
 
     set_stack_pointer(process->main_thread.kernel_stack);
 
@@ -180,13 +185,15 @@ void process_create_idle() {
     spin_unlock(&process->fd_table->lock);
 }
 
+extern void* fork_exit;
+
 pid_t process_fork() {
     process_t* process = calloc(1, sizeof(process_t));
     process_t* parent = get_current_process();
 
     process->id = ++id_generator;
     process->parent = parent->id;
-    process->tgid = 0;
+    process->tgid = process->id;
     process->page_directory = calloc(1, sizeof(mm_struct_t));
     process->page_directory->process_count = 1;
     process->page_directory->page_directory = kalloc_frame();
@@ -196,17 +203,18 @@ pid_t process_fork() {
 
     process->main_thread.process = process;
     process->main_thread.priority = parent->main_thread.priority;
-    process->main_thread.rip = parent->main_thread.rip;
-    process->main_thread.rbp = parent->main_thread.rbp;
-    process->main_thread.rbx = parent->main_thread.rbx;
-    process->main_thread.rdi = parent->main_thread.rdi;
-    process->main_thread.r12 = parent->main_thread.r12;
-    process->main_thread.r13 = parent->main_thread.r13;
-    process->main_thread.r14 = parent->main_thread.r14;
-    process->main_thread.r15 = parent->main_thread.r15;
+
+    //Save parent process state
+    setjmp(&process->main_thread);
     process->main_thread.user_stack = parent->main_thread.user_stack;
     process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
-    process->main_thread.rsp = parent->flags & PROC_FLAG_KERNEL ? process->main_thread.kernel_stack : process->main_thread.user_stack;
+    process->main_thread.rip = (uintptr_t) fork_exit;
+    process->main_thread.rsp = process->main_thread.user_stack;
+
+    regs_t registers;
+    memcpy(&registers, process->saved_registers, sizeof(regs_t));
+    registers.rax = 0;
+    PUSH_PTR(process->main_thread.kernel_stack, regs_t, registers);
 
     process->uid = parent->uid;
     process->gid = parent->gid;
@@ -234,6 +242,88 @@ pid_t process_fork() {
     }
 
     spin_unlock(&process->fd_table->lock);
+
+    list_insert(process_list, process);
+    tree_insert_child(process_tree, NULL, process);
+    list_insert(thread_queue, process);
+
+    return process->id;
+}
+
+pid_t process_clone(struct clone_args* args, size_t size) {
+    process_t* process = calloc(1, sizeof(process_t));
+    process_t* parent = get_current_process();
+
+    process->id = ++id_generator;
+    process->parent = parent->id;
+
+    if(args->flags & CLONE_THREAD) {
+        process->tgid = parent->tgid;
+    }
+
+    if(args->flags & CLONE_VM) {
+        process->page_directory = parent->page_directory;
+
+        spin_lock(&process->page_directory->lock);
+        process->page_directory->process_count++;
+        spin_unlock(&process->page_directory->lock);
+    } else {
+        process->page_directory = calloc(1, sizeof(mm_struct_t));
+        process->page_directory->process_count = 1;
+        process->page_directory->page_directory = kalloc_frame();
+        spin_unlock(&process->page_directory->lock);
+
+        memmgr_clone_page_map(memmgr_get_current_pml4(), memmgr_get_from_physical(process->page_directory->page_directory));
+    }
+
+    process->main_thread.process = process;
+    process->main_thread.priority = parent->main_thread.priority;
+
+    //Save parent process state
+    setjmp(&process->main_thread);
+    process->main_thread.user_stack = parent->main_thread.user_stack;
+    process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
+    process->main_thread.rip = (uintptr_t) fork_exit;
+    process->main_thread.rsp = process->main_thread.user_stack;
+
+    regs_t registers;
+    memcpy(&registers, process->saved_registers, sizeof(regs_t));
+    registers.rax = 0;
+    PUSH_PTR(process->main_thread.kernel_stack, regs_t, registers);
+
+    process->uid = parent->uid;
+    process->gid = parent->gid;
+    process->flags = parent->flags;
+    process->flags &= ~PROC_FLAG_RUNNING;
+    process->flags &= ~PROC_FLAG_ON_CPU;
+
+    if(args->flags & CLONE_FILES) {
+        process->fd_table = parent->fd_table;
+        spin_lock(&process->fd_table->lock);
+        process->fd_table->process_count++;
+        spin_unlock(&process->fd_table->lock);
+    } else {
+        process->fd_table = calloc(1, sizeof(fd_table_t));
+        process->fd_table->capacity = parent->fd_table->capacity;
+        process->fd_table->length = parent->fd_table->length;
+        process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+        memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+
+        for(int i = 0; i < process->fd_table->capacity; i++) {
+            if(parent->fd_table->handles[i] != NULL) {
+                file_handle_t* parentHandle = parent->fd_table->handles[i];
+
+                file_handle_t* handle = calloc(1, sizeof(file_handle_t*));
+                handle->fileNode = parentHandle->fileNode;
+                handle->offset = parentHandle->offset;
+                handle->mode = parentHandle->mode;
+
+                process->fd_table->handles[i] = handle;
+            }
+        }
+
+        spin_unlock(&process->fd_table->lock);
+    }
 
     list_insert(process_list, process);
     tree_insert_child(process_tree, NULL, process);
@@ -443,8 +533,60 @@ void wakeup_waiting(list_t* queue) {
     }
 }
 
-void process_terminate(process_t* process) {
+void process_terminate(process_t* process, int retval) {
+    if(process->id == 1) {
+        printf("PANIC: Init process tried to exit!!");
+        panic();
+    }
 
+    process->status = retval;
+
+    if(process->fd_table->length > 0) {
+        spin_lock(&process->fd_table->lock);
+
+        int length = process->fd_table->length;
+        int capacity = process->fd_table->capacity;
+        int i = 0;
+        while(length > 0) {
+            if(!process->fd_table->handles[i]) {
+                i++;
+                continue;
+            }
+
+            free(process->fd_table->handles[i]);
+            process->fd_table->handles[i] = NULL;
+
+            i++;
+            length--;
+
+            if(i > capacity) {
+                break;
+            }
+        }
+
+        spin_unlock(&process->fd_table->lock);
+
+        free(process->fd_table);
+        process->fd_table = NULL;
+    }
+
+
+    process->flags = PROC_FLAG_FINISHED;
+}
+
+void process_thread_exit(int retval) {
+    process_t* process = get_current_process();
+
+    if(process->id == 1) {
+        printf("PANIC: Init process tried to exit!!");
+        panic();
+    }
+
+    process->status = retval;
+    process->flags = PROC_FLAG_FINISHED;
+    //Now we wait until someone cleans it up.
+
+    schedule(true);
 }
 
 void process_exit(int retval) {
@@ -486,32 +628,28 @@ void process_exit(int retval) {
         process->fd_table = NULL;
     }
 
-    if(process->tgid != process->id) {
-        //Not the parent
 
-    } else {
-        //Kill other processes
-        if(process_list->length > 1) {
-            tree_node_t* parent = tree_find_child_root(process_tree, process);
+    process->flags = PROC_FLAG_FINISHED;
 
-            if(parent->children->length > 0) {
-                //Kill em
-                for(list_entry_t* entry = parent->children->head; entry; entry = entry->next) {
-                    process_t* other = (process_t*)entry->value;
+    //Kill other processes
+    if(process_list->length > 1) {
+        tree_node_t* parent = tree_find_child_root(process_tree, process);
 
-                    //This is a direct thread
-                    if(other->tgid == process->id) {
-                        process_terminate(other);
-                    }
+        if(parent->children->length > 0) {
+            //Kill em
+            for(list_entry_t* entry = parent->children->head; entry; entry = entry->next) {
+                process_t* other = (process_t*)entry->value;
+
+                //This is a direct thread
+                if(other->tgid == process->id && (process->flags & PROC_FLAG_FINISHED) == 0) {
+                    process_terminate(other, retval);
                 }
             }
         }
-
-        process->flags = PROC_FLAG_FINISHED;
-        //Now we wait until someone cleans it up.
-
-        schedule(true);
     }
+    //Now we wait until someone cleans it up.
+
+    schedule(true);
 }
 
 void sleep(long milliseconds) {

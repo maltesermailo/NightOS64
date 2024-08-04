@@ -264,7 +264,9 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
         uintptr_t pt_frame = kalloc_frame();
         pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
+#ifdef DEBUG
         printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
+#endif
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
     }
@@ -346,7 +348,9 @@ void* get_free_page(size_t len) {
                 freeMemory += 0x200000UL;
 
                 if(freeMemory > len) {
+#ifdef DEBUG
                     printf("cool: 0x%x\n", baseAddress);
+#endif
                     return (void*)baseAddress;
                 }
 
@@ -376,7 +380,9 @@ void* get_free_page(size_t len) {
                 freeMemory += 0x1000UL;
 
                 if(freeMemory > len) {
+#ifdef DEBUG
                     printf("cool2: 0x%x\n", baseAddress);
+#endif
                     return (void*)baseAddress;
                 }
             }
@@ -530,7 +536,9 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
             return (void*)start_addr;
         } else {
+#ifdef DEBUG
             printf("Get next free page...\n");
+#endif
             //Search new space
             uintptr_t start_addr = (uintptr_t) get_free_page(len);
 
@@ -540,7 +548,9 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 count++;
             }
 
+#ifdef DEBUG
             printf("Start addr: 0x%x, Count: %d\n", start_addr, count);
+#endif
 
             //Create the actual pages and reload the TLB at that location
             for(size_t i = 0; i < count; i++) {

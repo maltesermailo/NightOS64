@@ -3,6 +3,7 @@
 //
 #include "../include/kernel/tree.h"
 #include "../include/stdlib.h"
+#include "../../kernel/alloc.h"
 #include "../include/stdio.h"
 
 tree_t* tree_create() {
@@ -33,7 +34,7 @@ void tree_destroy_node(tree_node_t* node) {
 
     list_free(node->children);
     free(node->value);
-    free(node);
+    kfree(node);
 }
 
 void tree_free(tree_t* tree) {
@@ -54,7 +55,7 @@ void tree_free_node(tree_node_t* node) {
     }
 
     list_free(node->children);
-    free(node);
+    kfree(node);
 }
 
 void tree_calculate_height(tree_t* tree, tree_node_t* node, int height) {
@@ -86,7 +87,7 @@ void tree_set_root_node(tree_t* tree, tree_node_t* node) {
  * @return the new tree node
  */
 tree_node_t* tree_insert_child(tree_t* tree, tree_node_t* node, void* value) {
-    tree_node_t* tree_node = calloc(1, sizeof(tree_node_t));
+    tree_node_t* tree_node = kcalloc(1, sizeof(tree_node_t));
 
     tree_node->value = value;
 

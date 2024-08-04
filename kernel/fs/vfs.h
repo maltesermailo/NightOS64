@@ -57,6 +57,7 @@ struct file_operations {
     int (*chown) (struct FILE*, unsigned int, unsigned int);
     bool (*create)(struct FILE*, char*, int);
     int (*ioctl) (struct FILE*, unsigned long, void*);
+    int (*delete)(struct FILE*);
 };
 
 typedef struct FILE {
@@ -97,6 +98,7 @@ file_node_t* open(char* filename, int mode);
 file_node_t* create(char* filename, int mode);
 file_node_t* mkdir(char* filename);
 file_node_t* mkdir_vfs(char* filename);
+int delete(char* filename);
 
 file_handle_t* create_handle(file_node_t*);
 

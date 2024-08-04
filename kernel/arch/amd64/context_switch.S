@@ -5,6 +5,7 @@ global longjmp
 global enter_user
 global enter_user_2
 global enter_kernel
+global fork_exit
 setjmp:
     ; We get a structure containing all registers as a pointer, therefore we use that pointer on rdi
     ; 0 = stack pointer
@@ -36,6 +37,35 @@ longjmp:
     mov rax, 1
 
     jmp qword [RDI+16] ; Jump to process
+
+fork_exit:
+%macro swapgs_if_necessary 1
+	cmp QWORD [rsp+24], 0x8
+	je swapgs_end_%1
+	swapgs
+swapgs_end_%1:
+%endmacro
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+
+    swapgs_if_necessary end
+
+    add rsp, 16
+
+    iretq
 
 enter_user:
     ; RIP passed in RDI

@@ -101,6 +101,56 @@ int sys_lseek(long fd, long offset, long whence) {
     return handle->offset;
 }
 
+int sys_pread64(long fd, unsigned long buffer, unsigned long size, unsigned long offset) {
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR(buffer)) {
+        return -1;
+    }
+
+    //Use temporary handle to set offset without impacting other threads
+    file_handle_t tempHandle = {
+            .offset = offset,
+            .fileNode = handle->fileNode,
+            .mode = handle->mode
+    };
+
+    int readBytes = read(&tempHandle, (char*)buffer, size);
+
+    return readBytes;
+}
+
+int sys_pwrite64(long fd, unsigned long buffer, unsigned long size, unsigned long offset) {
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR(buffer)) {
+        return -1;
+    }
+
+    //Use temporary handle to set offset without impacting other threads
+    file_handle_t tempHandle = {
+            .offset = offset,
+            .fileNode = handle->fileNode,
+            .mode = handle->mode
+    };
+
+    int written = write(&tempHandle, (char*)buffer, size);
+
+    return written;
+}
+
 long sys_brk(long increment, long size) {
     process_t* proc = get_current_process();
 
@@ -122,8 +172,8 @@ long sys_brk(long increment, long size) {
     }
 }
 
-int sys_exit(long exitCode) {
-    return -1;
+[[noreturn]] int sys_exit(long exitCode) {
+    process_thread_exit(exitCode);
 }
 
 int sys_getpid() {
@@ -175,12 +225,35 @@ long sys_tcb_set(uintptr_t tcb) {
     return 0;
 }
 
+long sys_nanosleep(struct timespec* timespec) {
+    if(!CHECK_PTR(timespec)) {
+        return -EINVAL;
+    }
+
+    long nanosecondsToMs = timespec->tv_nsec / 1000000;
+
+    sleep(timespec->tv_sec * 1000 + nanosecondsToMs + 1);
+}
+
 long sys_ioctl() {
     return 0;
 }
 
 long sys_yield() {
     schedule(false);
+
+    return 0;
+}
+
+long sys_clone(unsigned long flags, unsigned long stack, unsigned long parent_tid, unsigned long child_tid, unsigned long tls) {
+    struct clone_args args;
+    args.flags = flags;
+    args.stack = stack;
+    args.parent_tid = parent_tid;
+    args.child_tid = child_tid;
+    args.tls = tls;
+
+    process_clone(&args, sizeof(struct clone_args));
 
     return 0;
 }
@@ -300,12 +373,16 @@ long sys_futex(long pointer, long action, long val, long timeout) {
     return -ENOSYS;
 }
 
+[[noreturn]] int sys_exit_group(long exitCode) {
+    process_exit(exitCode);
+}
+
 //Stub for unimplemented syscalls to fill
 int sys_stub() {
     return -1;
 }
 
-syscall_t syscall_table[202] = {
+syscall_t syscall_table[232] = {
         (syscall_t)sys_read,    //SYS_READ
         (syscall_t)sys_write,   //SYS_WRITE
         (syscall_t)sys_open,    //SYS_OPEN
@@ -323,8 +400,8 @@ syscall_t syscall_table[202] = {
         (syscall_t)sys_stub,    //SYS_SIGPROCMASK
         (syscall_t)sys_stub,    //SYS_RT_SIGRETURN
         (syscall_t)sys_ioctl,   //SYS_IOCTL
-        (syscall_t)sys_stub,    //SYS_PREAD64
-        (syscall_t)sys_stub,    //SYS_PWRITE64
+        (syscall_t)sys_pread64, //SYS_PREAD64
+        (syscall_t)sys_pwrite64,//SYS_PWRITE64
         (syscall_t)sys_stub,    //SYS_READV
         (syscall_t)sys_stub,    //SYS_WRITEV
         (syscall_t)sys_stub,    //SYS_ACCESS
@@ -362,7 +439,7 @@ syscall_t syscall_table[202] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
-        (syscall_t)sys_stub,   //SYS_CLONE
+        (syscall_t)sys_clone,   //SYS_CLONE
         (syscall_t)sys_fork,
         (syscall_t)sys_stub,
         (syscall_t)sys_execve, //SYS_EXECVE
@@ -508,12 +585,44 @@ syscall_t syscall_table[202] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_futex,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,
+        (syscall_t)sys_exit_group,
 };
 
 void syscall_entry(regs_t* regs) {
     uintptr_t syscallNo = regs->rax;
 
     if(syscall_table[syscallNo]) {
+        get_current_process()->saved_registers = regs;
+
         int returnCode = syscall_table[syscallNo](regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 
         regs->rax = returnCode;
