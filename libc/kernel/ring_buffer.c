@@ -10,6 +10,8 @@ circular_buffer_t* ring_buffer_create(int size) {
     circular_buffer_t* buffer = calloc(1, sizeof(circular_buffer_t));
     buffer->buffer = calloc(1, size);
     buffer->max = size;
+    mutex_init(&buffer->wait_queue_read);
+    mutex_init(&buffer->wait_queue_write);
 
     return buffer;
 }

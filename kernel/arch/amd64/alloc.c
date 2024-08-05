@@ -135,6 +135,7 @@ void alloc_register_object_size(size_t size) {
             registeredSizeClasses[i].slabs = NULL;
 
             kmalloc_for_size(&registeredSizeClasses[i]);
+            return;
         }
     }
 }

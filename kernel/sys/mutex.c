@@ -17,6 +17,13 @@ mutex_t* create_mutex() {
     mutex->waiting = list_create();
 }
 
+void mutex_init(mutex_t* mutex) {
+    spin_unlock(&mutex->lock);
+
+    mutex->owner = NULL;
+    mutex->waiting = list_create();
+}
+
 void mutex_acquire(mutex_t* mutex) {
     spin_lock(&mutex->lock);
 

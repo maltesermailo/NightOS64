@@ -178,6 +178,8 @@ _start:
     mov DWORD [edi], 0x00400083
     add edi, 8
     mov DWORD [edi], 0x00600083
+    add edi, 8
+    mov DWORD [edi], 0x00800083
 
 	; Enable paging
     mov eax, cr4                 ; Set the A-register to control register 4.

@@ -8,11 +8,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "../terminal.h"
+#include "pty.h"
+#include "../keyboard.h"
 
 const char CONSOLE_NAME[] = "console0\0";
 
 int console_input_read(struct FILE* node, char* buffer, size_t offset, size_t length) {
-    return 0; // NOT YET IMPLEMENTED
+    return pty_read(pty_get_slave(0), buffer, length, offset); // NOT YET IMPLEMENTED
 }
 
 int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t length) {
@@ -36,6 +38,13 @@ int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
     return 0;
 }
 
+void key_event(key_event_t* event) {
+    if(event->isDown) {
+        terminal_putchar((char)event->keyCode);
+        pty_write_char_to_input(0, (char) event->keyCode);
+    }
+}
+
 void console_init() {
     file_node_t* node = calloc(1, sizeof(file_node_t));
     node->id = get_next_file_id();
@@ -46,7 +55,13 @@ void console_init() {
     strncpy(node->name, CONSOLE_NAME, strlen(CONSOLE_NAME));
 
     node->file_ops.write = console_output_write;
+    node->file_ops.read = console_input_read;
     node->file_ops.ioctl = console_ioctl;
+
+    pty_init();
+    pty_create_pair(0);
+
+    registerKeyEventHandler(key_event);
 
     mount_directly("/dev/console0", node);
 }

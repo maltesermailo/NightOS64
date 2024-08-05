@@ -1,6 +1,6 @@
 ENTRY(_start)
 
-LMA = 0x800000;
+LMA = 0x2000000;
 
 SECTIONS
 {

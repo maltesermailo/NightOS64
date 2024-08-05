@@ -870,7 +870,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     }
 
     //Map kernel low memory
-    for(int i = 0x0; i < 0x801000; i += 0x1000) {
+    for(int i = 0x0; i < 0x1001000; i += 0x1000) {
         memmgr_phys_mark_page(ADDRESS_TO_PAGE(i));
     }
     spin_unlock(&PHYS_MEM_LOCK);
@@ -897,9 +897,6 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     reloadPML();
 
     //Register commonly used memory structures
-    alloc_register_object_size(sizeof(list_entry_t));
-    alloc_register_object_size(sizeof(list_t));
-    alloc_register_object_size(sizeof(process_t));
 
     //memmgr_dump();
 }

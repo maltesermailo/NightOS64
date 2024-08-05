@@ -159,6 +159,11 @@ void terminal_putchar(char c)
 {
     terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
 
+    //if(c == '\b') {
+    //    terminal_column--;
+    //    return;
+    //}
+
 	if (++terminal_column == VGA_WIDTH || c == '\n') {
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT) {
@@ -320,27 +325,6 @@ int printf(const char* restrict format, ...) {
     return written;
 }
 
-char commandline[64];
-
-void key_event(key_event_t* event) {
-    if(event->keyCode == 0x8) {
-        for(int i = 0; i < 64; i++) {
-            if(!commandline[i] && event->isDown) {
-                commandline[i-1] = 0;
-                return;
-            }
-        }
-        return;
-    }
-
-    for(int i = 0; i < 64; i++) {
-        if(!commandline[i] && event->isDown) {
-            commandline[i] = event->keyCode;
-            return;
-        }
-    }
-}
-
 void test_task() {
     printf("Hello userspace!");
 
@@ -464,6 +448,10 @@ void kernel_main(unsigned long magic, unsigned long header)
     timer_init();
     init_kernel_symbols();
 
+    alloc_register_object_size(sizeof(list_entry_t));
+    alloc_register_object_size(sizeof(list_t));
+    alloc_register_object_size(sizeof(process_t));
+
     __asm__ volatile ("sti"); // set the interrupt flag
 
     //Setup filesystem and modules
@@ -487,7 +475,7 @@ void kernel_main(unsigned long magic, unsigned long header)
                         ((struct multiboot_tag_module *) tag)->cmdline);
 
                 if(strcmp(((struct multiboot_tag_module *) tag)->cmdline, "tarfs") == 0) {
-                    tarfs_init("/", (void *) ((struct multiboot_tag_module *) tag)->mod_start, ((struct multiboot_tag_module *) tag)->mod_end - ((struct multiboot_tag_module *) tag)->mod_start);
+                    tarfs_init("/", memmgr_get_from_physical((uintptr_t) ((struct multiboot_tag_module *) tag)->mod_start), ((struct multiboot_tag_module *) tag)->mod_end - ((struct multiboot_tag_module *) tag)->mod_start);
                 }
                 break;
         }
@@ -497,12 +485,6 @@ void kernel_main(unsigned long magic, unsigned long header)
     pci_init(rsdp);
 
 	//terminal_writestring("Hello Kernel\n");
-
-    for(int i = 0; i < 64; i++) {
-        commandline[i] = 0;
-    }
-
-    registerKeyEventHandler(key_event);
 
     /*if(info->mods_count > 0) {
         multiboot_module_t* module = info->mods_addr;

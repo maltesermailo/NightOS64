@@ -44,6 +44,7 @@ string/string.o \
 kernel/list.o \
 kernel/tree.o \
 kernel/hashtable.o \
+kernel/ring_buffer.o \
 
 HOSTEDOBJS=\
 $(ARCH_HOSTEDOBJS) \
