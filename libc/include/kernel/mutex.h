@@ -6,7 +6,7 @@
 #ifndef NIGHTOS_MUTEX_H
 #define NIGHTOS_MUTEX_H
 
-#include "lock.h"
+#include "../../../kernel/lock.h"
 #include <stdbool.h>
 #include "list.h"
 

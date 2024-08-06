@@ -59,5 +59,7 @@ int ring_buffer_read(circular_buffer_t* circularBuffer, int size, uint8_t* buffe
 int ring_buffer_available(circular_buffer_t* buffer);
 
 void ring_buffer_discard_readable(circular_buffer_t* buffer);
+void ring_buffer_set_tail(circular_buffer_t* buffer, unsigned long offset);
+void ring_buffer_set_head(circular_buffer_t* buffer, unsigned long offset);
 
 #endif //NIGHTOS_RING_BUFFER_H

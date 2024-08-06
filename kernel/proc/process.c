@@ -38,6 +38,8 @@ _Noreturn void idle() {
     while(1) {
         __asm__ volatile("sti"); //Enable interrupts while waiting.
         __asm__ volatile("hlt");
+        __asm__ volatile("cli");
+        schedule(false);
     }
 }
 
@@ -492,23 +494,28 @@ process_t* get_next_process() {
 void schedule(bool sleep) {
     if(pcb.current_process == null) return;
 
-    if(setjmp(&pcb.current_process->main_thread)) {
+    if(pcb.current_process != pcb.kernel_idle_process && setjmp(&pcb.current_process->main_thread)) {
         //We are back in kernel space, resume call
         return;
     }
 
-    if(!sleep) {
+    if(pcb.current_process != pcb.kernel_idle_process && !sleep) {
         schedule_process(pcb.current_process);
     }
 
     pcb.current_process = get_next_process();
 
     if(pcb.current_process == null) {
+        //printf("Jumping to idle thread.\n");
         pcb.current_process = pcb.kernel_idle_process;
 
+        set_stack_pointer(pcb.current_process->main_thread.kernel_stack);
         longjmp(&pcb.kernel_idle_process->main_thread);
     }
 
+    //printf("Jumping to thread.\n");
+
+    set_stack_pointer(pcb.current_process->main_thread.kernel_stack);
     longjmp(&pcb.current_process->main_thread);
 }
 

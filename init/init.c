@@ -5,11 +5,12 @@
 #include <stdio.h>
 
 int main(int argc, char** argv) {
-    printf("Hi, from initd");
+    printf("Hi, from initd\n");
 
     while(1) {
         char input[256];
 
         scanf("%s", input);
+        printf("%s\n", input);
     }
 }

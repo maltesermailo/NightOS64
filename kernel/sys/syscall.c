@@ -86,6 +86,10 @@ int sys_lseek(long fd, long offset, long whence) {
         return -1;
     }
 
+    if(handle->fileNode->type == FILE_TYPE_VIRTUAL_DEVICE || handle->fileNode->type == FILE_TYPE_NAMED_PIPE) {
+        return -ESPIPE;
+    }
+
     switch(whence) {
         case SEEK_SET:
             handle->offset = offset;
@@ -422,7 +426,7 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_stub,    //SYS_DUP
         (syscall_t)sys_stub,    //SYS_DUP2
         (syscall_t)sys_stub,    //SYS_PAUSE
-        (syscall_t)sys_stub,    //SYS_NANOSLEEP
+        (syscall_t)sys_nanosleep,//SYS_NANOSLEEP
         (syscall_t)sys_stub,    //SYS_GETITIMER
         (syscall_t)sys_stub,    //SYS_ALARM
         (syscall_t)sys_stub,    //SYS_SETITIMER

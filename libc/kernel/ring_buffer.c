@@ -5,6 +5,7 @@
 #include "../../kernel/proc/process.h"
 #include "../../mlibc/abis/linux/errno.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 circular_buffer_t* ring_buffer_create(int size) {
     circular_buffer_t* buffer = calloc(1, sizeof(circular_buffer_t));
@@ -59,7 +60,7 @@ int ring_buffer_write(circular_buffer_t* cb, int size, uint8_t* data) {
         cb->buffer[cb->tail] = data[written];
         cb->tail++;
 
-        if(cb->tail > cb->max) {
+        if(cb->tail >= cb->max) {
             cb->tail = 0;
         }
 
@@ -79,12 +80,13 @@ int ring_buffer_write(circular_buffer_t* cb, int size, uint8_t* data) {
 
 int ring_buffer_read(circular_buffer_t* cb, int size, uint8_t* buffer) {
     size_t written = 0;
+    printf("Awaiting size %d\n", size);
     while(written == 0) {
         spin_lock(&cb->lock);
 
         while(ring_buffer_available(cb) > 0 && written < size) {
-            buffer[written] = cb->buffer[cb->tail];
-            cb->tail = (cb->tail + 1) % cb->max;
+            buffer[written] = cb->buffer[cb->head];
+            cb->head = (cb->head + 1) % cb->max;
             written++;
         }
 
@@ -93,11 +95,26 @@ int ring_buffer_read(circular_buffer_t* cb, int size, uint8_t* buffer) {
             //This mutex is nothing more than a simple wait queue.
             //If the mutex isnt acquired, it acquires it but doesnt block.
             //If it is acquired, it wont block, but will block on mutex_wait
-            mutex_acquire_if_free(&cb->wait_queue_write);
-            mutex_wait(&cb->wait_queue_write);
+            mutex_acquire_if_free(&cb->wait_queue_read);
+            mutex_wait(&cb->wait_queue_read);
             spin_lock(&cb->lock);
 
-            return -ERESTART; //RESTART SYSCALL
+            printf("Awaiting size %d\n", size);
+            printf("available %d\n", ring_buffer_available(cb));
+
+            while(ring_buffer_available(cb) > 0 && written < size) {
+                buffer[written] = cb->buffer[cb->head];
+                cb->head = (cb->head + 1) % cb->max;
+
+                printf("Read one\n");
+
+                written++;
+            }
+
+            if(written == 0) {
+                spin_unlock(&cb->lock);
+                return written;
+            }
         }
 
         spin_unlock(&cb->lock);
@@ -119,9 +136,9 @@ int ring_buffer_available(circular_buffer_t* buffer) {
     }
 
     if(buffer->tail < buffer->head) {
-        //Readable part is in front of writeable
+        //Writeable part is in front of readable
 
-        return (buffer->max - buffer->head) + buffer->tail - 1;
+        return (buffer->max - buffer->head) + buffer->tail;
     } else {
         //Readable part is in front of writeable
         //Basically since
@@ -129,6 +146,6 @@ int ring_buffer_available(circular_buffer_t* buffer) {
         //We're removing this part
         //|          XXXXXXHEAD   |
 
-        return buffer->tail - buffer->head - 1;
+        return buffer->tail - buffer->head;
     }
 }
