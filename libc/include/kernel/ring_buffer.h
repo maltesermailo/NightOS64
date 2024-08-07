@@ -19,6 +19,8 @@ typedef struct circular_buffer {
     spin_t lock;
     mutex_t wait_queue_write;
     mutex_t wait_queue_read;
+
+    bool blockingWrite;
 } circular_buffer_t;
 
 /***
@@ -26,7 +28,7 @@ typedef struct circular_buffer {
  * @param size the size of the buffer
  * @return a new ring buffer
  */
-circular_buffer_t* ring_buffer_create(int size);
+circular_buffer_t* ring_buffer_create(int size, bool blockingWrite);
 /***
  * Deletes the ring buffer, freeing its internal buffer
  * @param circularBuffer the ring buffer
@@ -61,5 +63,9 @@ int ring_buffer_available(circular_buffer_t* buffer);
 void ring_buffer_discard_readable(circular_buffer_t* buffer);
 void ring_buffer_set_tail(circular_buffer_t* buffer, unsigned long offset);
 void ring_buffer_set_head(circular_buffer_t* buffer, unsigned long offset);
+
+int ring_buffer_pop(circular_buffer_t* cb);
+int ring_buffer_peek(circular_buffer_t* cb, int offset, uint8_t* data);
+int ring_buffer_read_last(circular_buffer_t* cb, uint8_t* data);
 
 #endif //NIGHTOS_RING_BUFFER_H

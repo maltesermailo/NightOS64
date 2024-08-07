@@ -14,7 +14,7 @@
 const char CONSOLE_NAME[] = "console0\0";
 
 int console_input_read(struct FILE* node, char* buffer, size_t offset, size_t length) {
-    return pty_read(pty_get_slave(0), buffer, length, offset); // NOT YET IMPLEMENTED
+    return pty_slave_read(pty_get_slave(0), buffer, length, offset); // NOT YET IMPLEMENTED
 }
 
 int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t length) {
@@ -40,7 +40,12 @@ int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
 
 void key_event(key_event_t* event) {
     if(event->isDown) {
-        terminal_putchar((char)event->keyCode);
+        if(event->keyCode == '\b') {
+            terminal_putchar('\b');
+            terminal_putchar(' ');
+            terminal_putchar('\b');
+        }
+
         pty_write_char_to_input(0, (char) event->keyCode);
     }
 }

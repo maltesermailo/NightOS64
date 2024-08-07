@@ -5,19 +5,24 @@
 #include <errno.h>
 #include "../../libc/include/kernel/ring_buffer.h"
 #include "../proc/process.h"
+#include "../terminal.h"
+#include <stdint.h>
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 static struct pty_pair pty_pairs[MAX_PTY_PAIRS];
 
 static struct file_operations pty_master_ops = {
-        .read = pty_read,
-        .write = pty_write,
+        .read = pty_master_read,
+        .write = pty_master_write,
         .open = pty_open,
         .close = pty_close,
         .ioctl = pty_ioctl,
 };
 
 static struct file_operations pty_slave_ops = {
-        .read = pty_read,
+        .read = pty_slave_read,
         .write = pty_write,
         .open = pty_open,
         .close = pty_close,
@@ -36,9 +41,20 @@ int pty_create_pair(int pty_index) {
     pair->data = malloc(sizeof(struct pty_data));
     if (!pair->data) return -ENOMEM;
 
-    pair->data->input_buffer = ring_buffer_create(PTY_BUFFER_SIZE);
-    pair->data->output_buffer = ring_buffer_create(PTY_BUFFER_SIZE);
+    pair->data->input_buffer = ring_buffer_create(PTY_BUFFER_SIZE, false);
+    pair->data->output_buffer = ring_buffer_create(PTY_BUFFER_SIZE, false);
     pair->data->term_settings = malloc(sizeof(struct termios));
+    pair->data->raw = false;
+    pair->data->index = pty_index;
+
+    mutex_init(&pair->wait_queue_read);
+    mutex_init(&pair->wait_queue_write);
+
+    if(pty_index == 0) {
+        pair->data->console = true;
+        pair->data->term_settings->c_lflag = ECHO | ICANON;
+    }
+
     if (!pair->data->term_settings) {
         free(pair->data);
         return -ENOMEM;
@@ -79,15 +95,32 @@ file_node_t* pty_get_slave(int pty_index) {
     return &pty_pairs[pty_index].slave;
 }
 
-int pty_write_to_input(int pty_index, const char* buffer, size_t size) {
-    if (pty_index >= MAX_PTY_PAIRS) return -EINVAL;
-    struct pty_data *pty = pty_pairs[pty_index].data;
-    return ring_buffer_write(pty->input_buffer, size, buffer);
+static int find_newline(circular_buffer_t* buffer) {
+    int available = ring_buffer_available(buffer);
+    for (int i = 0; i < available; i++) {
+        uint8_t c;
+        if (ring_buffer_peek(buffer, i, &c) && c == '\n') {
+            return i + 1;  // Return the position after the newline
+        }
+    }
+    return -1;  // No newline found
 }
 
-int pty_read(file_node_t *node, char *buffer, size_t size, size_t offset) {
+int pty_slave_read(file_node_t *node, char *buffer, size_t size, size_t offset) {
     struct pty_data *pty = (struct pty_data *)node->fs;
-    return ring_buffer_read(pty->input_buffer, size, buffer);
+
+    if(pty->term_settings->c_lflag & ICANON) {
+        int newline_pos;
+
+        while((newline_pos = find_newline(buffer)) == -1) {
+            mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read);
+            mutex_wait(&pty_pairs[pty->index].wait_queue_read);
+        }
+
+        return ring_buffer_read(pty->input_buffer, MIN(newline_pos, size), buffer);
+    } else {
+        return ring_buffer_read(pty->input_buffer, size, buffer);
+    }
 }
 
 int pty_write(file_node_t *node, char *buffer, size_t size, size_t offset) {
@@ -95,12 +128,95 @@ int pty_write(file_node_t *node, char *buffer, size_t size, size_t offset) {
     return ring_buffer_write(pty->output_buffer, size, buffer);
 }
 
-int pty_write_char_to_input(int pty_index, char c) {
+int pty_master_write(file_node_t *node, char *buffer, size_t size, size_t offset) {
+    struct pty_data *pty = (struct pty_data *)node->fs;
+    return pty_write_to_input(pty->index, buffer, size);
+}
+
+static void echo_char(struct pty_data *pty, int pty_index, char c) {
+    if (pty->console) {
+        terminal_putchar(c);
+    } else {
+        pty_write(pty_get_slave(pty_index), &c, 1, 0);
+    }
+}
+
+static void signal_input_ready(struct pty_data *pty) {
+    if(mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read)) {
+        mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read);
+    }
+}
+
+int pty_write_to_input(int pty_index, const char* buffer, size_t size) {
     if (pty_index >= MAX_PTY_PAIRS) return -EINVAL;
     struct pty_data *pty = pty_pairs[pty_index].data;
 
-    // Write the single character to the input buffer
-    return ring_buffer_write(pty->input_buffer, 1, &c);
+    size_t written = 0;
+    bool line_complete = false;
+
+    for (size_t i = 0; i < size && !line_complete; i++) {
+        char c = buffer[i];
+
+        if (!(pty->term_settings->c_lflag & ICANON) || pty->raw) {
+            // In raw mode or non-canonical mode, just write the character directly
+            if (ring_buffer_write(pty->input_buffer, 1, &c) > 0) {
+                if (pty->term_settings->c_lflag & ECHO) {
+                    echo_char(pty, pty_index, c);
+                }
+                written++;
+            } else {
+                break;  // Buffer is full
+            }
+        } else {
+            // In canonical mode, handle special characters
+            switch (c) {
+                case '\b':  // Backspace
+                    if (ring_buffer_available(pty->input_buffer) > 0) {
+                        ring_buffer_pop(pty->input_buffer);
+                        if (pty->term_settings->c_lflag & ECHO) {
+                            echo_char(pty, pty_index, '\b');
+                            echo_char(pty, pty_index, ' ');
+                            echo_char(pty, pty_index, '\b');
+                        }
+                    }
+                    written++;
+                    break;
+                case '\n':  // Newline
+                case '\r':  // Carriage return
+                    if (ring_buffer_write(pty->input_buffer, 1, &c) > 0) {
+                        if (pty->term_settings->c_lflag & ECHO) {
+                            echo_char(pty, pty_index, c);
+                        }
+                        written++;
+                        line_complete = true;
+                    } else {
+                        line_complete = true;  // Buffer is full
+                    }
+                    break;
+                default:
+                    if (ring_buffer_write(pty->input_buffer, 1, &c) > 0) {
+                        if (pty->term_settings->c_lflag & ECHO) {
+                            echo_char(pty, pty_index, c);
+                        }
+                        written++;
+                    } else {
+                        line_complete = true;  // Buffer is full
+                    }
+                    break;
+            }
+        }
+    }
+
+    // Signal that input is ready if we're not in canonical mode, or if we've completed a line
+    if (!(pty->term_settings->c_lflag & ICANON) || pty->raw || line_complete) {
+        signal_input_ready(pty);
+    }
+
+    return written;
+}
+
+int pty_write_char_to_input(int pty_index, char c) {
+    return pty_write_to_input(pty_index, &c, 1);
 }
 
 void pty_open(file_node_t *node) {

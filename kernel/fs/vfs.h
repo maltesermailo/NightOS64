@@ -77,8 +77,11 @@ typedef struct FILE {
 
 typedef struct file_handle {
     file_node_t* fileNode;
+
     int mode;
     uint64_t offset;
+
+    int flags;
 } file_handle_t;
 
 typedef struct list_dir {

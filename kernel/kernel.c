@@ -159,10 +159,10 @@ void terminal_putchar(char c)
 {
     terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
 
-    //if(c == '\b') {
-    //    terminal_column--;
-    //    return;
-    //}
+    if(c == '\b') {
+        terminal_column--;
+        return;
+    }
 
 	if (++terminal_column == VGA_WIDTH || c == '\n') {
 		terminal_column = 0;
