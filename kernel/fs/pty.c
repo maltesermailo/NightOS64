@@ -112,7 +112,7 @@ int pty_slave_read(file_node_t *node, char *buffer, size_t size, size_t offset) 
     if(pty->term_settings->c_lflag & ICANON) {
         int newline_pos;
 
-        while((newline_pos = find_newline(buffer)) == -1) {
+        while((newline_pos = find_newline(pty->input_buffer)) == -1) {
             mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read);
             mutex_wait(&pty_pairs[pty->index].wait_queue_read);
         }
@@ -126,6 +126,10 @@ int pty_slave_read(file_node_t *node, char *buffer, size_t size, size_t offset) 
 int pty_write(file_node_t *node, char *buffer, size_t size, size_t offset) {
     struct pty_data *pty = (struct pty_data *)node->fs;
     return ring_buffer_write(pty->output_buffer, size, buffer);
+}
+
+int pty_master_read(file_node_t *node, char *buffer, size_t size, size_t offset) {
+    return 0;
 }
 
 int pty_master_write(file_node_t *node, char *buffer, size_t size, size_t offset) {
@@ -142,8 +146,8 @@ static void echo_char(struct pty_data *pty, int pty_index, char c) {
 }
 
 static void signal_input_ready(struct pty_data *pty) {
-    if(mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read)) {
-        mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read);
+    if(!mutex_acquire_if_free(&pty_pairs[pty->index].wait_queue_read)) {
+        mutex_release(&pty_pairs[pty->index].wait_queue_read);
     }
 }
 

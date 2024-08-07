@@ -40,12 +40,6 @@ int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
 
 void key_event(key_event_t* event) {
     if(event->isDown) {
-        if(event->keyCode == '\b') {
-            terminal_putchar('\b');
-            terminal_putchar(' ');
-            terminal_putchar('\b');
-        }
-
         pty_write_char_to_input(0, (char) event->keyCode);
     }
 }
