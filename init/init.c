@@ -3,6 +3,8 @@
 //
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
 
 int main(int argc, char** argv) {
     printf("Hi, from initd\n");
@@ -12,5 +14,9 @@ int main(int argc, char** argv) {
 
         scanf("%s", input);
         printf("%s\n", input);
+
+        if(strncmp("owo", input, 3) == 0) {
+            ioctl(0, 0x030);
+        }
     }
 }

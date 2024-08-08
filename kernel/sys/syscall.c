@@ -241,7 +241,19 @@ long sys_nanosleep(struct timespec* timespec) {
     sleep(timespec->tv_sec * 1000 + nanosecondsToMs + 1);
 }
 
-long sys_ioctl() {
+long sys_ioctl(long fd, unsigned long operation, unsigned long args, unsigned long result) {
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    if(handle->fileNode->file_ops.ioctl) {
+        handle->fileNode->file_ops.ioctl(handle->fileNode, operation, NULL);
+    }
+
     return 0;
 }
 

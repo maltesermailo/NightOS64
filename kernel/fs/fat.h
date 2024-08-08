@@ -117,7 +117,7 @@ typedef struct FatFilesystem {
 
     uint32_t capacity; //In sectors
 
-    uint64_t fatPointer; //Pointer to the fat
+    uint64_t fatPointer; //Pointer to the fat in sectors
     uint64_t dataPointer; //First data sector
 
     file_node_t* physicalDevice;
@@ -131,5 +131,10 @@ typedef struct FatEntry {
 } fat_entry_t;
 
 file_node_t* fat_mount(char* device, char* name);
+bool fat_create_file(file_node_t *dir, char *name, int mode);
+int fat_read(file_node_t *file, char *data, size_t size, size_t offset);
+int fat_write(file_node_t *file, char *data, size_t size, size_t offset);
+int fat_get_size(file_node_t* node);
+int fat_delete(struct FILE* file);
 
 #endif //NIGHTOS_FAT_H

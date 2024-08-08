@@ -510,14 +510,6 @@ tree_t* debug_get_file_tree() {
     return file_tree;
 }
 
-struct file_operations fileOperations = {
-    .create = vfs_create
-};
-
-struct file_operations* get_vfs_ops() {
-
-}
-
 void vfs_install() {
     printf("VFS INIT");
     file_tree = tree_create();

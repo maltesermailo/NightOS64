@@ -17,5 +17,14 @@ typedef struct RamFile {
 
 void ramfs_init(char* path);
 file_node_t* ramfs_find_dir(file_node_t* node, char* name);
+file_node_t* ramfs_mkdir(file_node_t* node, char* name);
+int ramfs_read_dir(file_node_t* node, list_dir_t* entries, int max);
+int ramfs_read(file_node_t* node, char* buffer, size_t offset, size_t length);
+int ramfs_write(file_node_t* node, char* buffer, size_t offset, size_t length);
+bool ramfs_create(file_node_t* node, char* name, int mode);
+int ramfs_delete(file_node_t* node);
+void ramfs_open(file_node_t* node);
+void ramfs_close(file_node_t* node);
+
 
 #endif //NIGHTOS_RAMFS_H

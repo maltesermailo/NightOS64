@@ -35,6 +35,22 @@ int console_output_seek(struct FILE* node, size_t offset) {
 }
 
 int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
+    if(operation == TISTTY) {
+        return 1;
+    }
+
+    if(operation == 0x030) {
+        //OWO operation
+        uint16_t* terminalBuffer = (uint16_t*)0xB8000;
+
+        for(int y = 0; y < 25; y++) {
+            for(int x = 0; x < 80; x++) {
+                const size_t index = y * 80 + x;
+                terminalBuffer[index] = ~terminalBuffer[index];
+            }
+        }
+    }
+
     return 0;
 }
 

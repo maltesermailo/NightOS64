@@ -157,12 +157,12 @@ void terminal_rollover() {
 
 void terminal_putchar(char c)
 {
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-
     if(c == '\b') {
         terminal_column--;
         return;
     }
+
+    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
 
 	if (++terminal_column == VGA_WIDTH || c == '\n') {
 		terminal_column = 0;

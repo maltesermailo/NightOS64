@@ -156,6 +156,25 @@ int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     return length;
 }
 
+int ahci_write(file_node_t* node, char* buf, size_t offset, size_t length) {
+    struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
+
+    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
+    ioRequest->type = IO_WRITE;
+    ioRequest->count = length;
+    ioRequest->offset = offset;
+    ioRequest->buffer = calloc(1, length);
+
+    memcpy(ioRequest->buffer, buf, length);
+
+    ahci_send_command(ioRequest, ATA_CMD_WRITE_DMA_EXT);
+
+    free(ioRequest->buffer);
+    free(ioRequest);
+
+    return length;
+}
+
 file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
     file_node_t* node = calloc(1, sizeof(file_node_t));
     node->type = FILE_TYPE_BLOCK_DEVICE;
@@ -164,6 +183,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
     snprintf(node->name, 16, "hd%d", sataDevice->port);
     node->refcount = 0;
     node->file_ops.read = ahci_read;
+    node->file_ops.write = ahci_write;
 
     return node;
 }

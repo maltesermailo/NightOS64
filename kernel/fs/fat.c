@@ -37,6 +37,335 @@ void clean_fat_filename(char* input, char* output) {
     }
 }
 
+
+uint32_t fat_find_free_cluster(fat_fs_t *fs) {
+    uint32_t *fat = malloc(fs->sectorSize);
+    uint32_t fat_sector = fs->fatPointer;
+    uint32_t entries_per_sector = fs->sectorSize / sizeof(uint32_t);
+
+    for (uint32_t i = 2; i < fs->capacity / fs->clusterSize; i++) {
+        if (i % entries_per_sector == 0) {
+            // Read next FAT sector
+            fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)fat,
+                                              (fat_sector + i / entries_per_sector) * fs->sectorSize, fs->sectorSize);
+        }
+
+        if (fat[i % entries_per_sector] == 0) {
+            free(fat);
+            return i;
+        }
+    }
+
+    free(fat);
+    return 0; // No free cluster found
+}
+
+void fat_update_fat(fat_fs_t *fs, uint32_t cluster, uint32_t value) {
+    uint32_t fat_offset = cluster * 4; //FAT uses 32-bit addressing with the upper 4 bits reserved
+    uint32_t fat_sector = fs->fatPointer + (fat_offset / fs->sectorSize);
+    uint32_t entry_offset = fat_offset % fs->sectorSize;
+
+    uint32_t *fat_sector_data = malloc(fs->sectorSize);
+
+    // Read FAT sector
+    fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)fat_sector_data,
+                                      fat_sector * fs->sectorSize, fs->sectorSize);
+
+    // Update FAT entry
+    fat_sector_data[entry_offset / 4] = value;
+
+    // Write updated FAT sector back to disk
+    fs->physicalDevice->file_ops.write(fs->physicalDevice, (char*)fat_sector_data,
+                                       fat_sector * fs->sectorSize, fs->sectorSize);
+
+    free(fat_sector_data);
+}
+
+int fat_create_dir_entry(fat_fs_t *fs, file_node_t *dir, const char *name, uint32_t cluster, uint32_t size, uint8_t attributes) {
+    uint32_t dir_cluster = ((fat_entry_t*)dir->fs)->cluster;
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+    uint32_t entries_per_cluster = cluster_size / sizeof(struct fatDirEntry);
+
+    struct fatDirEntry *dir_data = malloc(cluster_size);
+
+    // Read directory cluster
+    fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)dir_data,
+                                      fs->dataPointer * fs->sectorSize + (dir_cluster - 2) * cluster_size, cluster_size);
+
+    // Find a free entry
+    for (uint32_t i = 0; i < entries_per_cluster; i++) {
+        if (dir_data[i].filename[0] == 0x00 || dir_data[i].filename[0] == 0xE5) {
+            // Free entry found, create new entry
+            memset(&dir_data[i], 0, sizeof(struct fatDirEntry));
+            strncpy((char*)dir_data[i].filename, name, 11);
+            dir_data[i].attributes = attributes;
+            dir_data[i].clusterLow = cluster & 0xFFFF;
+            dir_data[i].clusterHigh = (cluster >> 16) & 0xFFFF;
+            dir_data[i].size = size;
+
+            // Write updated directory cluster back to disk
+            fs->physicalDevice->file_ops.write(fs->physicalDevice, (char*)dir_data,
+                                               fs->dataPointer * fs->sectorSize + (dir_cluster - 2) * cluster_size, cluster_size);
+
+            free(dir_data);
+            return 0;
+        }
+    }
+
+    free(dir_data);
+    return -1; // No free entry found
+}
+
+int fat_write_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, size_t size) {
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+    uint32_t current_cluster = start_cluster;
+    size_t bytes_written = 0;
+
+    while (bytes_written < size) {
+        size_t chunk_size = (size - bytes_written < cluster_size) ? size - bytes_written : cluster_size;
+
+        // Write data to current cluster
+        fs->physicalDevice->file_ops.write(fs->physicalDevice, data + bytes_written,
+                                           fs->dataPointer * fs->sectorSize + (current_cluster - 2) * cluster_size, chunk_size);
+
+        bytes_written += chunk_size;
+
+        if (bytes_written < size) {
+            // Need another cluster
+            uint32_t next_cluster = fat_find_free_cluster(fs);
+            if (next_cluster == 0) {
+                return -1; // No more free clusters
+            }
+
+            // Update FAT for current cluster
+            fat_update_fat(fs, current_cluster, next_cluster);
+
+            current_cluster = next_cluster;
+        }
+    }
+
+    // Mark end of file in FAT
+    fat_update_fat(fs, current_cluster, 0x0FFFFFFF);
+
+    return 0;
+}
+
+bool fat_create_file(struct FILE *dir, char *name, int mode) {
+    fat_fs_t *fs = ((fat_entry_t*)dir->fs)->fatFs;
+
+    // Find a free cluster for the new file
+    uint32_t cluster = fat_find_free_cluster(fs);
+    if (cluster == 0) {
+        return false; // No free clusters
+    }
+
+    // Create directory entry
+    if (fat_create_dir_entry(fs, dir, name, cluster, 0, 0) != 0) {
+        return false; // Couldn't create directory entry
+    }
+
+    // Mark cluster as end of file in FAT
+    fat_update_fat(fs, cluster, 0x0FFFFFFF);
+
+    // Create and return new file node
+    file_node_t *new_file = calloc(1, sizeof(file_node_t));
+    strcpy(new_file->name, name);
+    new_file->type = FILE_TYPE_FILE;
+    new_file->size = 0;
+
+    fat_entry_t *new_entry = calloc(1, sizeof(fat_entry_t));
+    new_entry->fatFs = fs;
+    new_entry->cluster = cluster;
+
+    new_file->fs = new_entry;
+    new_file->file_ops.read = fat_read;
+    new_file->file_ops.write = fat_write;
+    new_file->file_ops.get_size = fat_get_size;
+    new_file->file_ops.delete = fat_delete;
+
+    return true;
+}
+
+bool fat_mkdir(struct FILE *dir, char *name) {
+    if(dir->type != FILE_TYPE_DIR && dir->type != FILE_TYPE_MOUNT_POINT) {
+        return false;
+    }
+
+    fat_fs_t *fs = ((fat_entry_t*)dir->fs)->fatFs;
+
+    // Find a free cluster for the new file
+    uint32_t cluster = fat_find_free_cluster(fs);
+    if (cluster == 0) {
+        return false; // No free clusters
+    }
+
+    // Create directory entry
+    if (fat_create_dir_entry(fs, dir, name, cluster, 0, 0x10) != 0) {
+        return false; // Couldn't create directory entry
+    }
+
+    // Mark cluster as end of file in FAT
+    fat_update_fat(fs, cluster, 0x0FFFFFFF);
+
+    // Create and return new file node
+    file_node_t *new_file = calloc(1, sizeof(file_node_t));
+    strcpy(new_file->name, name);
+    new_file->type = FILE_TYPE_DIR;
+    new_file->size = 0;
+
+    fat_entry_t *new_entry = calloc(1, sizeof(fat_entry_t));
+    new_entry->fatFs = fs;
+    new_entry->cluster = cluster;
+
+    new_file->fs = new_entry;
+    new_file->file_ops.read = fat_read;
+    new_file->file_ops.write = fat_write;
+    new_file->file_ops.get_size = fat_get_size;
+    new_file->file_ops.mkdir = fat_mkdir;
+
+    return true;
+}
+
+uint32_t fat_get_next_cluster(fat_fs_t *fs, uint32_t cluster) {
+    uint32_t fat_offset = cluster * 4; //FAT uses 32-bit addressing with the upper 4 bits reserved
+    uint32_t fat_sector = fs->fatPointer + (fat_offset / fs->sectorSize);
+    uint32_t entry_offset = fat_offset % fs->sectorSize;
+
+    uint32_t *fat_sector_data = malloc(fs->sectorSize);
+
+    // Read FAT sector
+    fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)fat_sector_data,
+                                      fat_sector * fs->sectorSize, fs->sectorSize);
+
+    // Update FAT entry
+    uint32_t value = fat_sector_data[entry_offset / 4];
+
+    free(fat_sector_data);
+
+    return value;
+}
+
+int fat_read_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, size_t size) {
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+    uint32_t current_cluster = start_cluster;
+    size_t bytes_read = 0;
+
+    while (bytes_read < size) {
+        size_t chunk_size = (size - bytes_read < cluster_size) ? size - bytes_read : cluster_size;
+
+        // Write data to current cluster
+        fs->physicalDevice->file_ops.read(fs->physicalDevice, data + bytes_read,
+                                           fs->dataPointer * fs->sectorSize + (current_cluster - 2) * cluster_size, chunk_size);
+
+        bytes_read += chunk_size;
+
+        if (bytes_read < size) {
+            // Need another cluster
+            uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+            if (next_cluster >= 0x0FFFFFF8) {
+                return bytes_read;
+            }
+
+            current_cluster = next_cluster;
+        }
+    }
+
+    return bytes_read;
+}
+
+int fat_read(struct FILE *file, char *data, size_t size, size_t offset) {
+    fat_entry_t *entry = (fat_entry_t*)file->fs;
+    fat_fs_t *fs = entry->fatFs;
+
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+    uint32_t start_cluster = entry->cluster;
+
+    // Skip to the correct cluster for the offset
+    while (offset >= cluster_size) {
+        start_cluster = fat_get_next_cluster(fs, start_cluster);
+        if (start_cluster >= 0x0FFFFFF8) {
+            // End of file chain reached before offset
+            return -1;
+        }
+        offset -= cluster_size;
+    }
+
+    // Write data
+    int result = fat_write_file_data(fs, start_cluster, data, size);
+    if (result == 0) {
+        // Update file size in directory entry
+        file->size += size;
+        // TODO: Update directory entry with new file size
+    }
+
+    return result;
+}
+
+int fat_write(struct FILE *file, char *data, size_t size, size_t offset) {
+    fat_entry_t *entry = (fat_entry_t*)file->fs;
+    fat_fs_t *fs = entry->fatFs;
+
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+    uint32_t start_cluster = entry->cluster;
+
+    // Skip to the correct cluster for the offset
+    while (offset >= cluster_size) {
+        start_cluster = fat_get_next_cluster(fs, start_cluster);
+        if (start_cluster >= 0x0FFFFFF8) {
+            // End of file chain reached before offset
+            return -1;
+        }
+        offset -= cluster_size;
+    }
+
+    // Write data
+    int result = fat_write_file_data(fs, start_cluster, data, size);
+    if (result == 0) {
+        // Update file size in directory entry
+        file->size += size;
+        // TODO: Update directory entry with new file size
+    }
+
+    return result;
+}
+
+int fat_delete(struct FILE* file) {
+    fat_entry_t *entry = (fat_entry_t*)file->fs;
+    fat_fs_t *fs = entry->fatFs;
+
+    uint32_t start_cluster = entry->cluster;
+
+    if(file->type == FILE_TYPE_FILE) {
+        uint32_t current_cluster = start_cluster;
+
+        while (current_cluster < 0x0FFFFFF7) {
+            uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+
+            // Update FAT for current cluster
+            fat_update_fat(fs, current_cluster, 0);
+
+            current_cluster = next_cluster;
+        }
+    } else if(file->type == FILE_TYPE_DIR) {
+        if(fat_get_size(file) > 0) {
+            return -2; //NOT EMPTY
+        }
+
+        uint32_t current_cluster = start_cluster;
+
+        while (current_cluster < 0x0FFFFFF7) {
+            uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+
+            // Update FAT for current cluster
+            fat_update_fat(fs, current_cluster, 0);
+
+            current_cluster = next_cluster;
+        }
+    }
+
+    return 0;
+}
+
 file_node_t* fat_find_dir(file_node_t* node, char* name) {
     if(node->type != FILE_TYPE_DIR && node->type != FILE_TYPE_MOUNT_POINT) {
         return NULL;
@@ -91,6 +420,12 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
                 //TODO: FILE OPS
                 newNode->file_ops.find_dir = fat_find_dir;
+                newNode->file_ops.read = fat_read;
+                newNode->file_ops.write = fat_write;
+                newNode->file_ops.get_size = fat_get_size;
+                newNode->file_ops.mkdir = fat_mkdir;
+                newNode->file_ops.delete = fat_delete;
+                newNode->file_ops.create = fat_create_file;
                 return newNode;
             }
         }
@@ -146,6 +481,12 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
             //TODO: FILE OPS
             newNode->file_ops.find_dir = fat_find_dir;
+            newNode->file_ops.read = fat_read;
+            newNode->file_ops.write = fat_write;
+            newNode->file_ops.get_size = fat_get_size;
+            newNode->file_ops.mkdir = fat_mkdir;
+            newNode->file_ops.delete = fat_delete;
+            newNode->file_ops.create = fat_create_file;
             return newNode;
         }
     }
@@ -190,7 +531,6 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
                 continue;
             }
 
-            file_node_t* newNode = calloc(1, sizeof(file_node_t));
             clean_fat_filename((char*)&fatDirPointer->filename, (char*)&entries[i].name);
 
             entries[i].type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
@@ -234,7 +574,6 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
             continue;
         }
 
-        file_node_t* newNode = calloc(1, sizeof(file_node_t));
         clean_fat_filename((char*)&fatDirPointer->filename, (char*)&entries[i].name);
 
         entries[i].type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
