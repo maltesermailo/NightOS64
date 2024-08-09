@@ -506,6 +506,11 @@ int get_next_file_id() {
     return id_generator++;
 }
 
+/**
+ * This is no longer a debug function. It is used by ramfs to get actual access to the file tree
+ * TODO: I should add a function to add stuff to the file tree for functions instead of relying completely on the cache_node function
+ * @return
+ */
 tree_t* debug_get_file_tree() {
     return file_tree;
 }

@@ -65,6 +65,8 @@ typedef struct FILE {
     char full_path[4096];
 
     uint64_t id;
+    uint64_t owner; //The owner id
+    uint64_t ownerGroup; //The owner group id
     uint64_t type;
     uint64_t size;
     bool cached;
@@ -103,6 +105,8 @@ file_node_t* mkdir(char* filename);
 file_node_t* mkdir_vfs(char* filename);
 int delete(char* filename);
 
+int vfs_read_dir(struct FILE* node, struct list_dir* buffer, int count);
+
 file_handle_t* create_handle(file_node_t*);
 
 //File descriptor functions
@@ -124,6 +128,8 @@ char* get_full_path(file_node_t* node);
 int register_mount(char* name, mount_func func);
 int mount_directly(char* name, file_node_t* root);
 int mount_empty(char* name, int fileType);
+
+bool insert_file(file_node_t* parent, file_node_t* new);
 
 //Sets up the virtual file system
 void vfs_install();
