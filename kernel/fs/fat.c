@@ -363,6 +363,14 @@ int fat_write(struct FILE *file, char *data, size_t size, size_t offset) {
                 if (next_cluster == 0) {
                     return -1; // No more free clusters
                 }
+
+                char* nullBuffer = malloc(cluster_size);
+                memset(nullBuffer, 0, cluster_size);
+
+                fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+
+                free(nullBuffer);
+
                 fat_update_fat(fs, start_cluster, next_cluster);
                 fat_update_fat(fs, next_cluster, 0x0FFFFFFF); // Mark as EOF
             } else {
