@@ -74,7 +74,7 @@ int pty_slave_read(file_node_t *node, char *buffer, size_t size, size_t offset);
 int pty_master_read(file_node_t *node, char *buffer, size_t size, size_t offset);
 int pty_write(file_node_t *node, char *buffer, size_t size, size_t offset);
 int pty_master_write(file_node_t *node, char *buffer, size_t size, size_t offset);
-void pty_open(file_node_t *node);
+void pty_open(file_node_t *node, int mode);
 void pty_close(file_node_t *node);
 int pty_ioctl(file_node_t *node, unsigned long request, void *args);
 

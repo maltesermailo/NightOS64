@@ -223,7 +223,7 @@ int pty_write_char_to_input(int pty_index, char c) {
     return pty_write_to_input(pty_index, &c, 1);
 }
 
-void pty_open(file_node_t *node) {
+void pty_open(file_node_t *node, int i) {
     // Implement any necessary initialization
 }
 

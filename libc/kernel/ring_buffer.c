@@ -2,6 +2,9 @@
 // Created by Jannik on 28.07.2024.
 //
 #include "../include/kernel/ring_buffer.h"
+#ifdef __is_libk
+typedef long clock_t; //Temporary fix
+#endif
 #include "../../kernel/proc/process.h"
 #include "../../mlibc/abis/linux/errno.h"
 #include <stdlib.h>
