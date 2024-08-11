@@ -66,6 +66,8 @@
 #define CLONE_NEWNET 0x40000000
 #define CLONE_IO 0x80000000
 
+#define SIGSET_NWORDS (1024 / (8 * sizeof(uint32_t)))
+
 typedef int pid_t;
 
 struct process;
@@ -197,6 +199,7 @@ signal_handler_t* process_get_signal_handler(int signum);
 void process_check_signals(regs_t* regs);
 void process_enter_signal(regs_t* regs, int signum);
 int process_signal_return();
+void process_set_signal_mask(int how, sigset_t* new);
 
 //Process memory functions
 uintptr_t process_get_current_pml();

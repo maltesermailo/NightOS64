@@ -10,6 +10,7 @@
 #include "../../libc/include/kernel/tree.h"
 #include "../program/elf.h"
 #include "../timer.h"
+#include <signal.h>
 
 #define PUSH_PTR(stack, type, value) { \
             stack -= sizeof(type);     \
@@ -750,6 +751,7 @@ int process_signal_return() {
     long signum = 0;
     regs_t regs;
 
+    POP_PTR(rsp, sigset_t, get_current_process()->blocked_signals);
     POP_PTR(rsp, long, signum);
     POP_PTR(rsp, regs_t, regs);
 
@@ -781,6 +783,7 @@ void process_enter_signal(regs_t* regs, int signum) {
 
     PUSH_PTR(rsp, regs_t, *regs);
     PUSH_PTR(rsp, long, signum);
+    PUSH_PTR(rsp, sigset_t, get_current_process()->blocked_signals);
 
     asm volatile(
             "pushq %0\n"

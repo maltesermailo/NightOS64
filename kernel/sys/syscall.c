@@ -198,6 +198,31 @@ long sys_rt_sigaction(long signum, long newact, long oldact) {
     if(signew->sa_handler) {
         process_set_signal_handler(signum, signew);
     }
+
+    return 0;
+}
+
+long sys_rt_sigprocmask(long how, long newsigset, long oldsigset) {
+    process_t* proc = get_current_process();
+
+    if(proc == NULL) return -1;
+
+    if(!CHECK_PTR(newsigset) || !CHECK_PTR(newsigset)) {
+        return -EINVAL;
+    }
+
+    if(oldsigset != NULL) {
+        sigset_t* sigold = (sigset_t*) oldsigset;
+
+        for (int i = 0; i < SIGSET_NWORDS; i++) {
+            sigold->sig[i] = proc->blocked_signals.sig[i];
+        }
+    }
+
+    sigset_t* sigset = (sigset_t*)newsigset;
+    process_set_signal_mask(how, sigset);
+
+    return 0;
 }
 
 long sys_rt_sigreturn() {
@@ -445,8 +470,8 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_munmap,  //SYS_MUNMAP
         (syscall_t)sys_brk,     //SYS_BRK
         (syscall_t)sys_rt_sigaction,//SYS_RT_SIGACTION
-        (syscall_t)sys_stub,    //SYS_SIGPROCMASK
-        (syscall_t)sys_rt_sigreturn,    //SYS_RT_SIGRETURN
+        (syscall_t)sys_rt_sigprocmask,//SYS_SIGPROCMASK
+        (syscall_t)sys_rt_sigreturn,//SYS_RT_SIGRETURN
         (syscall_t)sys_ioctl,   //SYS_IOCTL
         (syscall_t)sys_pread64, //SYS_PREAD64
         (syscall_t)sys_pwrite64,//SYS_PWRITE64

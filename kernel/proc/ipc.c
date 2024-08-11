@@ -8,8 +8,6 @@
 #include <string.h>
 
 //Sigset
-
-#define SIGSET_NWORDS (1024 / (8 * sizeof(uint32_t)))
 // Initialize a signal set to empty
 inline int sigemptyset(sigset_t *set) {
     for (int i = 0; i < SIGSET_NWORDS; i++) {
@@ -56,6 +54,30 @@ int has_pending_signals(struct process *p) {
     return 0;  // No pending signals
 }
 
+void process_set_signal_mask(int how, sigset_t* new) {
+    process_t* current = get_current_process();
+
+    if(how == SIG_BLOCK) {
+        for (int i = 0; i < SIGSET_NWORDS; i++) {
+            current->blocked_signals.sig[i] = new->sig[i] | current->blocked_signals.sig[i];
+        }
+    }
+
+    if(how == SIG_UNBLOCK) {
+        for (int i = 0; i < SIGSET_NWORDS; i++) {
+            if(sigismember(new, i)) {
+                sigdelset(&current->blocked_signals, i);
+            }
+        }
+    }
+
+    if(how == SIG_SETMASK) {
+        for (int i = 0; i < SIGSET_NWORDS; i++) {
+            current->blocked_signals.sig[i] = current->blocked_signals.sig[i];
+        }
+    }
+}
+
 void process_set_signal_handler(int signum, struct sigaction* action) {
     process_t* proc = get_current_process();
 
@@ -63,7 +85,11 @@ void process_set_signal_handler(int signum, struct sigaction* action) {
     proc->signalHandlers[signum].handler = action->sa_handler;
     proc->signalHandlers[signum].sa_mask = action->sa_mask;
     proc->signalHandlers[signum].sa_flags = action->sa_flags;
-    proc->signalHandlers[signum].sa_restorer = action->sa_restorer;
+
+    if(action->sa_flags & 0x04000000) {
+        proc->signalHandlers[signum].sa_restorer = action->sa_restorer;
+    }
+
     spin_unlock(&proc->lock);
 }
 
@@ -124,6 +150,10 @@ void handle_signal(process_t* process, int signum, regs_t* regs) {
         }
 
         return;
+    }
+
+    if(get_current_process()->signalHandlers[signum].sa_flags & SA_NODEFER) {
+        sigaddset(&get_current_process()->blocked_signals, signum);
     }
 
     //SETUP SIGNAL HANDLER
