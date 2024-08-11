@@ -2,6 +2,7 @@
 // Created by Jannik on 14.07.2024.
 //
 #include "fat.h"
+#include <abi-bits/fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -344,6 +345,50 @@ int fat_update_dir_entry_size(fat_fs_t *fs, file_node_t *file) {
     return -1; // Entry not found
 }
 
+int fat_remove_dir_entry(fat_fs_t *fs, file_node_t *file) {
+    tree_node_t* treeNode = tree_find_child_root(debug_get_file_tree(), file);
+
+    if(treeNode == null) {
+        return -1;
+    }
+
+    tree_node_t* parentNode = treeNode->parent;
+
+    if(parentNode == NULL) {
+        return -1;
+    }
+
+    file_node_t* parent = (file_node_t*)parentNode->value;
+
+    fat_entry_t *parent_entry = (fat_entry_t*)parent->fs;
+    uint32_t parent_cluster = parent_entry->cluster;
+    uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+
+    struct fatDirEntry *dir_data = malloc(cluster_size);
+
+    // Read parent directory cluster
+    fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)dir_data,
+                                      fs->dataPointer * fs->sectorSize + (parent_cluster - 2) * cluster_size, cluster_size);
+
+    // Find the entry for this file
+    for (uint32_t i = 0; i < cluster_size / sizeof(struct fatDirEntry); i++) {
+        if (strncmp((char*)dir_data[i].filename, file->name, 11) == 0) {
+            // Update file size
+            memset(dir_data, 0, sizeof(struct fatDirEntry));
+
+            // Write updated directory cluster back to disk
+            fs->physicalDevice->file_ops.write(fs->physicalDevice, (char*)dir_data,
+                                               fs->dataPointer * fs->sectorSize + (parent_cluster - 2) * cluster_size, cluster_size);
+
+            free(dir_data);
+            return 0;
+        }
+    }
+
+    free(dir_data);
+    return -1; // Entry not found
+}
+
 int fat_write(struct FILE *file, char *data, size_t size, size_t offset) {
     fat_entry_t *entry = (fat_entry_t*)file->fs;
     fat_fs_t *fs = entry->fatFs;
@@ -415,6 +460,8 @@ int fat_delete(struct FILE* file) {
 
             current_cluster = next_cluster;
         }
+
+        fat_update_dir_entry_size(fs, file);
     } else if(file->type == FILE_TYPE_DIR) {
         if(fat_get_size(file) > 0) {
             return -2; //NOT EMPTY
@@ -431,6 +478,8 @@ int fat_delete(struct FILE* file) {
             current_cluster = next_cluster;
         }
     }
+
+    fat_remove_dir_entry(fs, file);
 
     return 0;
 }
@@ -735,6 +784,36 @@ int fat_get_size(file_node_t* node) {
     free(fatDirPointer);
 
     return count;
+}
+
+void fat_open(file_node_t* node, int mode) {
+    if(node->type == FILE_TYPE_FILE && mode & O_TRUNC) {
+        fat_entry_t *entry = (fat_entry_t*)node->fs;
+        fat_fs_t *fs = entry->fatFs;
+
+        uint32_t start_cluster = entry->cluster;
+
+        uint32_t current_cluster = fat_get_next_cluster(fs, start_cluster);
+
+        while (current_cluster < 0x0FFFFFF7) {
+            uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+
+            // Update FAT for current cluster
+            fat_update_fat(fs, current_cluster, 0);
+
+            current_cluster = next_cluster;
+        }
+
+        uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
+
+        char* nullBuffer = malloc(cluster_size);
+        memset(nullBuffer, 0, cluster_size);
+
+        fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+        node->size = 0;
+
+        fat_update_dir_entry_size(fs, node);
+    }
 }
 
 file_node_t* fat_mount(char* device, char* name) {

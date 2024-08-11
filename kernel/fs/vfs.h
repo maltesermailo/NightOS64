@@ -47,7 +47,7 @@ struct file_operations {
     int (*read) (struct FILE*, char*, size_t, size_t);
     int (*write) (struct FILE*, char*, size_t, size_t);
     size_t (*seek) (struct FILE*, size_t);
-    void (*open) (struct FILE*);
+    void (*open) (struct FILE*, int);
     void (*close) (struct FILE*);
     int (*read_dir) (struct FILE*, struct list_dir*, int);
     bool (*mkdir) (struct FILE*, char*);

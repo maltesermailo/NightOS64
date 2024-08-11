@@ -6,6 +6,7 @@
 #include "ramfs.h"
 #include "../terminal.h"
 #include <string.h>
+#include <abi-bits/fcntl.h>
 
 void ramfs_init(char* path) {
     char* file_name = strrchr(path, '/'); //Get file name
@@ -131,8 +132,10 @@ bool ramfs_create(file_node_t* parent, char* name, int mode) {
     parent->size++;
 
     ram_file_t* ramFile = calloc(1, sizeof(ram_file_t));
-    ramFile->begin = malloc(4096);
+    ramFile->begin = (uintptr_t) malloc(4096);
     ramFile->size = 4096;
+
+    node->fs = ramFile;
 
     tree_insert_child(debug_get_file_tree(), treeNode, node);
 
@@ -140,13 +143,17 @@ bool ramfs_create(file_node_t* parent, char* name, int mode) {
 }
 
 int ramfs_delete(file_node_t* node) {
+    ram_file_t* ramFile = (ram_file_t*) node->fs;
+
+    free((void*)ramFile->begin);
+    free(ramFile);
+
     return 0;
 }
 
-void ramfs_open(file_node_t* node) {
-
-}
-
-void ramfs_close(file_node_t* node) {
-
+void ramfs_open(file_node_t* node, int mode) {
+    if(mode & O_TRUNC) {
+        ram_file_t* ramFile = (ram_file_t*) node->fs;
+        memset((void*)ramFile->begin, 0, ramFile->size);
+    }
 }

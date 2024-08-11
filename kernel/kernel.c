@@ -21,6 +21,7 @@
 #include "fs/fat.h"
 #include "acpi.h"
 #include "symbol.h"
+#include "fs/ramfs.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -458,7 +459,6 @@ void kernel_main(unsigned long magic, unsigned long header)
     vfs_install();
 
     mkdir_vfs("/dev");
-    mkdir_vfs("/test");
 
     for (tag = (struct multiboot_tag *) (header + 8);
          tag->type != MULTIBOOT_TAG_TYPE_END;
@@ -497,7 +497,8 @@ void kernel_main(unsigned long magic, unsigned long header)
     syscall_init();
 
     //Load filesystem at hd0
-    mount_directly("/fatfs", fat_mount("/dev/hd0", "/fatfs"));
+    mount_directly("/mnt", fat_mount("/dev/hd0", "/fatfs"));
+    ramfs_init("/tmp");
 
     printf("Performing list test now...\n");
     //list_test();

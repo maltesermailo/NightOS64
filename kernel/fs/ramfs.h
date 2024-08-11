@@ -23,7 +23,7 @@ int ramfs_read(file_node_t* node, char* buffer, size_t offset, size_t length);
 int ramfs_write(file_node_t* node, char* buffer, size_t offset, size_t length);
 bool ramfs_create(file_node_t* node, char* name, int mode);
 int ramfs_delete(file_node_t* node);
-void ramfs_open(file_node_t* node);
+void ramfs_open(file_node_t* node, int mode);
 void ramfs_close(file_node_t* node);
 
 

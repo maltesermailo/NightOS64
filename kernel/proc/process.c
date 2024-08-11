@@ -17,6 +17,11 @@
             *((type*)stack) = (value);\
 }
 
+#define POP_PTR(stack, type, value) { \
+            *((type*)stack) = (value); \
+            stack += sizeof(type);     \
+}
+
 static struct process_control_block pcb; //currently the only one, we're running single core
 static int id_generator = 1;
 list_t* process_list;
@@ -84,6 +89,8 @@ void process_create_task(char* path, bool is_kernel) {
     file_handle_t* handle = create_handle(node);
 
     process_t* process = calloc(1, sizeof(process_t));
+
+    spin_unlock(&process->lock);
 
     process->id = 1;
     process->tgid = 1;
@@ -160,6 +167,8 @@ void process_create_task(char* path, bool is_kernel) {
 void process_create_idle() {
     process_t* process = calloc(1, sizeof(process_t));
 
+    spin_unlock(&process->lock);
+
     process->id = 0;
     process->tgid = 0;
     process->page_directory = calloc(1, sizeof(mm_struct_t));
@@ -192,6 +201,8 @@ extern void* fork_exit;
 pid_t process_fork() {
     process_t* process = calloc(1, sizeof(process_t));
     process_t* parent = get_current_process();
+
+    spin_unlock(&process->lock);
 
     process->id = ++id_generator;
     process->parent = parent->id;
@@ -255,6 +266,8 @@ pid_t process_fork() {
 pid_t process_clone(struct clone_args* args, size_t size) {
     process_t* process = calloc(1, sizeof(process_t));
     process_t* parent = get_current_process();
+
+    spin_unlock(&process->lock);
 
     process->id = ++id_generator;
     process->parent = parent->id;
@@ -499,6 +512,8 @@ void schedule(bool sleep) {
         return;
     }
 
+    __sync_and_and_fetch(&pcb.current_process->flags, ~(PROC_FLAG_ON_CPU));
+
     if(pcb.current_process != pcb.kernel_idle_process && !sleep) {
         schedule_process(pcb.current_process);
     }
@@ -515,11 +530,15 @@ void schedule(bool sleep) {
 
     //printf("Jumping to thread.\n");
 
+    __sync_or_and_fetch(&pcb.current_process->flags, PROC_FLAG_ON_CPU);
+
     set_stack_pointer(pcb.current_process->main_thread.kernel_stack);
     longjmp(&pcb.current_process->main_thread);
 }
 
 void schedule_process(process_t* process) {
+    __sync_and_and_fetch(&process->flags, ~(PROC_FLAG_SLEEP_INTERRUPTIBLE));
+
     list_insert(thread_queue, process);
 }
 
@@ -527,7 +546,7 @@ void wait_for_object(mutex_t* mutex) {
     spin_lock(&mutex->lock);
 
     list_insert(mutex->waiting, get_current_process());
-    __sync_and_and_fetch(&get_current_process()->flags, ~(PROC_FLAG_SLEEP_INTERRUPTIBLE));
+    __sync_or_and_fetch(&get_current_process()->flags, PROC_FLAG_SLEEP_INTERRUPTIBLE);
 
     spin_unlock(&mutex->lock);
 
@@ -675,6 +694,9 @@ void sleep(long milliseconds) {
     process_t* process = get_current_process();
     process->sleepTick = until;
 
+    __sync_or_and_fetch(&process->flags, PROC_FLAG_SLEEP_INTERRUPTIBLE);
+    __sync_and_and_fetch(&process->flags, ~(PROC_FLAG_ON_CPU));
+
     spin_lock(sleep_lock);
     list_insert(sleeping_queue, process);
     spin_unlock(sleep_lock);
@@ -719,4 +741,55 @@ bool wakeup_now(process_t* proc) {
     spin_unlock(sleep_lock);
 
     return true;
+}
+
+int process_signal_return() {
+    process_t* current = get_current_process();
+    uintptr_t rsp = current->saved_registers->rsp;
+
+    long signum = 0;
+    regs_t regs;
+
+    POP_PTR(rsp, long, signum);
+    POP_PTR(rsp, regs_t, regs);
+
+    current->saved_registers->rsp = regs.rsp;
+    current->saved_registers->rip = regs.rip;
+    current->saved_registers->rax = regs.rax;
+    current->saved_registers->rbx = regs.rbx;
+    current->saved_registers->rcx = regs.rcx;
+    current->saved_registers->rdx = regs.rdx;
+    current->saved_registers->rsi = regs.rsi;
+    current->saved_registers->rdi = regs.rdi;
+    current->saved_registers->rbp = regs.rbp;
+    current->saved_registers->r8 = regs.r8;
+    current->saved_registers->r9 = regs.r9;
+    current->saved_registers->r10 = regs.r9;
+    current->saved_registers->r11 = regs.r9;
+    current->saved_registers->r12 = regs.r9;
+    current->saved_registers->r13 = regs.r9;
+    current->saved_registers->r14 = regs.r9;
+    current->saved_registers->r15 = regs.r9;
+
+    current->saved_registers->rflags = regs.rflags | (1 << 9) | (1 << 21);
+
+    return signum;
+}
+
+void process_enter_signal(regs_t* regs, int signum) {
+    uintptr_t rsp = regs->rsp;
+
+    PUSH_PTR(rsp, regs_t, *regs);
+    PUSH_PTR(rsp, long, signum);
+
+    asm volatile(
+            "pushq %0\n"
+            "pushq %1\n"
+            "pushq %2\n"
+            "pushq %3\n"
+            "pushq %4\n"
+            "swapgs\n"
+            "iretq"
+            : : "g"(0x20), "g"(rsp), "g"(0x200), "g"(0x18), "m"(get_current_process()->signalHandlers[signum].handler), "D"(signum)
+            );
 }

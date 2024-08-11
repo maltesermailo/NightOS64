@@ -8,12 +8,6 @@
 #include <stdint.h>
 #include <bits/ansi/time_t.h>
 
-
-struct timespec {
-    time_t tv_sec;
-    long tv_nsec;
-};
-
 void timer_init();
 void ksleep(long milliseconds);
 unsigned long get_counter();

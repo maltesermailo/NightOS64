@@ -8,6 +8,8 @@
 #include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
 #include "../terminal.h"
+#include <abi-bits/errno.h>
+#include <abi-bits/fcntl.h>
 
 file_node_t* root_node;
 tree_t* file_tree;
@@ -349,21 +351,47 @@ char* get_full_path(file_node_t* node) {
     return path;
 }
 
+/***
+ * Following modes are handled right now
+ * - O_APPEND in write
+ * - O_TRUNC in node->file_ops->open
+ * - O_CREAT here
+ * - O_RDONLY, O_WRONLY, O_RDWR in read and write respectively
+ *
+ * @param filename
+ * @param mode
+ * @return
+ */
 file_node_t* open(char* filename, int mode) {
     if(strlen(filename) == 1 && memcmp(filename, "/", strlen(filename))) {
         return root_node;
     }
 
     file_node_t* node = resolve_path("/", filename, NULL, NULL);
+
+    if(node == NULL) {
+        if(!(mode & O_CREAT)) {
+            return NULL;
+        }
+
+        node = create(filename, mode & ~O_CREAT);
+    }
+
+    if(mode & O_DIRECTORY) {
+        if(node->type != FILE_TYPE_DIR || node->type != FILE_TYPE_MOUNT_POINT) {
+            return NULL;
+        }
+    }
+
     if(node->file_ops.open) {
-        node->file_ops.open(node);
+        node->file_ops.open(node, mode);
     }
 
     return node;
 }
 
 file_node_t* create(char* filename, int mode) {
-    file_node_t* node = open(filename, mode);
+    file_node_t* node = resolve_path("/", filename, NULL, NULL);
 
     //If node exists, don't create it, just return invalid
     if(node != NULL) {
@@ -378,7 +406,7 @@ file_node_t* create(char* filename, int mode) {
     parent->file_ops.create(parent, outFileName, mode);
     parent->size++;
 
-    node = open(filename, mode);
+    node = open(filename, mode & ~O_CREAT);
 
     return node;
 }
@@ -478,13 +506,47 @@ int get_size(file_node_t* node) {
 int read(file_handle_t* handle, char* buffer, size_t length) {
     file_node_t* node = handle->fileNode;
 
+    if(handle->mode & O_WRONLY) {
+        return -1;
+    }
+
     return node->file_ops.read(node, buffer, handle->offset, length);
 }
 
 int write(file_handle_t* handle, char* buffer, size_t length) {
     file_node_t* node = handle->fileNode;
 
+    if(handle->mode & O_APPEND) {
+        handle->offset = node->size;
+    }
+
     return node->file_ops.write(node, buffer, handle->offset, length);
+}
+
+int delete(char* filename) {
+    file_node_t* node = open(filename, 0);
+
+    if(node == NULL) {
+        return -1;
+    }
+
+    if(node->file_ops.delete) {
+        int result = node->file_ops.delete(node);
+
+        if(result == 0) {
+            tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+
+            if(treeNode) {
+                tree_remove(file_tree, treeNode);
+            }
+        } else {
+            return result;
+        }
+    }
+
+    free(node);
+
+    return 0;
 }
 
 /**

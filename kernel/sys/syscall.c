@@ -10,6 +10,7 @@
 #include "../../mlibc/abis/linux/errno.h"
 #include "../timer.h"
 #include <bits/ansi/time_t.h>
+#include <signal.h>
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -174,6 +175,33 @@ long sys_brk(long increment, long size) {
         uintptr_t result = (uintptr_t) mmap((void *) proc->page_directory->heap, size - proc->page_directory->heap, false);
         return result == UINT64_MAX;
     }
+}
+
+long sys_rt_sigaction(long signum, long newact, long oldact) {
+    process_t* proc = get_current_process();
+
+    if(proc == NULL) return -1;
+
+    if(!CHECK_PTR(newact) || !CHECK_PTR(oldact) || signum > 32) {
+        return -EINVAL;
+    }
+
+    struct sigaction* signew = (struct sigaction*)newact;
+
+    if(oldact != NULL) {
+        struct sigaction* sigold = (struct sigaction*) oldact;
+        sigold->sa_handler = process_get_signal_handler(signum)->handler;
+        sigold->sa_mask = process_get_signal_handler(signum)->sa_mask;
+        sigold->sa_flags = process_get_signal_handler(signum)->sa_flags;
+    }
+
+    if(signew->sa_handler) {
+        process_set_signal_handler(signum, signew);
+    }
+}
+
+long sys_rt_sigreturn() {
+    return process_signal_return();
 }
 
 [[noreturn]] int sys_exit(long exitCode) {
@@ -416,9 +444,9 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_mprotect,//SYS_MPROTECT
         (syscall_t)sys_munmap,  //SYS_MUNMAP
         (syscall_t)sys_brk,     //SYS_BRK
-        (syscall_t)sys_stub,    //SYS_RT_SIGACTION
+        (syscall_t)sys_rt_sigaction,//SYS_RT_SIGACTION
         (syscall_t)sys_stub,    //SYS_SIGPROCMASK
-        (syscall_t)sys_stub,    //SYS_RT_SIGRETURN
+        (syscall_t)sys_rt_sigreturn,    //SYS_RT_SIGRETURN
         (syscall_t)sys_ioctl,   //SYS_IOCTL
         (syscall_t)sys_pread64, //SYS_PREAD64
         (syscall_t)sys_pwrite64,//SYS_PWRITE64
@@ -637,6 +665,19 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_exit_group,
 };
 
+void restart_syscall(regs_t* regs, int signum) {
+    if(get_current_process()->syscall > 0 && regs->rax == -ERESTART) {
+        if(signum == SIG_CONT || (get_current_process()->signalHandlers[signum].sa_flags & SA_RESTART)) {
+            regs->rax = get_current_process()->syscall;
+            get_current_process()->syscall = 0;
+            syscall_entry(regs);
+        } else {
+            get_current_process()->syscall = 0;
+            regs->rax = -EINTR;
+        }
+    }
+}
+
 void syscall_entry(regs_t* regs) {
     uintptr_t syscallNo = regs->rax;
 
@@ -644,6 +685,10 @@ void syscall_entry(regs_t* regs) {
         get_current_process()->saved_registers = regs;
 
         int returnCode = syscall_table[syscallNo](regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
+
+        if(syscallNo == 15) {
+            return;
+        }
 
         regs->rax = returnCode;
         return;

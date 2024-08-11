@@ -17,7 +17,7 @@
 #define PROT_WRITE 1<<2
 #define PROT_NONE 0
 
-#define CHECK_PTR(ptr) (ptr < 0xfffffe0000000000ull)
+#define CHECK_PTR(ptr) (ptr < 0xfffffe0000000000ull && memmgr_check_user(ptr))
 
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
@@ -88,6 +88,8 @@ void* sbrk(intptr_t len);
  * @param len the increment
  */
 void* brk(size_t len);
+
+bool memmgr_check_user(uintptr_t addr);
 
 size_t get_heap_length();
 

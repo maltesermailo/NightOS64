@@ -813,6 +813,46 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
     }
 }
 
+bool memmgr_check_user(uintptr_t virtualAddr) {
+    uint64_t INDEX_PML4 = PML4_INDEX(virtualAddr);
+    uint64_t INDEX_PDP = PDP_INDEX(virtualAddr);
+    uint64_t INDEX_PD = PD_INDEX(virtualAddr);
+    uint64_t INDEX_PT = PT_INDEX(virtualAddr);
+
+    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
+
+    if(!((uintptr_t)pageMap[INDEX_PML4] & PAGE_USER) || pageDirectoryPointer == 0) {
+        return false;
+    }
+
+    if((uintptr_t)pageMap[INDEX_PML4] & PAGE_LARGE) {
+        return true;
+    }
+
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
+
+    if((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_USER || pageDirectory == 0) {
+        return false;
+    }
+
+    if((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
+        return true;
+    }
+
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
+
+    if((uintptr_t)pageDirectory[INDEX_PD] & PAGE_USER || pageTable == 0) {
+        return false;
+    }
+
+    if((uintptr_t)pageDirectory[INDEX_PD] & PAGE_LARGE) {
+        return true;
+    }
+
+    return pageTable[INDEX_PT] & PAGE_USER;
+}
+
 size_t get_kernel_heap_length() {
     return kernel_heap_length;
 }

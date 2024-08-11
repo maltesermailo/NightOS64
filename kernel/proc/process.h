@@ -10,6 +10,7 @@
 #include "../lock.h"
 #include "../mutex.h"
 #include "../idt.h"
+#include <signal.h>
 
 #define PROC_FLAG_KERNEL 1<<0
 #define PROC_FLAG_RUNNING 1<<1 // whether the process is currently running
@@ -65,7 +66,7 @@
 #define CLONE_NEWNET 0x40000000
 #define CLONE_IO 0x80000000
 
-typedef unsigned long long pid_t;
+typedef int pid_t;
 
 struct process;
 
@@ -111,6 +112,13 @@ typedef struct {
     spin_t lock;
 } mm_struct_t;
 
+typedef struct SignalHandler {
+    void (*handler)(int);
+    sigset_t sa_mask;
+    int sa_flags;
+    void (*sa_restorer)(void);
+} signal_handler_t;
+
 typedef struct process {
     pid_t id;
 
@@ -129,9 +137,17 @@ typedef struct process {
     mm_struct_t* page_directory;
     kernel_thread_t main_thread; // this is the thread that started the process, if it is killed, the process is dead and all threads are killed
 
+    signal_handler_t signalHandlers[32]; //POSIX defines 32 signals which will be implemented
+
     regs_t* saved_registers;
+    unsigned long syscall; //Syscall if interrupted
 
     fd_table_t* fd_table;
+
+    sigset_t blocked_signals;
+    sigset_t pending_signals;
+
+    spin_t lock;
 } process_t;
 
 typedef struct process_control_block {
@@ -176,6 +192,11 @@ pid_t process_clone(struct clone_args* args, size_t size);
 //Process management functions
 void process_thread_exit(int retval);
 void process_exit(int retval);
+void process_set_signal_handler(int signum, struct sigaction* sigaction);
+signal_handler_t* process_get_signal_handler(int signum);
+void process_check_signals(regs_t* regs);
+void process_enter_signal(regs_t* regs, int signum);
+int process_signal_return();
 
 //Process memory functions
 uintptr_t process_get_current_pml();
