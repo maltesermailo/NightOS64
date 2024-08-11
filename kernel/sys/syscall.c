@@ -260,7 +260,7 @@ long sys_tcb_set(uintptr_t tcb) {
 }
 
 long sys_nanosleep(struct timespec* timespec) {
-    if(!CHECK_PTR(timespec)) {
+    if(!CHECK_PTR((uintptr_t) timespec)) {
         return -EINVAL;
     }
 
@@ -667,7 +667,7 @@ syscall_t syscall_table[232] = {
 
 void restart_syscall(regs_t* regs, int signum) {
     if(get_current_process()->syscall > 0 && regs->rax == -ERESTART) {
-        if(signum == SIG_CONT || (get_current_process()->signalHandlers[signum].sa_flags & SA_RESTART)) {
+        if(signum == SIGCONT || (get_current_process()->signalHandlers[signum].sa_flags & SA_RESTART)) {
             regs->rax = get_current_process()->syscall;
             get_current_process()->syscall = 0;
             syscall_entry(regs);

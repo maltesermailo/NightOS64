@@ -31,6 +31,7 @@ kernel/fs/console.o \
 kernel/fs/fat.o \
 kernel/fs/ramfs.o \
 kernel/sys/syscall.o \
+kernel/proc/ipc.o \
 kernel/program/elf.o \
 kernel/pci/ahci.o \
 kernel/sys/mutex.o \

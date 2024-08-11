@@ -11,17 +11,20 @@
 
 #define SIGSET_NWORDS (1024 / (8 * sizeof(uint32_t)))
 // Initialize a signal set to empty
-inline void sigemptyset(sigset_t *set) {
+inline int sigemptyset(sigset_t *set) {
     for (int i = 0; i < SIGSET_NWORDS; i++) {
         set->sig[i] = 0;
     }
+    return 0;
 }
 
 // Initialize a signal set to full (all signals)
-inline void sigfillset(sigset_t *set) {
+inline int sigfillset(sigset_t *set) {
     for (int i = 0; i < SIGSET_NWORDS; i++) {
         set->sig[i] = ~0;
     }
+
+    return 0;
 }
 
 // Add a signal to a signal set
@@ -34,14 +37,14 @@ inline int sigaddset(sigset_t *set, int signum) {
 // Remove a signal from a signal set
 inline int sigdelset(sigset_t *set, int signum) {
     if (signum <= 0 || signum > 1024) return -1;
-    set->sig[(signum-1)/(8*sizeof(uint32_t))] &= ~(1UL << ((signum-1)%(8*sizeof(uint32_t)));
+    set->sig[(signum-1)/(8*sizeof(uint32_t))] &= ~(1UL << ((signum-1)%(8*sizeof(uint32_t))));
     return 0;
 }
 
 // Check if a signal is in a signal set
 inline int sigismember(const sigset_t *set, int signum) {
     if (signum <= 0 || signum > 1024) return -1;
-    return (set->sig[(signum-1)/(8*sizeof(uint32_t))] & (1UL << ((signum-1)%(8*sizeof(uint32_t)))) != 0;
+    return (set->sig[(signum-1)/(8*sizeof(uint32_t))] & (1UL << ((signum-1)%(8*sizeof(uint32_t))))) != 0;
 }
 
 int has_pending_signals(struct process *p) {
