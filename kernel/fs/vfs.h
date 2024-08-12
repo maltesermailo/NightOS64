@@ -17,6 +17,7 @@
 #define FILE_TYPE_MOUNT_POINT 0x7
 #define FILE_TYPE_DEVICES 0x8
 #define FILE_TYPE_KERNEL 0x9
+#define FILE_TYPE_SOCKET 0x10
 
 #define DT_UNKNOWN	0
 #define DT_FIFO		1
@@ -57,6 +58,7 @@ struct file_operations {
     int (*chown) (struct FILE*, unsigned int, unsigned int);
     bool (*create)(struct FILE*, char*, int);
     int (*ioctl) (struct FILE*, unsigned long, void*);
+    int (*poll) (struct FILE*, int);
     int (*delete)(struct FILE*);
 };
 

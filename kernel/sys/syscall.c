@@ -11,6 +11,7 @@
 #include "../timer.h"
 #include <bits/ansi/time_t.h>
 #include <signal.h>
+#include <stat.h>
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -75,6 +76,186 @@ int sys_open(long ptr, long mode) {
 int sys_close(long fd) {
     process_close_fd(fd);
 
+    return 0;
+}
+
+long sys_stat(long path, long statbuf) {
+    if(!CHECK_PTR(path) || !CHECK_PTR(statbuf)) {
+        return -EINVAL;
+    }
+
+    file_node_t* node = open((char*)path, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    struct stat* stat_struct = (struct stat*)statbuf;
+    stat_struct->st_dev = 0;
+    stat_struct->st_ino = 0;
+    stat_struct->st_nlink = 0;
+
+    switch(node->type) {
+        case FILE_TYPE_MOUNT_POINT:
+        case FILE_TYPE_DIR:
+            stat_struct->st_mode = S_IFDIR;
+            break;
+        case FILE_TYPE_FILE:
+            stat_struct->st_mode = S_IFREG;
+            break;
+        case FILE_TYPE_VIRTUAL_DEVICE:
+            stat_struct->st_mode = S_IFCHR;
+            break;
+        case FILE_TYPE_BLOCK_DEVICE:
+            stat_struct->st_mode = S_IFBLK;
+            break;
+        case FILE_TYPE_NAMED_PIPE:
+            stat_struct->st_mode = S_IFIFO;
+            break;
+        case FILE_TYPE_SOCKET:
+            stat_struct->st_mode = S_IFSOCK;
+            break;
+        default:
+            stat_struct->st_mode = S_IFREG;
+    }
+
+    stat_struct->st_mode |= (S_IRWXU | S_IRWXG);
+    stat_struct->st_uid = 0;
+    stat_struct->st_gid = 0;
+    stat_struct->st_blksize = 512;
+    stat_struct->st_size = node->size;
+    stat_struct->st_blocks = node->size / 512;
+    stat_struct->st_atim.tv_sec = 0;
+    stat_struct->st_atim.tv_nsec = 0;
+
+    stat_struct->st_mtim.tv_sec = 0;
+    stat_struct->st_mtim.tv_nsec = 0;
+
+    stat_struct->st_ctim.tv_sec = 0;
+    stat_struct->st_ctim.tv_nsec = 0;
+
+    return 0;
+}
+
+long sys_lstat(long path, long statbuf) {
+    if(!CHECK_PTR(path) || !CHECK_PTR(statbuf)) {
+        return -EINVAL;
+    }
+
+    file_node_t* node = open((char*)path, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    struct stat* stat_struct = (struct stat*)statbuf;
+    stat_struct->st_dev = 0;
+    stat_struct->st_ino = 0;
+    stat_struct->st_nlink = 0;
+
+    switch(node->type) {
+        case FILE_TYPE_MOUNT_POINT:
+        case FILE_TYPE_DIR:
+            stat_struct->st_mode = S_IFDIR;
+            break;
+        case FILE_TYPE_FILE:
+            stat_struct->st_mode = S_IFREG;
+            break;
+        case FILE_TYPE_VIRTUAL_DEVICE:
+            stat_struct->st_mode = S_IFCHR;
+            break;
+        case FILE_TYPE_BLOCK_DEVICE:
+            stat_struct->st_mode = S_IFBLK;
+            break;
+        case FILE_TYPE_NAMED_PIPE:
+            stat_struct->st_mode = S_IFIFO;
+            break;
+        case FILE_TYPE_SOCKET:
+            stat_struct->st_mode = S_IFSOCK;
+            break;
+        default:
+            stat_struct->st_mode = S_IFREG;
+    }
+
+    stat_struct->st_mode |= (S_IRWXU | S_IRWXG);
+    stat_struct->st_uid = 0;
+    stat_struct->st_gid = 0;
+    stat_struct->st_blksize = 512;
+    stat_struct->st_size = node->size;
+    stat_struct->st_blocks = node->size / 512;
+    stat_struct->st_atim.tv_sec = 0;
+    stat_struct->st_atim.tv_nsec = 0;
+
+    stat_struct->st_mtim.tv_sec = 0;
+    stat_struct->st_mtim.tv_nsec = 0;
+
+    stat_struct->st_ctim.tv_sec = 0;
+    stat_struct->st_ctim.tv_nsec = 0;
+
+    return 0;
+}
+
+long sys_fstat(long fd, long statbuf) {
+    if(!CHECK_PTR(statbuf)) {
+        return -EINVAL;
+    }
+
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -EINVAL;
+    }
+
+    struct stat* stat_struct = (struct stat*)statbuf;
+    stat_struct->st_dev = 0;
+    stat_struct->st_ino = 0;
+    stat_struct->st_nlink = 0;
+
+    switch(node->type) {
+        case FILE_TYPE_MOUNT_POINT:
+        case FILE_TYPE_DIR:
+            stat_struct->st_mode = S_IFDIR;
+            break;
+        case FILE_TYPE_FILE:
+            stat_struct->st_mode = S_IFREG;
+            break;
+        case FILE_TYPE_VIRTUAL_DEVICE:
+            stat_struct->st_mode = S_IFCHR;
+            break;
+        case FILE_TYPE_BLOCK_DEVICE:
+            stat_struct->st_mode = S_IFBLK;
+            break;
+        case FILE_TYPE_NAMED_PIPE:
+            stat_struct->st_mode = S_IFIFO;
+            break;
+        case FILE_TYPE_SOCKET:
+            stat_struct->st_mode = S_IFSOCK;
+            break;
+        default:
+            stat_struct->st_mode = S_IFREG;
+    }
+
+    stat_struct->st_mode |= (S_IRWXU | S_IRWXG);
+    stat_struct->st_uid = 0;
+    stat_struct->st_gid = 0;
+    stat_struct->st_blksize = 512;
+    stat_struct->st_size = node->size;
+    stat_struct->st_blocks = node->size / 512;
+    stat_struct->st_atim.tv_sec = 0;
+    stat_struct->st_atim.tv_nsec = 0;
+
+    stat_struct->st_mtim.tv_sec = 0;
+    stat_struct->st_mtim.tv_nsec = 0;
+
+    stat_struct->st_ctim.tv_sec = 0;
+    stat_struct->st_ctim.tv_nsec = 0;
+
+    return 0;
+}
+
+int sys_poll(long fdbuf, long nfds, int timeout) {
     return 0;
 }
 
@@ -452,7 +633,7 @@ long sys_futex(long pointer, long action, long val, long timeout) {
 
 //Stub for unimplemented syscalls to fill
 int sys_stub() {
-    return -1;
+    return -ENOSYS;
 }
 
 syscall_t syscall_table[232] = {
@@ -460,10 +641,10 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_write,   //SYS_WRITE
         (syscall_t)sys_open,    //SYS_OPEN
         (syscall_t)sys_close,   //SYS_CLOSE
-        (syscall_t)sys_stub,    //SYS_STAT
-        (syscall_t)sys_stub,    //SYS_FSTAT
-        (syscall_t)sys_stub,    //SYS_LSTAT
-        (syscall_t)sys_stub,    //SYS_POLL
+        (syscall_t)sys_stat,    //SYS_STAT
+        (syscall_t)sys_fstat,   //SYS_FSTAT
+        (syscall_t)sys_lstat,   //SYS_LSTAT
+        (syscall_t)sys_poll,    //SYS_POLL
         (syscall_t)sys_lseek,   //SYS_LSEEK
         (syscall_t)sys_mmap,    //SYS_MMAP
         (syscall_t)sys_mprotect,//SYS_MPROTECT
