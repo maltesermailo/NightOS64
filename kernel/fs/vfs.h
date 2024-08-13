@@ -59,8 +59,13 @@ struct file_operations {
     bool (*create)(struct FILE*, char*, int);
     int (*ioctl) (struct FILE*, unsigned long, void*);
     int (*poll) (struct FILE*, int);
+    struct FILE* (*rename)(struct FILE*, char*);
     int (*delete)(struct FILE*);
 };
+
+typedef struct FSStruct {
+    void* owner; //A pointer to an identifying object for each mount.
+} fs_struct_t;
 
 //TODO: Add support for symbolic links
 typedef struct FILE {
@@ -110,7 +115,9 @@ file_node_t* open(char* filename, int mode);
 file_node_t* create(char* filename, int mode);
 file_node_t* mkdir(char* filename);
 file_node_t* mkdir_vfs(char* filename);
+file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char** outFileName);
 int delete(char* filename);
+int move_file(file_node_t* node, char* new_path, int flags);
 
 int vfs_read_dir(struct FILE* node, struct list_dir* buffer, int count);
 

@@ -7,6 +7,7 @@
 #include "../terminal.h"
 #include <string.h>
 #include <abi-bits/fcntl.h>
+#include "../proc/process.h"
 
 void ramfs_init(char* path) {
     char* file_name = strrchr(path, '/'); //Get file name
@@ -53,6 +54,7 @@ bool ramfs_mkdir(file_node_t* parent, char* dirname) {
     node->file_ops.create = ramfs_create;
     node->file_ops.read = ramfs_read;
     node->file_ops.write = ramfs_write;
+    node->file_ops.rename = ramfs_rename;
     parent->size++;
 
     tree_insert_child(debug_get_file_tree(), treeNode, node);
@@ -129,11 +131,13 @@ bool ramfs_create(file_node_t* parent, char* name, int mode) {
     node->file_ops.create = ramfs_create;
     node->file_ops.read = ramfs_read;
     node->file_ops.write = ramfs_write;
+    node->file_ops.rename = ramfs_rename;
     parent->size++;
 
     ram_file_t* ramFile = calloc(1, sizeof(ram_file_t));
     ramFile->begin = (uintptr_t) malloc(4096);
     ramFile->size = 4096;
+    ramFile->owner = ramFile;
 
     node->fs = ramFile;
 
@@ -156,4 +160,24 @@ void ramfs_open(file_node_t* node, int mode) {
         ram_file_t* ramFile = (ram_file_t*) node->fs;
         memset((void*)ramFile->begin, 0, ramFile->size);
     }
+}
+
+file_node_t* ramfs_rename(file_node_t* node, char* path) {
+    file_node_t* parent;
+    resolve_path(get_cwd_name(), path, &parent, NULL);
+
+    if(parent == NULL) {
+        return NULL;
+    }
+
+    tree_node_t* treeNode = tree_find_child_root(debug_get_file_tree(), parent);
+
+    if(!treeNode) {
+        printf("Warning: File %s is not present in file tree\n", parent->name);
+        return NULL;
+    }
+
+    tree_insert_child(debug_get_file_tree(), treeNode, node);
+
+    return node;
 }

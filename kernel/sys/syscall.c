@@ -541,6 +541,20 @@ long sys_access(long pathPtr, long mode) {
     return 0;
 }
 
+long sys_rename(long oldpathptr, long newpathptr) {
+    if(!CHECK_PTR(oldpathptr) || !CHECK_PTR(newpathptr)) {
+        return -EINVAL;
+    }
+
+    file_node_t* node = open((char*)oldpathptr, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    return move_file(node, (char*)newpathptr, 0);
+}
+
 [[noreturn]] int sys_exit(long exitCode) {
     process_thread_exit(exitCode);
 }
@@ -691,6 +705,23 @@ long sys_execve(long pathname, long argv, long envp) {
     return execve(path, args, env);
 }
 
+long sys_rename(long oldpathptr, long newpathptr) {
+    if(!CHECK_PTR(oldpathptr) || !CHECK_PTR(newpathptr)) {
+        return -EFAULT;
+    }
+
+    char* old_path = (char*) oldpathptr;
+    char* new_path = (char*) newpathptr;
+
+    file_node_t* old = open(old_path, 0);
+    file_node_t* new = open(new_path, 0);
+
+    if(old == NULL) {
+        return -ENOENT;
+    }
+
+
+}
 #define FUTEX_WAIT 0
 #define FUTEX_WAKE 1
 
@@ -789,7 +820,7 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_pwrite64,//SYS_PWRITE64
         (syscall_t)sys_readv,   //SYS_READV
         (syscall_t)sys_writev,  //SYS_WRITEV
-        (syscall_t)sys_stub,    //SYS_ACCESS
+        (syscall_t)sys_access,  //SYS_ACCESS
         (syscall_t)sys_stub,    //SYS_PIPE
         (syscall_t)sys_stub,    //SYS_SELECT
         (syscall_t)sys_yield,   //SYS_SCHED_YIELD
@@ -831,30 +862,30 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_exit,   //SYS_EXIT
         (syscall_t)sys_stub,   //SYS_WAIT4
         (syscall_t)sys_stub,   //SYS_KILL
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,   //SYS_UNAME
+        (syscall_t)sys_stub,   //SYS_SEMGET
+        (syscall_t)sys_stub,   //SYS_SEMOP
+        (syscall_t)sys_stub,   //SYS_SEMCTL
+        (syscall_t)sys_stub,   //SYS_SHMDT
+        (syscall_t)sys_stub,   //SYS_MSGGET
+        (syscall_t)sys_stub,   //SYS_MSGSND
+        (syscall_t)sys_stub,   //SYS_MSGRCV
+        (syscall_t)sys_stub,   //SYS_MSGCTL
+        (syscall_t)sys_stub,   //SYS_FCNTL
+        (syscall_t)sys_stub,   //SYS_FLOCK
+        (syscall_t)sys_stub,   //SYS_FSYNC
+        (syscall_t)sys_stub,   //SYS_FDATASYNC
+        (syscall_t)sys_stub,   //SYS_TRUNCATE
+        (syscall_t)sys_stub,   //SYS_GETDENTS
+        (syscall_t)sys_stub,   //SYS_GETCWD
+        (syscall_t)sys_stub,   //SYS_CHDIR
+        (syscall_t)sys_stub,   //SYS_FCHDIR
+        (syscall_t)sys_rename, //SYS_RENAME
+        (syscall_t)sys_stub,   //SYS_MKDIR
+        (syscall_t)sys_stub,   //SYS_RMDIR
+        (syscall_t)sys_stub,   //SYS_CREAT
+        (syscall_t)sys_stub,   //SYS_LINK
+        (syscall_t)sys_stub,   //SYS_UNLINK
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,

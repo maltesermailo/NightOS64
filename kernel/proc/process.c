@@ -11,6 +11,7 @@
 #include "../program/elf.h"
 #include "../timer.h"
 #include <signal.h>
+#include <string.h>
 
 #define PUSH_PTR(stack, type, value) { \
             stack -= sizeof(type);     \
@@ -124,6 +125,9 @@ void process_create_task(char* path, bool is_kernel) {
     process->gid = 0;
     process->flags = is_kernel ? PROC_FLAG_KERNEL : 0;
     process->flags |= PROC_FLAG_RUNNING;
+    process->cwd_file = open("/", 0);
+    //Always make sure to clean this string up!!!
+    process->cwd = strdup("/");
 
     process->fd_table = calloc(1, sizeof(fd_table_t));
     process->fd_table->capacity = 32;
@@ -795,4 +799,38 @@ void process_enter_signal(regs_t* regs, int signum) {
             "iretq"
             : : "g"(0x20), "g"(rsp), "g"(0x200), "g"(0x18), "m"(get_current_process()->signalHandlers[signum].handler), "D"(signum)
             );
+}
+
+file_node_t* get_cwd() {
+    process_t* current = get_current_process();
+
+    if(current->cwd_file == NULL) {
+        file_node_t* cwd_file = open(current->cwd, 0);
+
+        if(cwd_file == NULL) {
+            return open("/", 0);
+        }
+
+        current->cwd_file = cwd_file;
+        return current->cwd_file;
+    }
+
+    return current->cwd_file;
+}
+
+char* get_cwd_name() {
+    process_t* current = get_current_process();
+
+    if(current->cwd_file == NULL) {
+        file_node_t* cwd_file = open(current->cwd, 0);
+
+        if(cwd_file == NULL) {
+            return "/";
+        }
+
+        current->cwd_file = cwd_file;
+        return current->cwd;
+    }
+
+    return current->cwd;
 }

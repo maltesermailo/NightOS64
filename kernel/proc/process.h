@@ -146,6 +146,10 @@ typedef struct process {
 
     fd_table_t* fd_table;
 
+    //Always make sure to clean this string up!!!
+    char* cwd;
+    file_node_t* cwd_file;
+
     sigset_t blocked_signals;
     sigset_t pending_signals;
 
@@ -211,6 +215,8 @@ void process_close_fd(int fd);
 
 //Current process state
 process_t* get_current_process();
+file_node_t* get_cwd();
+char* get_cwd_name();
 
 int execve(char* path, char** argv, char** envp);
 

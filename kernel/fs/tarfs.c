@@ -36,6 +36,7 @@ THE SOFTWARE
 */
 
 tar_t* archive;
+const char* TARFS_TYPE = "tarfs\0";
 
 int oct2bin(char *str, int size) {
     int n = 0;
@@ -129,6 +130,7 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             if(count <= 1) {
                 if(strcmp(filename, name) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
+                    node_context->type = TARFS_TYPE;
                     node_context->fs = context->fs;
                     node_context->entry = current;
 
@@ -181,6 +183,7 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             if(count <= 1) {
                 if(strcmp(filename, path) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
+                    ode_context->type = TARFS_TYPE;
                     node_context->fs = context->fs;
                     node_context->entry = current;
 

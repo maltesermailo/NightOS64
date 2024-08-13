@@ -8,8 +8,8 @@
 #include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
 #include "../terminal.h"
-#include <abi-bits/errno.h>
-#include <abi-bits/fcntl.h>
+#include "../../mlibc/abis/linux/fcntl.h"
+#include "../../mlibc/abis/linux/errno.h"
 
 file_node_t* root_node;
 tree_t* file_tree;
@@ -76,6 +76,7 @@ int mount_directly(char* name, file_node_t* node) {
             //Probably should do this different later
             //TODO: Proper cleanup on umount
             node->size += root_node->size;
+            free(root_node);
         }
 
         root_node = node;
@@ -367,7 +368,7 @@ file_node_t* open(char* filename, int mode) {
         return root_node;
     }
 
-    file_node_t* node = resolve_path("/", filename, NULL, NULL);
+    file_node_t* node = resolve_path(get_cwd_name(), filename, NULL, NULL);
 
     if(node == NULL) {
         if(!(mode & O_CREAT)) {
@@ -545,6 +546,87 @@ int delete(char* filename) {
     }
 
     free(node);
+
+    return 0;
+}
+
+int move_file(file_node_t* node, char* newpath, int flags) {
+    file_node_t* new = open(newpath, 0);
+
+    if(new == NULL) {
+        file_node_t* parent;
+        resolve_path(get_cwd_name(), newpath, &parent, NULL);
+
+        if(parent == NULL) {
+            return -ENOENT;
+        }
+    } else {
+        if(new->type == FILE_TYPE_DIR) {
+            if(get_size(new) > 0) {
+                return -EEXIST;
+            }
+        }
+
+        if(node->file_ops.delete) {
+            int result = node->file_ops.delete(node);
+
+            if(result == 0) {
+                tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+
+                if(treeNode) {
+                    tree_remove(file_tree, treeNode);
+                }
+            } else {
+                return -EINVAL;
+            }
+        }
+
+        free(node);
+    }
+
+    if(node->fs == NULL || new->fs == NULL) {
+        return -EXDEV;
+    }
+
+    fs_struct_t* node_fs = (fs_struct_t*)node->fs;
+    fs_struct_t* new_fs = (fs_struct_t*)node->fs;
+
+    if(node_fs->owner != new_fs->owner) {
+        return -EXDEV;
+    }
+
+    if(new->type == FILE_TYPE_DIR && node->type != new->type) {
+        return -EISDIR;
+    }
+
+    if(new->type == FILE_TYPE_FILE && node->type != new->type) {
+        return -ENOTDIR;
+    }
+
+    //Now we are confirmed that at least the parent exists, and the position is free.
+    //We will now move the directory to the new location and update the directory entries.
+    if(!node->file_ops.rename) {
+        return -EACCES;
+    }
+
+    tree_node_t* treeNode = tree_find_child_root(file_tree, node);
+    tree_node_t* parent = treeNode->parent;
+
+    while(parent != NULL) {
+        if(parent->value == node) {
+            return -EINVAL;
+        }
+
+        parent = parent->parent;
+    }
+    tree_remove(file_tree, treeNode);
+
+    //This operation moves the file descriptor
+    struct FILE* newFile = node->file_ops.rename(node, newpath);
+
+    if(newFile == NULL) {
+        return -EBUSY;
+    }
 
     return 0;
 }
