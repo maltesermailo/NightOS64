@@ -62,13 +62,18 @@ struct file_operations {
     int (*delete)(struct FILE*);
 };
 
+//TODO: Add support for symbolic links
 typedef struct FILE {
     char name[256];
     char full_path[4096];
 
     uint64_t id;
+
     uint64_t owner; //The owner id
-    uint64_t ownerGroup; //The owner group id
+    uint64_t owner_group; //The owner group id
+
+    uint64_t access_mask;
+
     uint64_t type;
     uint64_t size;
     bool cached;
@@ -76,7 +81,7 @@ typedef struct FILE {
 
     struct file_operations file_ops;
 
-    int64_t refcount;
+    int64_t ref_count;
 } file_node_t;
 
 typedef struct file_handle {

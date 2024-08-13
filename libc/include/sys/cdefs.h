@@ -4,6 +4,6 @@
 #define __nightos_libc 1
 #define NULL 0
 #define null 0
-typedef unsigned long size_t;
+typedef long unsigned int size_t;
 
 #endif

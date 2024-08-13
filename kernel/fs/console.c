@@ -63,7 +63,7 @@ void key_event(key_event_t* event) {
 void console_init() {
     file_node_t* node = calloc(1, sizeof(file_node_t));
     node->id = get_next_file_id();
-    node->refcount = 0;
+    node->ref_count = 0;
     node->size = 0;
     node->type = FILE_TYPE_VIRTUAL_DEVICE;
 

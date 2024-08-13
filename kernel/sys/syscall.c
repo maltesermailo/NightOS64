@@ -11,7 +11,9 @@
 #include "../timer.h"
 #include <bits/ansi/time_t.h>
 #include <signal.h>
-#include <stat.h>
+#include <abi-bits/stat.h>
+#include <abi-bits/access.h>
+#include <bits/posix/iovec.h>
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -32,6 +34,7 @@ int sys_read(long fd, long buffer, long size) {
     }
 
     int readBytes = read(handle, (char*)buffer, size);
+    handle->offset += readBytes;
 
     return readBytes;
 }
@@ -50,6 +53,7 @@ int sys_write(long fd, long buffer, long size) {
     }
 
     int written = write(handle, (char*)buffer, size);
+    handle->offset += written;
 
     return written;
 }
@@ -213,7 +217,7 @@ long sys_fstat(long fd, long statbuf) {
     stat_struct->st_ino = 0;
     stat_struct->st_nlink = 0;
 
-    switch(node->type) {
+    switch(handle->fileNode->type) {
         case FILE_TYPE_MOUNT_POINT:
         case FILE_TYPE_DIR:
             stat_struct->st_mode = S_IFDIR;
@@ -241,8 +245,8 @@ long sys_fstat(long fd, long statbuf) {
     stat_struct->st_uid = 0;
     stat_struct->st_gid = 0;
     stat_struct->st_blksize = 512;
-    stat_struct->st_size = node->size;
-    stat_struct->st_blocks = node->size / 512;
+    stat_struct->st_size = handle->fileNode->size;
+    stat_struct->st_blocks = handle->fileNode->size / 512;
     stat_struct->st_atim.tv_sec = 0;
     stat_struct->st_atim.tv_nsec = 0;
 
@@ -408,6 +412,133 @@ long sys_rt_sigprocmask(long how, long newsigset, long oldsigset) {
 
 long sys_rt_sigreturn() {
     return process_signal_return();
+}
+
+long sys_readv(long fd, const struct iovec* iov, int iovcnt) {
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR((uintptr_t) iov)) {
+        return -EINVAL;
+    }
+
+    int totalBytesRead = 0;
+
+    for(int i = 0; i < iovcnt; i++) {
+        int readBytes = read(handle, (char*)(iov->iov_base), iov->iov_len);
+        handle->offset += readBytes;
+        totalBytesRead += readBytes;
+
+        iov++;
+    }
+
+    return totalBytesRead;
+}
+
+long sys_writev(long fd, const struct iovec* iov, int iovcnt) {
+    process_t* proc = get_current_process();
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    if(!CHECK_PTR((uintptr_t) iov)) {
+        return -EINVAL;
+    }
+
+    int totalBytesWritten = 0;
+
+    for(int i = 0; i < iovcnt; i++) {
+        int written = write(handle, (char*)(iov->iov_base), iov->iov_len);
+        handle->offset += written;
+        totalBytesWritten += written;
+
+        iov++;
+    }
+
+    return totalBytesWritten;
+}
+
+long sys_access(long pathPtr, long mode) {
+    //TODO: Add support for symbolic links
+    if(!CHECK_PTR(pathPtr)) {
+        return -EFAULT;
+    }
+
+    char* path = (char*)pathPtr;
+
+    file_node_t* node = open(path, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    process_t* process = get_current_process();
+
+    if(process->uid == 0 || process->gid == 0) {
+        //Superuser always has access
+        return 0;
+    }
+
+    if(mode == F_OK) {
+        return 0;
+    }
+
+    if(node->owner == process->uid) {
+        //Now check the access mask
+        if(mode & R_OK && (node->access_mask & S_IRUSR) == 0) {
+            return -EACCES;
+        }
+
+        if(mode & W_OK && (node->access_mask & S_IWUSR) == 0) {
+            return -EACCES;
+        }
+
+        if(mode & X_OK && (node->access_mask & S_IXUSR) == 0) {
+            return -EACCES;
+        }
+
+        return 0;
+    }
+
+    if(node->owner_group == process->gid) {
+        //Now check the access mask
+        if(mode & R_OK && (node->access_mask & S_IRGRP) == 0) {
+            return -EACCES;
+        }
+
+        if(mode & W_OK && (node->access_mask & S_IWGRP) == 0) {
+            return -EACCES;
+        }
+
+        if(mode & X_OK && (node->access_mask & S_IXGRP) == 0) {
+            return -EACCES;
+        }
+
+        return 0;
+    }
+
+    //Now check the access mask
+    if(mode & R_OK && (node->access_mask & S_IROTH) == 0) {
+        return -EACCES;
+    }
+
+    if(mode & W_OK && (node->access_mask & S_IWOTH) == 0) {
+        return -EACCES;
+    }
+
+    if(mode & X_OK && (node->access_mask & S_IXOTH) == 0) {
+        return -EACCES;
+    }
+
+    return 0;
 }
 
 [[noreturn]] int sys_exit(long exitCode) {
@@ -656,8 +787,8 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_ioctl,   //SYS_IOCTL
         (syscall_t)sys_pread64, //SYS_PREAD64
         (syscall_t)sys_pwrite64,//SYS_PWRITE64
-        (syscall_t)sys_stub,    //SYS_READV
-        (syscall_t)sys_stub,    //SYS_WRITEV
+        (syscall_t)sys_readv,   //SYS_READV
+        (syscall_t)sys_writev,  //SYS_WRITEV
         (syscall_t)sys_stub,    //SYS_ACCESS
         (syscall_t)sys_stub,    //SYS_PIPE
         (syscall_t)sys_stub,    //SYS_SELECT

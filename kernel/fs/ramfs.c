@@ -18,7 +18,7 @@ void ramfs_init(char* path) {
     root->type = FILE_TYPE_MOUNT_POINT; //We set it to mount point so the driver knows its the root of the tar filesystem
     strncpy(root->name, file_name, strlen(file_name));
     strncpy(root->full_path, path, strlen(path));
-    root->refcount = 0;
+    root->ref_count = 0;
     root->file_ops.delete = ramfs_delete;
     root->file_ops.mkdir = ramfs_mkdir;
     root->file_ops.delete = ramfs_delete;
@@ -47,7 +47,7 @@ bool ramfs_mkdir(file_node_t* parent, char* dirname) {
     node->id = get_next_file_id(); //id 1 will always be the root
     node->size = 0;
     strncpy(node->name, dirname, strlen(dirname));
-    node->refcount = 0;
+    node->ref_count = 0;
     node->file_ops.delete = ramfs_delete;
     node->file_ops.mkdir = ramfs_mkdir;
     node->file_ops.create = ramfs_create;
@@ -124,7 +124,7 @@ bool ramfs_create(file_node_t* parent, char* name, int mode) {
     node->id = get_next_file_id(); //id 1 will always be the root
     node->size = 0;
     strncpy(node->name, name, strlen(name));
-    node->refcount = 0;
+    node->ref_count = 0;
     node->file_ops.delete = ramfs_delete;
     node->file_ops.create = ramfs_create;
     node->file_ops.read = ramfs_read;

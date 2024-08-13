@@ -59,7 +59,7 @@ bool vfs_create(struct FILE* parent, char* filename, int mode) {
 
     node->type = FILE_TYPE_FILE;
     node->size = 0;
-    node->refcount = 0;
+    node->ref_count = 0;
     node->id = id_generator++;
     strncpy(node->name, filename, strlen(filename));
 
@@ -122,7 +122,7 @@ int mount_empty(char* name, int fileType) {
     node->size = 0;
     node->type = fileType;
     node->id = 0; //Replace with get_next_id
-    node->refcount = 0;
+    node->ref_count = 0;
 
     return mount_directly(name, node);
 }
@@ -467,7 +467,7 @@ file_node_t* mkdir_vfs(char* dirname) {
     node->id = id_generator++; //id 1 will always be the root
     node->size = 0;
     strncpy(node->name, filename, strlen(dirname));
-    node->refcount = 0;
+    node->ref_count = 0;
     node->file_ops.read_dir = vfs_read_dir;
     node->file_ops.create = vfs_create;
     parent->size++;
@@ -587,7 +587,7 @@ void vfs_install() {
     root_node->id = id_generator++; //id 1 will always be the root
     root_node->size = 0;
     strncpy(root_node->name, "[root]", 6);
-    root_node->refcount = 0;
+    root_node->ref_count = 0;
     root_node->file_ops.read_dir = vfs_read_dir;
 
     tree_insert_child(file_tree, NULL, root_node);

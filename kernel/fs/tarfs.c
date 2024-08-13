@@ -138,7 +138,7 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     node->id = id;
                     node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
                     node->size = oct2bin(current->size, 11);
-                    node->refcount = 0;
+                    node->ref_count = 0;
                     node->file_ops.read = tarfs_read;
                     node->fs = node_context;
 
@@ -190,7 +190,7 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     node->id = id;
                     node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
                     node->size = oct2bin(current->size, 11);
-                    node->refcount = 0;
+                    node->ref_count = 0;
                     node->file_ops.read = tarfs_read;
                     node->fs = node_context;
 
@@ -415,7 +415,7 @@ file_node_t* tarfs_mount(char* name) {
     root->type = FILE_TYPE_MOUNT_POINT; //We set it to mount point so the driver knows its the root of the tar filesystem
     strncpy(root->name, "[root_tarfs]", strlen("[root_tarfs]"));
     strncpy(root->full_path, name, strlen(name));
-    root->refcount = 0;
+    root->ref_count = 0;
     root->file_ops.find_dir = tarfs_find_dir;
     root->file_ops.read_dir = tarfs_read_dir;
     root->file_ops.read = tarfs_read;

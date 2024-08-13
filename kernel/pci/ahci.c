@@ -181,7 +181,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
     node->fs = sataDevice;
     node->size = sataDevice->size;
     snprintf(node->name, 16, "hd%d", sataDevice->port);
-    node->refcount = 0;
+    node->ref_count = 0;
     node->file_ops.read = ahci_read;
     node->file_ops.write = ahci_write;
 
