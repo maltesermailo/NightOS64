@@ -528,7 +528,7 @@ int delete(char* filename) {
     file_node_t* node = open(filename, 0);
 
     if(node == NULL) {
-        return -1;
+        return -ENOENT;
     }
 
     if(node->file_ops.delete) {
@@ -629,6 +629,58 @@ int move_file(file_node_t* node, char* newpath, int flags) {
     }
 
     return 0;
+}
+
+int link(file_handle_t* handle, char* path) {
+    if(!handle->fileNode->file_ops.link) {
+        return -EINVAL;
+    }
+
+    file_node_t* new = open(path, 0);
+
+    if(new == NULL) {
+        file_node_t* parent;
+        resolve_path(get_cwd_name(), path, &parent, NULL);
+
+        new = parent;
+
+        if(parent == NULL) {
+            return -ENOENT;
+        }
+    } else {
+        if(new->type == FILE_TYPE_DIR) {
+            if(get_size(new) > 0) {
+                return -EEXIST;
+            }
+        }
+    }
+
+    if(handle->fileNode->fs == NULL || new->fs == NULL) {
+        return -EXDEV;
+    }
+
+    fs_struct_t* node_fs = (fs_struct_t*)handle->fileNode->fs;
+    fs_struct_t* new_fs = (fs_struct_t*)new->fs;
+
+    if(node_fs->owner != new_fs->owner) {
+        return -EXDEV;
+    }
+
+    int result = handle->fileNode->file_ops.link(handle->fileNode, path);
+
+    if(result) {
+        return result;
+    }
+
+    new = open(path, 0);
+
+    if(new == NULL) {
+        printf("Link creation went wrong at %s\n", path);
+    }
+
+    int fd = process_open_fd(new, 0);
+
+    return fd;
 }
 
 /**

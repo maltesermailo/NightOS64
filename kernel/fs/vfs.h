@@ -60,7 +60,8 @@ struct file_operations {
     int (*ioctl) (struct FILE*, unsigned long, void*);
     int (*poll) (struct FILE*, int);
     struct FILE* (*rename)(struct FILE*, char*);
-    int (*delete)(struct FILE*);
+    int (*delete)(struct FILE*); //UNLINK
+    int (*link)(struct FILE*, char*);
 };
 
 typedef struct FSStruct {
@@ -135,6 +136,7 @@ int chown(file_node_t* file, unsigned int user, unsigned int group);
 int ioctl(file_node_t* file, unsigned long request, void* args);
 int fcntl(file_node_t* file);
 list_dir_t* find(char* filename);
+int link(file_handle_t* file, char* path);
 
 char* get_full_path(file_node_t* node);
 

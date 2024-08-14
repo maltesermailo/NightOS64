@@ -541,20 +541,6 @@ long sys_access(long pathPtr, long mode) {
     return 0;
 }
 
-long sys_rename(long oldpathptr, long newpathptr) {
-    if(!CHECK_PTR(oldpathptr) || !CHECK_PTR(newpathptr)) {
-        return -EINVAL;
-    }
-
-    file_node_t* node = open((char*)oldpathptr, 0);
-
-    if(node == NULL) {
-        return -ENOENT;
-    }
-
-    return move_file(node, (char*)newpathptr, 0);
-}
-
 [[noreturn]] int sys_exit(long exitCode) {
     process_thread_exit(exitCode);
 }
@@ -711,17 +697,104 @@ long sys_rename(long oldpathptr, long newpathptr) {
     }
 
     char* old_path = (char*) oldpathptr;
-    char* new_path = (char*) newpathptr;
 
     file_node_t* old = open(old_path, 0);
-    file_node_t* new = open(new_path, 0);
 
     if(old == NULL) {
         return -ENOENT;
     }
 
-
+    return move_file(old, (char*)newpathptr, 0);
 }
+
+long sys_mkdir(long pathptr) {
+    if(!CHECK_PTR(pathptr)) {
+        return -EFAULT;
+    }
+
+    char* path = (char*) pathptr;
+
+    file_node_t* node = open(path, 0);
+
+    if(node != NULL) {
+        return -EEXIST;
+    }
+
+    node = mkdir(path);
+
+    if(node == NULL) {
+        return -ENOSPC;
+    }
+
+    return 0;
+}
+
+long sys_rmdir(long pathptr) {
+    if(!CHECK_PTR(pathptr)) {
+        return -EFAULT;
+    }
+
+    char* path = (char*) pathptr;
+
+    file_node_t* node = open(path, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    if(node->type != FILE_TYPE_DIR) {
+        return -ENOTDIR;
+    }
+
+    return delete(path);
+}
+
+long sys_create(long pathptr) {
+    return sys_open(pathptr, O_CREAT | O_WRONLY | O_TRUNC);
+}
+
+long sys_link(long fd, long pathptr) {
+    if(!CHECK_PTR(pathptr)) {
+        return -EFAULT;
+    }
+
+    char* path = (char*) pathptr;
+
+    file_node_t* node = open(path, 0);
+
+    if(node != NULL) {
+        return -EEXIST;
+    }
+
+    if(fd > get_current_process()->fd_table->capacity) {
+        return -EFAULT;
+    }
+
+    file_handle_t* handle = get_current_process()->fd_table->handles[fd];
+
+    if(!handle) {
+        return -EFAULT;
+    }
+
+    return link(handle, path);
+}
+
+long sys_unlink(long pathptr) {
+    if(!CHECK_PTR(pathptr)) {
+        return -EFAULT;
+    }
+
+    char* path = (char*) pathptr;
+
+    file_node_t* node = open(path, 0);
+
+    if(node == NULL) {
+        return -ENOENT;
+    }
+
+    return delete(path);
+}
+
 #define FUTEX_WAIT 0
 #define FUTEX_WAKE 1
 
@@ -881,11 +954,11 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_stub,   //SYS_CHDIR
         (syscall_t)sys_stub,   //SYS_FCHDIR
         (syscall_t)sys_rename, //SYS_RENAME
-        (syscall_t)sys_stub,   //SYS_MKDIR
-        (syscall_t)sys_stub,   //SYS_RMDIR
-        (syscall_t)sys_stub,   //SYS_CREAT
-        (syscall_t)sys_stub,   //SYS_LINK
-        (syscall_t)sys_stub,   //SYS_UNLINK
+        (syscall_t)sys_mkdir,  //SYS_MKDIR
+        (syscall_t)sys_rmdir,  //SYS_RMDIR
+        (syscall_t)sys_create, //SYS_CREAT
+        (syscall_t)sys_link,   //SYS_LINK
+        (syscall_t)sys_unlink, //SYS_UNLINK
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
