@@ -25,7 +25,8 @@ add_project_arguments(
     '-mno-mmx',
     '-mno-sse',
     '-mno-sse2',
-    '-g',
+    '-ggdb',
+    '-O0',
     '--sysroot=' + sysroot,
     kernel_arch_cflags,
     language : 'c'
@@ -33,7 +34,8 @@ add_project_arguments(
 
 add_project_link_arguments(
     '-ffreestanding',
-    '-O2',
+    '-ggdb',
+    '-O0',
     '-nostdlib',
     '-z', 'max-page-size=0x1000',
     '-no-pie',
@@ -96,7 +98,6 @@ kernel = executable('nightos.kernel',
                     kernel_sources,
                     objects : [start_obj, boot_obj] + nasm_objs,
                     link_args : ['-T', gen_linker_script.full_path(),
-                                 '-Wl,-Map=nightos.kernel.map',
                                  '-Wl,--start-group',
                                  '-lgcc', '-lk',
                                  '-Wl,--end-group'],
@@ -114,10 +115,33 @@ iso_target = custom_target('nightos.iso',
                                'cd ' + meson.current_source_dir() + ' && ' +
                                'mkdir -p isodir/boot/grub/ && ' +
                                'cp grub.cfg isodir/boot/grub/grub.cfg && ' +
+                               'cp ' + kernel.full_path() + ' isodir/boot/ &&' +
                                'tar -cvf rootfs.tar initd test.txt && ' +
                                'cp rootfs.tar isodir/boot/ && ' +
+                               'grub-mkstandalone -O x86_64-efi -o isodir/EFI/BOOT/BOOTX64.EFI boot/grub/grub.cfg &&' +
                                'grub-mkrescue -o ' + meson.current_build_dir() + '/@OUTPUT@ isodir && ' +
-                               'rm -rf isodir rootfs.tar'
+                               'rm -rf rootfs.tar'
+                           ],
+                           depends : kernel,
+                           build_by_default : true
+)
+
+# Create ISO
+iso_limine_target = custom_target('nightos-limine.iso',
+                           output : 'nightos-limine.iso',
+                           command : [
+                               'sh', '-c',
+                               'cd ' + meson.current_source_dir() + ' && ' +
+                               'mkdir -p isodir/boot/limine/ && ' +
+                               'mkdir -p isodir/boot/EFI/ &&' +
+                               'cp limine.conf isodir/boot/limine/ && ' +
+                               'cp ' + kernel.full_path() + ' isodir/boot/ &&' +
+                               'tar -cvf rootfs.tar initd test.txt && ' +
+                               'cp rootfs.tar isodir/boot/ && ' +
+                               'cp -v ../limine/bin/limine-bios.sys ../limine/bin/limine-bios-cd.bin ../limine/bin/limine-uefi-cd.bin isodir/boot/limine/ &&' +
+                               'cp -v ../limine/bin/BOOTX64.EFI isodir/EFI/BOOT/ &&' +
+                               'xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin --no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine/limine-uefi-cd.bin --efi-boot-part --efi-boot-image --protective-msdos-label isodir -o ' + meson.current_build_dir() + '/@OUTPUT@ && ' +
+                               'rm -rf rootfs.tar'
                            ],
                            depends : kernel,
                            build_by_default : true
@@ -127,5 +151,5 @@ iso_target = custom_target('nightos.iso',
 default_target = custom_target('default',
                                output : 'default',
                                command : ['touch', '@OUTPUT@'],
-                               depends : iso_target
+                               depends : [iso_target, iso_limine_target]
 )

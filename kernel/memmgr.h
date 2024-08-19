@@ -19,11 +19,17 @@
 
 #define CHECK_PTR(ptr) (ptr < 0xfffffe0000000000ull && memmgr_check_user(ptr))
 
+#define ADDRESS_TO_PAGE(addr) ((addr >> 12))
+#define PAGE_TO_ADDRESS(page) ((page << 12))
+
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 
 uintptr_t kalloc_frame();
 void kfree_frame(uintptr_t addr);
+
+void memmgr_phys_mark_page(int idx);
+void memmgr_phys_free_page(int idx);
 
 void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, uintptr_t flags);
 /**

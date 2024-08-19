@@ -804,6 +804,8 @@ void process_enter_signal(regs_t* regs, int signum) {
 file_node_t* get_cwd() {
     process_t* current = get_current_process();
 
+    if(current == NULL) return NULL;
+
     if(current->cwd_file == NULL) {
         file_node_t* cwd_file = open(current->cwd, 0);
 
@@ -820,6 +822,8 @@ file_node_t* get_cwd() {
 
 char* get_cwd_name() {
     process_t* current = get_current_process();
+
+    if(current == NULL) return "/";
 
     if(current->cwd_file == NULL) {
         file_node_t* cwd_file = open(current->cwd, 0);

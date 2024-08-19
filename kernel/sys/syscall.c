@@ -14,6 +14,7 @@
 #include <abi-bits/stat.h>
 #include <abi-bits/access.h>
 #include <bits/posix/iovec.h>
+#include "../../mlibc/abis/linux/fcntl.h"
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -583,7 +584,7 @@ long sys_munmap(unsigned long address, unsigned long length)  {
 
 long sys_tcb_set(uintptr_t tcb) {
     if(!CHECK_PTR(tcb)) {
-        return -EINVAL;
+        return -EFAULT;
     }
 
     uint32_t high = tcb >> 32;
@@ -598,7 +599,7 @@ long sys_tcb_set(uintptr_t tcb) {
 
 long sys_nanosleep(struct timespec* timespec) {
     if(!CHECK_PTR((uintptr_t) timespec)) {
-        return -EINVAL;
+        return -EFAULT;
     }
 
     long nanosecondsToMs = timespec->tv_nsec / 1000000;
@@ -630,7 +631,7 @@ long sys_yield() {
 
 long sys_clone(unsigned long flags, unsigned long stack, unsigned long parent_tid, unsigned long child_tid, unsigned long tls) {
     if(!(CHECK_PTR(flags) && CHECK_PTR(stack) && CHECK_PTR(parent_tid) && CHECK_PTR(child_tid) && CHECK_PTR(tls))) {
-        return -EINVAL;
+        return -EFAULT;
     }
 
     struct clone_args args;
@@ -870,6 +871,20 @@ long sys_futex(long pointer, long action, long val, long timeout) {
 int sys_stub() {
     return -ENOSYS;
 }
+/**
+ * We're gonna implement a custom syscall specifically for the microkernel portion of this operating system
+ * SYS_SRVCTL
+ *
+ * int srvctl(long operation, int flags, void* message);
+ *
+ * Operations can be one of
+ *
+ * SRV_SEND: Send a message to a server
+ * SRV_CALL: Send a message with response
+ * SRV_RECEIVE: Receive a message from a queue
+ * SRV_REGISTER: Register a server
+ * SRV_UNGREGISTER: Delete a server
+ */
 
 syscall_t syscall_table[232] = {
         (syscall_t)sys_read,    //SYS_READ

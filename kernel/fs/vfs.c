@@ -170,6 +170,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
         if(fCwd == NULL) {
             tree_node_t* current = file_tree->head;
 
+            cwd = strdup(cwd);
             char* pch = (char *) NULL;
             char* save = NULL;
             printf("Resolving cwd: %s\n", cwd);
@@ -219,12 +220,14 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                             }
                         }
 
+                        free(cwd);
                         //We couldn't resolve cwd, wtf?
                         return NULL;
                     }
                 }
             } while(pch != null);
 
+            free(cwd);
             if(current != NULL) {
                 fCwd = current;
             }
@@ -234,6 +237,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     tree_node_t* current = fCwd;
     tree_node_t* fParent = NULL;
 
+    file = strdup(file);
     char* pch = (char *) NULL;
     char* save = NULL;
     printf("Resolving path: %s\n", file);
@@ -279,6 +283,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
                         if(pch == NULL) {
                             //End of search, return current
+                            free(file);
                             return (file_node_t *) current->value;
                         }
                     }
@@ -295,11 +300,13 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                     }
                 }
 
+                free(file);
                 return NULL;
             }
         }
     } while(pch != null);
 
+    free(file);
     if(current != NULL) {
         return (file_node_t*)current->value;
     }
@@ -364,7 +371,7 @@ char* get_full_path(file_node_t* node) {
  * @return
  */
 file_node_t* open(char* filename, int mode) {
-    if(strlen(filename) == 1 && memcmp(filename, "/", strlen(filename))) {
+    if(strlen(filename) == 1 && !memcmp(filename, "/", strlen(filename))) {
         return root_node;
     }
 

@@ -22,6 +22,10 @@
 #include "acpi.h"
 #include "symbol.h"
 #include "fs/ramfs.h"
+#include "proc/message.h"
+#define SSFN_CONSOLEBITMAP_TRUECOLOR        /* use the special renderer for 32 bit truecolor packed pixels */
+#define SSFN_CONSOLEBITMAP_CONTROL
+#include "ssfn.h"
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -66,12 +70,18 @@ static const size_t VGA_HEIGHT = 25;
 
 size_t terminal_row;
 size_t terminal_column;
+size_t terminal_width;
+size_t terminal_height;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
+uint8_t* back_buffer;
 RSDP_t* rsdp;
 extern unsigned long long _physical_end;
 uintptr_t kernel_end = 0;
+bool use_framebuffer = false;
 
+extern char font_data_start[];
+extern char font_data_end[];
 
 #define MAX_SYMBOLS 1024  // Adjust as needed
 
@@ -110,17 +120,35 @@ struct kernel_symbol *find_symbol(const char *name) {
     return ht_lookup(ksymtab, name);
 }
 
-void terminal_initialize(void)
+void terminal_initialize(int sizeX, int sizeY, int bytesPerLine)
 {
-	terminal_row = 0;
-	terminal_column = 0;
-	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	terminal_buffer = (uint16_t*)0xB8000;
+	if(use_framebuffer) {
+        terminal_row = 0;
+        terminal_column = 0;
+        terminal_color = 0;
 
-    for (size_t y = 0; y < VGA_HEIGHT; y++) {
-        for (size_t x = 0; x < VGA_WIDTH; x++) {
-            const size_t index = y * VGA_WIDTH + x;
-            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        back_buffer = calloc(1, sizeY * bytesPerLine);
+
+        ssfn_src = (ssfn_font_t *) &font_data_start;
+        ssfn_dst.ptr = (uint8_t *) back_buffer;
+        ssfn_dst.p = bytesPerLine;
+        ssfn_dst.fg = 0xFFFFFFFF;
+        ssfn_dst.bg = 0;
+        ssfn_dst.w = sizeX;
+        ssfn_dst.h = sizeY;
+        ssfn_dst.x = 0;
+        ssfn_dst.y = 0;
+    } else {
+        terminal_row = 0;
+        terminal_column = 0;
+        terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        terminal_buffer = (uint16_t*)0xB8000;
+
+        for (size_t y = 0; y < VGA_HEIGHT; y++) {
+            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                const size_t index = y * VGA_WIDTH + x;
+                terminal_buffer[index] = vga_entry(' ', terminal_color);
+            }
         }
     }
 }
@@ -139,46 +167,83 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 	terminal_buffer[index] = vga_entry(c, color);
 }
 
-void terminal_rollover() {
-    for (size_t y = 1; y < VGA_HEIGHT; y++) {
-        for (size_t x = 0; x < VGA_WIDTH; x++) {
-            const size_t index = y * VGA_WIDTH + x;
-            const size_t new_index = (y-1) * VGA_WIDTH + x;
-
-            terminal_buffer[new_index] = terminal_buffer[index];
-        }
+void terminal_swap() {
+    if(use_framebuffer) {
+        memcpy(terminal_buffer, back_buffer, ssfn_dst.y * ssfn_dst.p);
     }
+}
 
-    for(int x = 0; x < VGA_WIDTH; x++) {
-        const size_t index = 24 * VGA_WIDTH + x;
+void terminal_rollover() {
+    if(use_framebuffer) {
+        //NOT IMPLEMENTED
+    } else {
+        for (size_t y = 1; y < VGA_HEIGHT; y++) {
+            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                const size_t index = y * VGA_WIDTH + x;
+                const size_t new_index = (y-1) * VGA_WIDTH + x;
 
-        terminal_buffer[index] = vga_entry(' ', terminal_color);
+                terminal_buffer[new_index] = terminal_buffer[index];
+            }
+        }
+
+        for(int x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = 24 * VGA_WIDTH + x;
+
+            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        }
     }
 }
 
 void terminal_putchar(char c)
 {
-    if(c == '\b') {
-        terminal_column--;
-        return;
-    }
+    if(use_framebuffer) {
+        /*if(c == '\b') {
+            ssfn_dst.x--;
 
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+            if(ssfn_dst.x < 0) {
+                ssfn_dst.x = 0;
+                ssfn_dst.y--;
 
-	if (++terminal_column == VGA_WIDTH || c == '\n') {
-		terminal_column = 0;
-		if (++terminal_row == VGA_HEIGHT) {
-            //Instead of moving up we a
-            terminal_rollover();
-            terminal_row = VGA_HEIGHT - 1;
+                if(ssfn_dst.y < 0) {
+                    ssfn_dst.y = 0;
+                }
+            }
+            return;
+        }*/
+
+        int err = ssfn_putc(c);
+
+        if(err < 0) {
+            serial_printf("Print error: %d", err);
         }
-	}
+
+        /*if (++ssfn_dst.x == terminal_width || c == '\n') {
+            ssfn_dst.x = 0;
+            if (++ssfn_dst.y == terminal_height) {
+                //Instead of moving up we a
+                terminal_rollover();
+                terminal_row = terminal_height - 1;
+            }
+        }*/
+    } else {
+        terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+
+        if (++terminal_column == VGA_WIDTH || c == '\n') {
+            terminal_column = 0;
+            if (++terminal_row == VGA_HEIGHT) {
+                //Instead of moving up we a
+                terminal_rollover();
+                terminal_row = VGA_HEIGHT - 1;
+            }
+        }
+    }
 }
 
 void terminal_write(const char* data, size_t size)
 {
 	for (size_t i = 0; i < size; i++)
 		terminal_putchar(data[i]);
+    terminal_swap();
 }
 
 void terminal_writestring(const char* data)
@@ -187,12 +252,22 @@ void terminal_writestring(const char* data)
 }
 
 void terminal_resetline() {
-    terminal_column = 0;
+    if(use_framebuffer) {
+        ssfn_dst.x = 0;
 
-    for(int x = 0; x < VGA_WIDTH; x++) {
-        const size_t index = terminal_row * VGA_WIDTH + x;
+        for(int i = 0; i < ssfn_dst.p; i++) {
+            ssfn_putc(' ');
+        }
 
-        terminal_buffer[index] = vga_entry(' ', terminal_color);
+        ssfn_dst.x = 0;
+    } else {
+        terminal_column = 0;
+
+        for(int x = 0; x < VGA_WIDTH; x++) {
+            const size_t index = terminal_row * VGA_WIDTH + x;
+
+            terminal_buffer[index] = vga_entry(' ', terminal_color);
+        }
     }
 }
 
@@ -243,6 +318,7 @@ static bool print(const char* data, size_t length) {
     const unsigned char* bytes = (const unsigned char*) data;
     for (size_t i = 0; i < length; i++)
         terminal_putchar(bytes[i]);
+    terminal_swap();
     return true;
 }
 
@@ -265,8 +341,7 @@ int printf(const char* restrict format, ...) {
                 // TODO: Set errno to EOVERFLOW.
                 return -1;
             }
-            if (!print(format, amount))
-                return -1;
+            print(format, amount);
             format += amount;
             written += amount;
             continue;
@@ -347,7 +422,6 @@ extern void syscall_init();
 void kernel_main(unsigned long magic, unsigned long header)
 {
 	/* Initialize terminal interface */
-	terminal_initialize();
     if(serial_init()) {
         printf("No serial.");
 
@@ -368,8 +442,7 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     size = *(unsigned *) header;
 
-    serial_printf("Colonel version 0.0.0 starting up...\n");
-    printf("Colonel version 0.0.0-3 starting up...\n");
+    struct multiboot_tag_framebuffer* tagfb;
 
     //Multiboot parsing
     for (tag = (struct multiboot_tag *) (header + 8);
@@ -377,40 +450,40 @@ void kernel_main(unsigned long magic, unsigned long header)
          tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                          + ((tag->size + 7) & ~7)))
     {
-        printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
+        serial_printf ("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
         switch (tag->type)
         {
             case MULTIBOOT_TAG_TYPE_CMDLINE:
-                printf ("Command line = %s\n",
-                        ((struct multiboot_tag_string *) tag)->string);
+                serial_printf ("Command line = %s\n",
+                               ((struct multiboot_tag_string *) tag)->string);
                 break;
             case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
-                printf ("Boot loader name = %s\n",
-                        ((struct multiboot_tag_string *) tag)->string);
+                serial_printf ("Boot loader name = %s\n",
+                               ((struct multiboot_tag_string *) tag)->string);
                 break;
             case MULTIBOOT_TAG_TYPE_MODULE:
-                printf ("Module at 0x%x-0x%x. Command line %s\n",
-                        ((struct multiboot_tag_module *) tag)->mod_start,
-                        ((struct multiboot_tag_module *) tag)->mod_end,
-                        ((struct multiboot_tag_module *) tag)->cmdline);
+                serial_printf ("Module at 0x%x-0x%x. Command line %s\n",
+                               ((struct multiboot_tag_module *) tag)->mod_start,
+                               ((struct multiboot_tag_module *) tag)->mod_end,
+                               ((struct multiboot_tag_module *) tag)->cmdline);
                 if(((struct multiboot_tag_module *) tag)->mod_end > kernel_end) {
                     kernel_end = ((struct multiboot_tag_module *) tag)->mod_end;
                 }
                 break;
             case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-                printf ("mem_lower = %uKB, mem_upper = %uKB\n",
-                        ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
-                        ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);
+                serial_printf ("mem_lower = %uKB, mem_upper = %uKB\n",
+                               ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
+                               ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);
                 break;
             case MULTIBOOT_TAG_TYPE_BOOTDEV:
-                printf ("Boot device 0x%x,%u,%u\n",
-                        ((struct multiboot_tag_bootdev *) tag)->biosdev,
-                        ((struct multiboot_tag_bootdev *) tag)->slice,
-                        ((struct multiboot_tag_bootdev *) tag)->part);
+                serial_printf ("Boot device 0x%x,%u,%u\n",
+                               ((struct multiboot_tag_bootdev *) tag)->biosdev,
+                               ((struct multiboot_tag_bootdev *) tag)->slice,
+                               ((struct multiboot_tag_bootdev *) tag)->part);
                 break;
             case MULTIBOOT_TAG_TYPE_MMAP:
             {
-                printf ("mmap\n");
+                serial_printf ("mmap\n");
 
                 mmap = (struct multiboot_tag_mmap *) tag;
             }
@@ -419,11 +492,18 @@ void kernel_main(unsigned long magic, unsigned long header)
             {
                 multiboot_uint32_t color;
                 unsigned i;
-                struct multiboot_tag_framebuffer *tagfb
+                tagfb
                         = (struct multiboot_tag_framebuffer *) tag;
                 void *fb = (void *) (unsigned long) tagfb->common.framebuffer_addr;
+
+                if(tagfb->common.framebuffer_type == 2) {
+                    terminal_initialize(80, 25, 0);
+                    break;
+                }
+
+                use_framebuffer = true;
             }
-            break;
+                break;
             case MULTIBOOT_TAG_TYPE_ACPI_OLD:
             {
                 struct multiboot_tag_old_acpi* acpi = (struct multiboot_tag_old_acpi*) tag;
@@ -441,6 +521,14 @@ void kernel_main(unsigned long magic, unsigned long header)
     //Setup Memory Management
     memmgr_init(mmap, kernel_end);
 
+    if(use_framebuffer) {
+        terminal_buffer = (uint16_t *) memmgr_get_from_physical((unsigned long) tagfb->common.framebuffer_addr);
+        terminal_initialize(tagfb->common.framebuffer_width, tagfb->common.framebuffer_height, tagfb->common.framebuffer_pitch); //Re-initialize the terminal
+    }
+
+    serial_printf("Colonel version 0.0.0-4 starting up...\n");
+    printf("Colonel version 0.0.0-4 starting up...\n");
+
     //Setup interrupts
     idt_install();
     pic_setup();
@@ -452,8 +540,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     alloc_register_object_size(sizeof(list_entry_t));
     alloc_register_object_size(sizeof(list_t));
     alloc_register_object_size(sizeof(process_t));
-
-    __asm__ volatile ("sti"); // set the interrupt flag
+    alloc_register_object_size(sizeof(message_t));
 
     //Setup filesystem and modules
     vfs_install();
@@ -475,6 +562,9 @@ void kernel_main(unsigned long magic, unsigned long header)
                         ((struct multiboot_tag_module *) tag)->cmdline);
 
                 if(strcmp(((struct multiboot_tag_module *) tag)->cmdline, "tarfs") == 0) {
+                    for(int i = 0; i < ((struct multiboot_tag_module *) tag)->mod_end - ((struct multiboot_tag_module *) tag)->mod_start; i += 4096) {
+                        memmgr_phys_mark_page(ADDRESS_TO_PAGE(((uintptr_t) ((struct multiboot_tag_module *) tag)->mod_start) + i));
+                    }
                     tarfs_init("/", memmgr_get_from_physical((uintptr_t) ((struct multiboot_tag_module *) tag)->mod_start), ((struct multiboot_tag_module *) tag)->mod_end - ((struct multiboot_tag_module *) tag)->mod_start);
                 }
                 break;
@@ -513,6 +603,8 @@ void kernel_main(unsigned long magic, unsigned long header)
     file_node_t* console0 = open("/dev/console0", 0);
     file_handle_t* hConsole = create_handle(console0);
     write(hConsole, "test", strlen("test")+1);
+
+    __asm__ volatile ("sti"); // set the interrupt flag
 
     process_init();
     process_create_idle();

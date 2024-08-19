@@ -11,6 +11,11 @@ kernel_arch_objs = [
     'pit.c',
 ]
 
+# Copy the font file to the build directory
+font_file = 'unifont.sfn'
+fs = import('fs')
+font_data = fs.copyfile(font_file)
+
 # Convert the list of source files to full paths
 kernel_arch_objs = files(kernel_arch_objs)
 
@@ -19,6 +24,7 @@ kernel_arch_nasm_sources = [
     'idt.S',
     'gdt.S',
     'memmgr.S',
+    'font.S',
 ]
 
 kernel_arch_nasm_sources = files(kernel_arch_nasm_sources)

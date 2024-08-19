@@ -38,14 +38,18 @@ align 8
         dw 0
         dw 12
         dd 3
-framebuffer_tag_start:
+align 8
         dw MULTIBOOT_HEADER_TAG_FRAMEBUFFER
-        dw MULTIBOOT_HEADER_TAG_OPTIONAL
-        dd framebuffer_tag_end - framebuffer_tag_start
-        dd 85
-        dd 25
+        dw 0
+        dd 20
+        dd 1024
+        dd 768
+        dd 32
+align 8
+        dw 4
+        dw 0
+        dd 12
         dd 0
-framebuffer_tag_end:
 align 8
         dw MULTIBOOT_HEADER_TAG_END
         dw 0
@@ -229,6 +233,10 @@ PAGE_USER     equ 1 << 2
     mov QWORD [rdi], 0x8007
     add rdi, 8
     mov QWORD [rdi], 0x9007
+    add rdi, 8
+    mov QWORD [rdi], 0xA007
+    add rdi, 8
+    mov QWORD [rdi], 0xB007
     mov rdi, 0x8000
 
     extern _bootstrap_end
@@ -237,7 +245,7 @@ PAGE_USER     equ 1 << 2
     mov rbx, _bootstrap_end
     or rbx, PAGE_PRESENT
     or rbx, PAGE_WRITABLE
-    mov rcx, 1024                 ; Set the C-register to 1024 to map the next 4 MB.
+    mov rcx, 2048                 ; Set the C-register to 2048 to map the next 8 MB.
 
 .SetEntryLM:
     mov QWORD [rdi], rbx         ; Set the uint32_t at the destination index to the B-register.

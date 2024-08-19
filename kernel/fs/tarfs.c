@@ -5,6 +5,7 @@
 #include "../terminal.h"
 #include "../../libc/include/kernel/list.h"
 #include "../../libc/include/kernel/tree.h"
+#include "../memmgr.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -130,7 +131,6 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             if(count <= 1) {
                 if(strcmp(filename, name) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
-                    node_context->type = TARFS_TYPE;
                     node_context->fs = context->fs;
                     node_context->entry = current;
 
@@ -183,7 +183,6 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             if(count <= 1) {
                 if(strcmp(filename, path) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
-                    ode_context->type = TARFS_TYPE;
                     node_context->fs = context->fs;
                     node_context->entry = current;
 
@@ -460,7 +459,7 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
 
     bool read = true;
 
-    printf("Trying to load filesystem\n");
+    printf("Trying to load filesystem at 0x%x\n", buf);
 
     while(read && buf < ((uintptr_t)ptr + bufsize)) {
         previous = current;

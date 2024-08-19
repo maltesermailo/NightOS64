@@ -23,7 +23,7 @@ struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     slab->object_size = sizeClass->size;
 
     slab->memory = sbrk(4096);
-    slab->bitmap = malloc(bitmapSize);
+    slab->bitmap = calloc(1, bitmapSize);
 
     struct slab* ptr = sizeClass->slabs;
     if(ptr == NULL) {

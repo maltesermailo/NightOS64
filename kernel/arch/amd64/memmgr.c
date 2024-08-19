@@ -8,12 +8,10 @@
 #include "../../terminal.h"
 #include "../../proc/process.h"
 #include "../../lock.h"
+#include "../../serial.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-#define ADDRESS_TO_PAGE(addr) ((addr >> 12))
-#define PAGE_TO_ADDRESS(page) ((page << 12))
 
 #define PAGE_PRESENT 1 << 0
 #define PAGE_WRITABLE 1 << 1
@@ -29,10 +27,10 @@
 #define LOW_MEMORY 0x7fffffffffull
 
 /**** FUNCTIONS FOR PAGE ID *********/
-#define PML4_INDEX(addr) ((addr) >> 39 & 0x1FF)
-#define PDP_INDEX(addr) ((addr) >> 30 & 0x1FF)
-#define PD_INDEX(addr) ((addr) >> 21 & 0x1FF)
-#define PT_INDEX(addr) ((addr) >> 12 & 0x1FF)
+#define PML4_INDEX(addr) (((addr) >> 39) & 0x1FF)
+#define PDP_INDEX(addr) (((addr) >> 30) & 0x1FF)
+#define PD_INDEX(addr) (((addr) >> 21) & 0x1FF)
+#define PT_INDEX(addr) (((addr) >> 12) & 0x1FF)
 #define PAGE_INDEX(addr) ((addr) & 0x1FF)
 
 #define PAGE_MASK 0xfffffffffffff000ull
@@ -221,8 +219,10 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
-    //printf("Virtual addr: 0x%x\n", virtualAddr);
-    //printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
+#ifdef DEBUG
+    printf("Virtual addr: 0x%x\n", virtualAddr);
+    printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
+#endif
 
     uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
@@ -242,6 +242,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
         pageMap[INDEX_PML4] = pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectoryPointer = (uint64_t*)(pdp_frame | KERNEL_MEMORY);
+        memset(pageDirectoryPointer, 0, 0x1000);
     }
 
     uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
@@ -254,6 +255,7 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectory = (uint64_t*)(pd_frame | KERNEL_MEMORY);
+        memset(pageDirectory, 0, 0x1000);
     }
 
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
@@ -269,12 +271,15 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
 #endif
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
+        memset(pageTable, 0, 0x1000);
     }
 
     //If page doesnt exist, either return or try to create
     if(pageTable[INDEX_PT] == 0) {
         if(!create) return NULL;
-        //printf("Creating new page\n");
+#ifdef DEBUG
+        printf("Creating new page\n");
+#endif
         pageTable[INDEX_PT] = kalloc_frame() | PAGE_PRESENT | PAGE_WRITABLE | flags;
     }
 
@@ -443,6 +448,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
         pageMap[INDEX_PML4] = pdp_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectoryPointer = (uint64_t*)(pdp_frame | KERNEL_MEMORY);
+        memset(pageDirectoryPointer, 0, 0x1000);
     }
 
     uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
@@ -452,6 +458,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
         pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
 
         pageDirectory = (uint64_t*)(pd_frame | KERNEL_MEMORY);
+        memset(pageDirectory, 0, 0x1000);
     }
 
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
@@ -463,6 +470,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
         //printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
+        memset(pageTable, 0, 0x1000);
     }
 
     pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | flags;
@@ -528,6 +536,10 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
                 count++;
             }
 
+#ifdef DEBUG
+            printf("Start addr: %x\n", start_addr);
+#endif
+
             //Create the actual pages and reload the TLB at that location
             for(size_t i = 0; i < count; i++) {
                 memmgr_create_or_get_page(start_addr + 0x1000 * i, 0, 1);
@@ -578,6 +590,8 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
         for(size_t i = 0; i < count; i++) {
             memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER, 1);
             memmgr_reload((uintptr_t)addr + 0x1000 * i);
+
+            memset(addr + 0x1000 * i, 0, 0x1000);
         }
 
         return addr;
@@ -658,6 +672,7 @@ void* sbrk(intptr_t len) {
 
     if(len > 0) {
         //Map new kernel space
+        //printf("Mapping from %d to %d\n", kernel_heap_length, kernel_heap_length + len);
         ptr = mmap(0, kernel_heap_length + len, true) + kernel_heap_length;
     } else {
         //Unmap kernel space
@@ -813,7 +828,7 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
     }
 }
 
-bool memmgr_check_user(uintptr_t virtualAddr) {
+bool __attribute__((optimize("O0"))) memmgr_check_user(uintptr_t virtualAddr) {
     uint64_t INDEX_PML4 = PML4_INDEX(virtualAddr);
     uint64_t INDEX_PDP = PDP_INDEX(virtualAddr);
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
@@ -832,7 +847,7 @@ bool memmgr_check_user(uintptr_t virtualAddr) {
 
     uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
 
-    if((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_USER || pageDirectory == 0) {
+    if(!((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_USER) || pageDirectory == 0) {
         return false;
     }
 
@@ -842,7 +857,7 @@ bool memmgr_check_user(uintptr_t virtualAddr) {
 
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
-    if((uintptr_t)pageDirectory[INDEX_PD] & PAGE_USER || pageTable == 0) {
+    if(!((uintptr_t)pageDirectory[INDEX_PD] & PAGE_USER) || pageTable == 0) {
         return false;
     }
 
@@ -900,7 +915,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
          mmap = (multiboot_memory_map_t *)
                  ((unsigned long) mmap
                   + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
-        printf("Mmap start: 0x%x, Mmap end: 0x%x, Mmap size: %d, Mmap type: %d \n", mmap->addr, mmap->addr + mmap->len, mmap->len, mmap->type);
+        serial_printf("Mmap start: 0x%x, Mmap end: 0x%x, Mmap size: %d, Mmap type: %d \n", mmap->addr, mmap->addr + mmap->len, mmap->len, mmap->type);
 
         if(mmap->type != MULTIBOOT_MEMORY_AVAILABLE) {
             for(unsigned long i = mmap->addr; i < mmap->addr + mmap->len; i += 0x1000) {
@@ -918,7 +933,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     //Apply Identity Mapping for the entire supported address space
     uint64_t* IDENTITY_MAP_PD_TEMP = (uint64_t *) ((uintptr_t) IDENTITY_MAP_PD - 0xffffff0000000000ull);
 
-    printf("IDENTITY MAP LOC: 0x%x\n", IDENTITY_MAP_PD_TEMP);
+    serial_printf("IDENTITY MAP LOC: 0x%x\n", IDENTITY_MAP_PD_TEMP);
 
     for(uint64_t i = 0; i < 512; i++) {
         IDENTITY_MAP_PD_TEMP[i] = 0;
