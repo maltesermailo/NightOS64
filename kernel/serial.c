@@ -59,8 +59,15 @@ void write_serial(char a) {
 
 static bool serial_print(const char* data, size_t length) {
     const unsigned char* bytes = (const unsigned char*) data;
-    for (size_t i = 0; i < length; i++)
+    for (size_t i = 0; i < length; i++) {
+        if(bytes[i] == '\n') {
+            write_serial('\r');
+            write_serial('\n');
+            continue;
+        }
+
         write_serial(bytes[i]);
+    }
     return true;
 }
 

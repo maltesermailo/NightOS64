@@ -136,14 +136,16 @@ iso_limine_target = custom_target('nightos-limine.iso',
                                'mkdir -p isodir/boot/EFI/ &&' +
                                'cp limine.conf isodir/boot/limine/ && ' +
                                'cp ' + kernel.full_path() + ' isodir/boot/ &&' +
-                               'tar -cvf rootfs.tar initd test.txt && ' +
+                               'cd sysroot/ && ' +
+                               'tar -cvf ../rootfs.tar * && ' +
+                               'cd .. &&' +
                                'cp rootfs.tar isodir/boot/ && ' +
                                'cp -v ../limine/bin/limine-bios.sys ../limine/bin/limine-bios-cd.bin ../limine/bin/limine-uefi-cd.bin isodir/boot/limine/ &&' +
                                'cp -v ../limine/bin/BOOTX64.EFI isodir/EFI/BOOT/ &&' +
                                'xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin --no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine/limine-uefi-cd.bin --efi-boot-part --efi-boot-image --protective-msdos-label isodir -o ' + meson.current_build_dir() + '/@OUTPUT@ && ' +
                                'rm -rf rootfs.tar'
                            ],
-                           depends : kernel,
+                           depends : iso_target,
                            build_by_default : true
 )
 

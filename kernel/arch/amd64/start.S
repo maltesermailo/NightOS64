@@ -49,7 +49,7 @@ align 8
         dw 4
         dw 0
         dd 12
-        dd 0
+        dd 1
 align 8
         dw MULTIBOOT_HEADER_TAG_END
         dw 0
@@ -184,6 +184,10 @@ _start:
     mov DWORD [edi], 0x00600083
     add edi, 8
     mov DWORD [edi], 0x00800083
+    add edi, 8
+    mov DWORD [edi], 0x00A00083
+    add edi, 8
+    mov DWORD [edi], 0x00B00083
 
 	; Enable paging
     mov eax, cr4                 ; Set the A-register to control register 4.
@@ -252,9 +256,6 @@ PAGE_USER     equ 1 << 2
     add rbx, 0x1000              ; Add 0x1000 to the B-register.
     add rdi, 8                   ; Add eight to the destination index.
     loop .SetEntryLM             ; Set the next entry.
-
-    mov rdi, 0x1FF8
-    mov QWORD [rdi], 0x1003
 
     mov ax, GDT64.Data
     mov ds, ax                    ; Set the data segment to the A-register.

@@ -16,7 +16,7 @@ make install-libs
 
 #cd ../
 cd ../mlibc/
-meson setup --wipe --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=false -Ddefault_library=both build
+meson setup --wipe --cross-file ../nightos-meson-target.txt --prefix="$PREFIX" -Dheaders_only=false -Ddefault_library=both -Dlinux_kernel_headers=/usr/include build
 meson build
 cd ./build/
 ninja -v

@@ -169,7 +169,7 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 
 void terminal_swap() {
     if(use_framebuffer) {
-        memcpy(terminal_buffer, back_buffer, ssfn_dst.y * ssfn_dst.p);
+        memcpy(terminal_buffer, back_buffer, ssfn_dst.h * ssfn_dst.p);
     }
 }
 
@@ -520,9 +520,12 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     //Setup Memory Management
     memmgr_init(mmap, kernel_end);
+    idt_install();
 
     if(use_framebuffer) {
-        terminal_buffer = (uint16_t *) memmgr_get_from_physical((unsigned long) tagfb->common.framebuffer_addr);
+        memmgr_map_mmio((unsigned long) tagfb->common.framebuffer_addr, tagfb->common.framebuffer_height * tagfb->common.framebuffer_pitch, FLAG_WC, false);
+        terminal_buffer = (uint16_t *) memmgr_get_mmio((unsigned long) tagfb->common.framebuffer_addr);
+
         terminal_initialize(tagfb->common.framebuffer_width, tagfb->common.framebuffer_height, tagfb->common.framebuffer_pitch); //Re-initialize the terminal
     }
 
@@ -530,7 +533,6 @@ void kernel_main(unsigned long magic, unsigned long header)
     printf("Colonel version 0.0.0-4 starting up...\n");
 
     //Setup interrupts
-    idt_install();
     pic_setup();
     irq_install();
     ps2_init();

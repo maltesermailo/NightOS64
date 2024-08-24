@@ -22,6 +22,13 @@
 #define ADDRESS_TO_PAGE(addr) ((addr >> 12))
 #define PAGE_TO_ADDRESS(page) ((page << 12))
 
+#define FLAG_WB 0x0
+#define FLAG_WT 0x8
+#define FLAG_UCMINUS 0x10
+#define FLAG_UC 0x18
+#define FLAG_WP 0x80
+#define FLAG_WC 0x88
+
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 
@@ -53,9 +60,11 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew);
  */
 void* memmgr_get_current_pml4();
 void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create);
+bool memmgr_change_flags(uintptr_t virt, int flags);
+bool memmgr_change_flags_bulk(uintptr_t virt, int pages, int flags);
 void memmgr_clear_page_map(uintptr_t pageMap);
 
-void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel);
+void* memmgr_map_mmio(uintptr_t addr, size_t len, int flags, bool is_kernel);
 void* memmgr_get_mmio(uintptr_t addr);
 
 void load_page_map(uintptr_t pageMap);

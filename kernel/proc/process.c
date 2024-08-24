@@ -24,6 +24,17 @@
             stack += sizeof(type);     \
 }
 
+char* push_string_to_userstack(uintptr_t* stack, const char* str) {
+    size_t len = strlen(str) + 1;  // Include null terminator
+
+    // Decrease stack and align to 8 bytes
+    *stack -= len;
+    *stack &= ~7ULL;
+
+    // Copy the string to the stack
+    memcpy((void*)*stack, str, len);
+}
+
 static struct process_control_block pcb; //currently the only one, we're running single core
 static int id_generator = 1;
 list_t* process_list;
@@ -150,8 +161,11 @@ void process_create_task(char* path, bool is_kernel) {
 
     printf("Before 0x%x\n", userStack);
 
+    push_string_to_userstack(&userStack, "PATH=/bin");
+    uintptr_t envp = userStack;
+
     PUSH_PTR(userStack, uintptr_t, 0); //ENVP ZERO
-    PUSH_PTR(userStack, uintptr_t, 0); //ENVP
+    PUSH_PTR(userStack, uintptr_t, envp);
     PUSH_PTR(userStack, uintptr_t, 0); //ARGV ZERO
     PUSH_PTR(userStack, uintptr_t, 0); //ARGC
 

@@ -189,7 +189,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
 }
 
 void ahci_setup(void* abar, uint16_t interruptVector) {
-    abar = memmgr_map_mmio((uintptr_t)abar, 0x2000, true); //ABAR needs a full page for each port and about 512 bytes for the HBA mem
+    abar = memmgr_map_mmio((uintptr_t)abar, 0x2000, FLAG_UCMINUS, true); //ABAR needs a full page for each port and about 512 bytes for the HBA mem
 
     HBA_MEM* mem = (HBA_MEM*) abar;
     hba = mem;

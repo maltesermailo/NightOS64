@@ -438,6 +438,11 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
     uint64_t* pageMap = memmgr_get_current_pml4();
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
+    int pageFlags = flags;
+    //Clear bits that might be different for other page levels
+    //TODO: Find a way to set flags for all levels equally
+    flags &= 0x3f;
+
     if(pageMap[INDEX_PML4] == 0) {
         uintptr_t pdp_frame = kalloc_frame();
 
@@ -473,7 +478,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
         memset(pageTable, 0, 0x1000);
     }
 
-    pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | flags;
+    pageTable[INDEX_PT] = frame_addr | PAGE_PRESENT | PAGE_WRITABLE | pageFlags;
 }
 
 /***
@@ -486,13 +491,12 @@ void memmgr_reload(uintptr_t addr) {
             : : "r"(addr));
 }
 
-void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel) {
+void* memmgr_map_mmio(uintptr_t addr, size_t len, int flags, bool is_kernel) {
     if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
         addr = (uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
     }
 
     //Map as NO_CACHE because Memory-Mapped I/O has to be always fetched new.
-    int flags = PAGE_WRITABLE | PAGE_NOCACHE;
     if(!is_kernel) flags |= PAGE_USER;
 
     uintptr_t start_addr = MMIO_MEMORY + addr;
@@ -504,11 +508,134 @@ void* memmgr_map_mmio(uintptr_t addr, size_t len, bool is_kernel) {
 
     for(size_t i = 0; i < count+1; i++) {
         memmgr_map_frame_to_virtual(addr + 0x1000 * i, start_addr + 0x1000 * i, flags);
-        memmgr_reload(start_addr + 0x1000 * i);
-        printf("Mapped %d\n", i);
     }
 
     return (void*)start_addr;
+}
+
+bool memmgr_change_flags(uintptr_t virt, int flags) {
+    uint64_t INDEX_PML4 = PML4_INDEX(virt);
+    uint64_t INDEX_PDP = PDP_INDEX(virt);
+    uint64_t INDEX_PD = PD_INDEX(virt);
+    uint64_t INDEX_PT = PT_INDEX(virt);
+
+    uint64_t* pagePtr = null;
+
+    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
+
+    if(pageDirectoryPointer == 0) {
+        return false;
+    }
+
+    if((uintptr_t)pageMap[INDEX_PML4] & PAGE_LARGE) {
+        pagePtr = (uint64_t *) pageMap[INDEX_PML4];
+        goto _done;
+    }
+
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
+
+    if(pageDirectory == 0) {
+        return false;
+    }
+
+    if((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
+        pagePtr = (uint64_t *) pageDirectoryPointer[INDEX_PDP];
+        goto _done;
+    }
+
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
+
+    if(pageTable == 0) {
+        return false;
+    }
+
+    if((uintptr_t)pageDirectory[INDEX_PD] & PAGE_LARGE) {
+        pagePtr = (uint64_t *) pageDirectoryPointer[INDEX_PDP];
+        goto _done;
+    }
+
+    pagePtr = (uint64_t *) pageTable[INDEX_PT];
+
+_done:
+    *pagePtr |= flags;
+
+    return true;
+}
+
+uint8_t memmgr_get_page_level(uintptr_t virt) {
+    uint64_t INDEX_PML4 = PML4_INDEX(virt);
+    uint64_t INDEX_PDP = PDP_INDEX(virt);
+    uint64_t INDEX_PD = PD_INDEX(virt);
+    uint64_t INDEX_PT = PT_INDEX(virt);
+
+    uint64_t* pagePtr = null;
+
+    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
+
+    if(pageDirectoryPointer == 0) {
+        return -1;
+    }
+
+    if((uintptr_t)pageMap[INDEX_PML4] & PAGE_LARGE) {
+        return 3;
+    }
+
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
+
+    if(pageDirectory == 0) {
+        return -1;
+    }
+
+    if((uintptr_t) pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
+        return 2;
+    }
+
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
+
+    if(pageTable == 0) {
+        return -1;
+    }
+
+    if((uintptr_t)pageDirectory[INDEX_PD] & PAGE_LARGE) {
+        return 1;
+    }
+
+    return 0;
+}
+
+bool memmgr_change_flags_bulk(uintptr_t virt, int size, int flags) {
+    uintptr_t start_addr = virt;
+
+    for(size_t i = 0; i < size;) {
+        uintptr_t page_level = memmgr_get_page_level(virt);
+
+        if(!memmgr_change_flags(start_addr + i, flags)) {
+            return false;
+        }
+
+        switch(page_level) {
+            case 3:
+                i += 0x8000000000;
+                break;
+            case 2:
+                i += 0x40000000;
+                break;
+            case 1:
+                i += 0x200000;
+                break;
+            case 0:
+                i += 0x1000;
+                break;
+            default:
+                break;
+        }
+
+        memmgr_reload(start_addr + i);
+    }
+
+    return true;
 }
 
 /**
@@ -543,7 +670,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             //Create the actual pages and reload the TLB at that location
             for(size_t i = 0; i < count; i++) {
                 memmgr_create_or_get_page(start_addr + 0x1000 * i, 0, 1);
-                memmgr_reload(start_addr + 0x1000 * i);
+                //memmgr_reload(start_addr + 0x1000 * i);
             }
 
             return (void*)start_addr;
@@ -567,7 +694,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             //Create the actual pages and reload the TLB at that location
             for(size_t i = 0; i < count; i++) {
                 memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER, 1);
-                memmgr_reload(start_addr + 0x1000 * i);
+                //memmgr_reload(start_addr + 0x1000 * i);
             }
 
             return (void*)start_addr;
@@ -589,7 +716,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
         //Create the actual pages and reload the TLB at that location
         for(size_t i = 0; i < count; i++) {
             memmgr_create_or_get_page((uintptr_t)addr + 0x1000 * i, is_kernel ? 0 : PAGE_USER, 1);
-            memmgr_reload((uintptr_t)addr + 0x1000 * i);
+            //memmgr_reload((uintptr_t)addr + 0x1000 * i);
 
             memset(addr + 0x1000 * i, 0, 0x1000);
         }
@@ -897,6 +1024,14 @@ void memmgr_dump() {
             }
         }
     }
+}
+
+void memmgr_init_pat() {
+    uintptr_t value = 0x10500070406;
+    uint32_t high = value >> 32;
+    uint32_t low = value;
+
+    __asm__ volatile("wrmsr" : : "a"(low), "d"(high), "c"(0x277));
 }
 
 void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {

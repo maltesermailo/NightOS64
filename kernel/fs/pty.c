@@ -140,6 +140,8 @@ int pty_master_write(file_node_t *node, char *buffer, size_t size, size_t offset
 static void echo_char(struct pty_data *pty, int pty_index, char c) {
     if (pty->console) {
         terminal_putchar(c);
+        terminal_swap();
+        __asm__ volatile ("mfence");
     } else {
         pty_write(pty_get_slave(pty_index), &c, 1, 0);
     }
