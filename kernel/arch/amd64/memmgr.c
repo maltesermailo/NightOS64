@@ -1085,6 +1085,7 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
 
     //Reload PML to apply our mappings
     reloadPML();
+    memmgr_init_pat();
 
     //Register commonly used memory structures
 

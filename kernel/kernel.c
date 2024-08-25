@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
+#include <xmmintrin.h>
 #include "multiboot2.h"
 #include "memmgr.h"
 #include "gdt.h"
@@ -167,9 +168,32 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 	terminal_buffer[index] = vga_entry(c, color);
 }
 
+void wc_memcpy(void *dst, const void *src, size_t n) {
+    unsigned long long *d = (unsigned long long *)dst;
+    const unsigned long long *s = (const unsigned long long *)src;
+    size_t count = n / sizeof(unsigned long long);
+
+    while (count >= 4) {
+        __builtin_prefetch(s + 4, 0, 0);
+        unsigned long long v1 = *s++;
+        unsigned long long v2 = *s++;
+        unsigned long long v3 = *s++;
+        unsigned long long v4 = *s++;
+        *d++ = v1;
+        *d++ = v2;
+        *d++ = v3;
+        *d++ = v4;
+        count -= 4;
+    }
+    while (count--) {
+        *d++ = *s++;
+    }
+    __asm__ volatile("mfence" ::: "memory");
+}
+
 void terminal_swap() {
     if(use_framebuffer) {
-        memcpy(terminal_buffer, back_buffer, ssfn_dst.h * ssfn_dst.p);
+        wc_memcpy(terminal_buffer, back_buffer, ssfn_dst.h * ssfn_dst.p);
     }
 }
 
@@ -318,7 +342,6 @@ static bool print(const char* data, size_t length) {
     const unsigned char* bytes = (const unsigned char*) data;
     for (size_t i = 0; i < length; i++)
         terminal_putchar(bytes[i]);
-    terminal_swap();
     return true;
 }
 
@@ -354,6 +377,7 @@ int printf(const char* restrict format, ...) {
             char c = (char) va_arg(parameters, int /* char promotes to int */);
             if (!maxrem) {
                 // TODO: Set errno to EOVERFLOW.
+                terminal_swap();
                 return -1;
             }
             if (!print(&c, sizeof(c)))
@@ -365,6 +389,7 @@ int printf(const char* restrict format, ...) {
             size_t len = strlen(str);
             if (maxrem < len) {
                 // TODO: Set errno to EOVERFLOW.
+                terminal_swap();
                 return -1;
             }
             if (!print(str, len))
@@ -388,6 +413,7 @@ int printf(const char* restrict format, ...) {
             size_t len = strlen(format);
             if (maxrem < len) {
                 // TODO: Set errno to EOVERFLOW.
+                terminal_swap();
                 return -1;
             }
             if (!print(format, len))
@@ -397,6 +423,7 @@ int printf(const char* restrict format, ...) {
         }
     }
 
+    terminal_swap();
     va_end(parameters);
     return written;
 }
@@ -610,7 +637,7 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     process_init();
     process_create_idle();
-    process_create_task("/initd", false);
+    process_create_task("/bin/bash", false);
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");

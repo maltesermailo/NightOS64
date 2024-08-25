@@ -96,6 +96,7 @@ void process_create_task(char* path, bool is_kernel) {
 
     if(node == NULL) {
         printf("Error: can't open %s\n", path);
+        panic();
         return;
     }
 

@@ -10,7 +10,7 @@
 #include "../proc/process.h"
 
 void ramfs_init(char* path) {
-    char* file_name = strrchr(path, '/'); //Get file name
+    char* file_name = strrchr(path, '/')+1; //Get file name
 
     file_node_t* root = calloc(1, sizeof(file_node_t));
 

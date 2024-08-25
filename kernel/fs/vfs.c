@@ -298,10 +298,10 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                     if(outFileName != NULL) {
                         *outFileName = strdup(name);
                     }
-                }
 
-                free(file);
-                return NULL;
+                    free(file);
+                    return NULL;
+                }
             }
         }
     } while(pch != null);

@@ -120,6 +120,8 @@ void vfs_test() {
         printf("Entry: %s, %d, %d\n", ptr[i].name, ptr[i].type, ptr[i].size);
     }
 
+    free(ptr);
+
     file_node_t* test = open("/test.txt", 0);
     file_handle_t* handle = create_handle(test);
 

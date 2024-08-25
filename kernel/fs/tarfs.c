@@ -128,6 +128,10 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                 }
             }
 
+            if(filename[strlen(filename)-1] == '/') {
+                filename[strlen(filename)-1] = '\0';
+            }
+
             if(count <= 1) {
                 if(strcmp(filename, name) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
@@ -142,6 +146,8 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     node->size = oct2bin(current->size, 11);
                     node->ref_count = 0;
                     node->file_ops.read = tarfs_read;
+                    node->file_ops.find_dir = tarfs_find_dir;
+                    node->file_ops.read_dir = tarfs_read_dir;
                     node->fs = node_context;
 
                     return node;
@@ -154,24 +160,29 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
 
         return null;
     } else {
-        tar_t* current = context->fs->root;
+        tar_t* current = context->entry;
+
+        char filename[256];
+        memset(filename, 0, 256);
+        strncat(filename, current->prefix, 155);
+        strncat(filename, current->name, 100);
+        strncat(filename, name, strlen(name));
 
         while(current) {
-            char filename[256];
-            strncat(filename, current->prefix, 155);
-            strncat(filename, current->name, 100);
-
-            //The sub path inside the tar file system, because I like mounting at subdirectories.
-            char* path = strstr(name, context->fs->root_node->full_path);
-
-            //Path is as long as root path, what happened?
-            if(strlen(path) <= strlen(context->fs->root_node->full_path)) {
-                return NULL;
+            if(filename[strlen(filename)-1] == '/') {
+                filename[strlen(filename)-1] = '\0';
             }
 
-            path += strlen(context->fs->root_node->full_path);
+            //The sub path inside the tar file system, because I like mounting at subdirectories.
+            /*char* path = strstr(name, context->fs->root_node->full_path);
 
-            printf("Finding in %s", path);
+            path += strlen(context->fs->root_node->full_path);*/
+
+            char other[256];
+            memset(other, 0, 256);
+            strncat(other, current->prefix, 155);
+            strncat(other, current->name, 100);
+            strncat(other, name, strlen(name));
 
             int count = 0;
             for(int i = 0; filename[i]; i++) {
@@ -181,7 +192,7 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             }
 
             if(count <= 1) {
-                if(strcmp(filename, path) == 0) {
+                if(strcmp(filename, other) == 0) {
                     tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
                     node_context->fs = context->fs;
                     node_context->entry = current;
@@ -194,6 +205,8 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                     node->size = oct2bin(current->size, 11);
                     node->ref_count = 0;
                     node->file_ops.read = tarfs_read;
+                    node->file_ops.find_dir = tarfs_find_dir;
+                    node->file_ops.read_dir = tarfs_read_dir;
                     node->fs = node_context;
 
                     return node;
@@ -206,6 +219,16 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
 
         return NULL;
     }
+}
+
+int count_char_occurrences(const char *str, char c) {
+    int count = 0;
+    for (int i = 0; str[i]; i++) {
+        if (str[i] == c) {
+            count++;
+        }
+    }
+    return count;
 }
 
 int tarfs_read_dir(file_node_t* node, list_dir_t* entries, int count) {
@@ -259,13 +282,20 @@ int tarfs_read_dir(file_node_t* node, list_dir_t* entries, int count) {
                 strncat(entry_name, next->prefix, 155);
                 strncat(entry_name, next->name, 100);
 
-                if(strstr(entry_name, "/") != 0) {
-                    break;
+                int len = strlen(entry_name);
+
+                if(count_char_occurrences(entry_name, '/') >= 2 || (count_char_occurrences(entry_name, '/') >= 1 && entry_name[len-1] != '/')) {
+                    next = next->next;
+                    continue;
                 }
 
                 entries[readCount].size = oct2bin(next->size, 11);
                 entries[readCount].type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-                strcpy(entries[readCount].name, entry_name);
+                if(entry_name[len-1] == '/') {
+                    strncpy(entries[readCount].name, entry_name, len-1);
+                } else {
+                    strcpy(entries[readCount].name, entry_name);
+                }
 
                 free(entry_name);
 
@@ -302,6 +332,8 @@ int tarfs_read_dir(file_node_t* node, list_dir_t* entries, int count) {
                 break;
             }
 
+            int entry_len = strlen(entry_name);
+
             char* ptr = entry_name;
             ptr += len + 1;
 
@@ -311,7 +343,11 @@ int tarfs_read_dir(file_node_t* node, list_dir_t* entries, int count) {
 
             entries[readCount].size = oct2bin(next->size, 11);
             entries[readCount].type = next->type == 0 ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-            strcpy(entries[readCount].name, ptr);
+            if(entry_name[entry_len-1] == '/') {
+                strncpy(entries[readCount].name, entry_name, len-1);
+            } else {
+                strcpy(entries[readCount].name, entry_name);
+            }
 
             readCount++;
 
@@ -454,7 +490,6 @@ void tarfs_init(char* path, void* ptr, uintptr_t bufsize) {
     tar_t* current = NULL;
     tar_t* previous = NULL;
 
-    char* newMem = malloc(bufsize); //Allocate new space, since old one might overlap
     char* buf = (char*) ptr;
 
     bool read = true;
