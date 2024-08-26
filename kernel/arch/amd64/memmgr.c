@@ -258,6 +258,11 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
         memset(pageDirectory, 0, 0x1000);
     }
 
+    if(pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
+        //Skip large page
+        return 0;
+    }
+
     uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
 
     //If PT doesnt exist, either return or try to create
@@ -272,6 +277,11 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
 
         pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
         memset(pageTable, 0, 0x1000);
+    }
+
+    if(pageDirectory[INDEX_PD] & PAGE_LARGE) {
+        //Skip large page
+        return 0;
     }
 
     //If page doesnt exist, either return or try to create
@@ -647,7 +657,7 @@ bool memmgr_change_flags_bulk(uintptr_t virt, int size, int flags) {
 void* mmap(void* addr, size_t len, bool is_kernel) {
     //Page-align
     if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
-        addr = (void*)((uintptr_t)((uintptr_t)addr + PAGE_SIZE) & ~(PAGE_SIZE - 1));
+        addr = (void*)((uintptr_t)((uintptr_t)addr) & ~(PAGE_SIZE - 1));
     }
 
     if(addr == 0) {

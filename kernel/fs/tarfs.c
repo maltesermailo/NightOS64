@@ -182,37 +182,32 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
             memset(other, 0, 256);
             strncat(other, current->prefix, 155);
             strncat(other, current->name, 100);
-            strncat(other, name, strlen(name));
 
-            int count = 0;
-            for(int i = 0; filename[i]; i++) {
-                if(filename[i] == '/') {
-                    count++;
-                }
+            if(other[strlen(other)-1] == '/') {
+                other[strlen(other)-1] = '\0';
             }
 
-            if(count <= 1) {
-                if(strcmp(filename, other) == 0) {
-                    tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
-                    node_context->fs = context->fs;
-                    node_context->entry = current;
+            printf("Other: %s\n", other);
 
-                    file_node_t* node = calloc(1, sizeof(file_node_t));
-                    strncpy(node->name, name, strlen(name));
-                    strncpy(node->full_path, filename, strlen(filename));
-                    node->id = id;
-                    node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
-                    node->size = oct2bin(current->size, 11);
-                    node->ref_count = 0;
-                    node->file_ops.read = tarfs_read;
-                    node->file_ops.find_dir = tarfs_find_dir;
-                    node->file_ops.read_dir = tarfs_read_dir;
-                    node->fs = node_context;
+            if(strcmp(filename, other) == 0) {
+                tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
+                node_context->fs = context->fs;
+                node_context->entry = current;
 
-                    return node;
-                }
+                file_node_t* node = calloc(1, sizeof(file_node_t));
+                strncpy(node->name, name, strlen(name));
+                strncpy(node->full_path, filename, strlen(filename));
+                node->id = id;
+                node->type = current->type == '0' ? FILE_TYPE_FILE : FILE_TYPE_DIR;
+                node->size = oct2bin(current->size, 11);
+                node->ref_count = 0;
+                node->file_ops.read = tarfs_read;
+                node->file_ops.find_dir = tarfs_find_dir;
+                node->file_ops.read_dir = tarfs_read_dir;
+                node->fs = node_context;
+
+                return node;
             }
-
             current = current->next;
             id++;
         }

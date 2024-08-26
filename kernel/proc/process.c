@@ -162,7 +162,7 @@ void process_create_task(char* path, bool is_kernel) {
 
     printf("Before 0x%x\n", userStack);
 
-    push_string_to_userstack(&userStack, "PATH=/bin");
+    push_string_to_userstack(&userStack, "PATH=/usr/bin");
     uintptr_t envp = userStack;
 
     PUSH_PTR(userStack, uintptr_t, 0); //ENVP ZERO

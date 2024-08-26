@@ -26,6 +26,10 @@ int sys_read(long fd, long buffer, long size) {
 
     file_handle_t* handle = proc->fd_table->handles[fd];
 
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
+
     if(handle == NULL) {
         return -1;
     }
@@ -42,6 +46,10 @@ int sys_read(long fd, long buffer, long size) {
 
 int sys_write(long fd, long buffer, long size) {
     process_t* proc = get_current_process();
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
 
     file_handle_t* handle = proc->fd_table->handles[fd];
 
@@ -207,6 +215,10 @@ long sys_fstat(long fd, long statbuf) {
 
     process_t* proc = get_current_process();
 
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
+
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
@@ -266,6 +278,10 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
 
 int sys_lseek(long fd, long offset, long whence) {
     process_t* proc = get_current_process();
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
 
     file_handle_t* handle = proc->fd_table->handles[fd];
 
@@ -610,6 +626,10 @@ long sys_nanosleep(struct timespec* timespec) {
 long sys_ioctl(long fd, unsigned long operation, unsigned long args, unsigned long result) {
     process_t* proc = get_current_process();
 
+    if(!CHECK_PTR(args)) {
+        return -EFAULT;
+    }
+
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
@@ -617,7 +637,7 @@ long sys_ioctl(long fd, unsigned long operation, unsigned long args, unsigned lo
     }
 
     if(handle->fileNode->file_ops.ioctl) {
-        handle->fileNode->file_ops.ioctl(handle->fileNode, operation, NULL);
+        handle->fileNode->file_ops.ioctl(handle->fileNode, operation, (void*)args);
     }
 
     return 0;
@@ -794,6 +814,18 @@ long sys_unlink(long pathptr) {
     }
 
     return delete(path);
+}
+
+long sys_getuid() {
+    process_t* current = get_current_process();
+
+    return current->uid;
+}
+
+long sys_getgid() {
+    process_t* current = get_current_process();
+
+    return current->gid;
 }
 
 #define FUTEX_WAIT 0
@@ -974,23 +1006,23 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_create, //SYS_CREAT
         (syscall_t)sys_link,   //SYS_LINK
         (syscall_t)sys_unlink, //SYS_UNLINK
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        (syscall_t)sys_stub,   //SYS_SYMLINK
+        (syscall_t)sys_stub,   //SYS_READLINK
+        (syscall_t)sys_stub,   //SYS_CHMOD
+        (syscall_t)sys_stub,   //SYS_FCHMOD
+        (syscall_t)sys_stub,   //SYS_CHOWN
+        (syscall_t)sys_stub,   //SYS_FCHOWN
+        (syscall_t)sys_stub,   //SYS_LCHOWN
+        (syscall_t)sys_stub,   //SYS_UMASK
+        (syscall_t)sys_stub,   //SYS_GETTIMEOFDAY
+        (syscall_t)sys_stub,   //SYS_GETRLIMIT
+        (syscall_t)sys_stub,   //SYS_GETRUSAGE
+        (syscall_t)sys_stub,   //SYS_SYSINFO
+        (syscall_t)sys_stub,   //SYS_TIMES
+        (syscall_t)sys_stub,   //SYS_PTRACE
+        (syscall_t)sys_getuid, //SYS_GETUID
+        (syscall_t)sys_stub,   //SYS_SYSLOG
+        (syscall_t)sys_getgid,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,

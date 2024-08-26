@@ -637,7 +637,7 @@ void kernel_main(unsigned long magic, unsigned long header)
 
     process_init();
     process_create_idle();
-    process_create_task("/bin/bash", false);
+    process_create_task("/usr/bin/bash", false);
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
