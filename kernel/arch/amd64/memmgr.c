@@ -106,8 +106,11 @@ void memmgr_phys_free_page(int idx) {
 }
 
 uintptr_t kalloc_frame() {
+    __asm__ volatile("cli" ::: "memory");
     spin_lock(&PHYS_MEM_LOCK);
-    int idx = 0;
+
+    bool restart = idx > 0;
+
     for(;;) {
         if(!memory_map[idx]) {
             //Found free, yay
@@ -118,15 +121,12 @@ uintptr_t kalloc_frame() {
         }
 
         if(idx >= BITMAP_SIZE) {
-            if(idx < BITMAP_SIZE) {
-                //We didnt iterate through all
+            if(restart) {
                 idx = 0;
-                continue;
+                restart = false;
             } else {
                 break;
             }
-        } else if(idx >= BITMAP_SIZE) {
-            break;
         }
 
         idx++;
@@ -135,10 +135,11 @@ uintptr_t kalloc_frame() {
 
     spin_unlock(&PHYS_MEM_LOCK);
     //NO FRAME FOUND, WE ARE OFFICIALLY FUCKED (HOW TF DO U USE 64 GB ANYWAY)
-    return UINT64_MAX;
+    return 0;
 }
 
 void kfree_frame(uintptr_t addr) {
+    __asm__ volatile("cli" ::: "memory");
     spin_lock(&PHYS_MEM_LOCK);
     int frame_idx = ADDRESS_TO_PAGE((size_t)addr);
 

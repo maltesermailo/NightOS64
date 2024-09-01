@@ -539,6 +539,9 @@ void kernel_main(unsigned long magic, unsigned long header)
         }
     }
 
+    int terminalWidth = 0;
+    int terminalHeight = 0;
+
     //Setup GDT and TSS
     gdt_install();
 
@@ -554,6 +557,17 @@ void kernel_main(unsigned long magic, unsigned long header)
         terminal_buffer = (uint16_t *) memmgr_get_mmio((unsigned long) tagfb->common.framebuffer_addr);
 
         terminal_initialize(tagfb->common.framebuffer_width, tagfb->common.framebuffer_height, tagfb->common.framebuffer_pitch); //Re-initialize the terminal
+
+        printf("O");
+        int keyWidth = ssfn_dst.x;
+        printf("\n");
+        int keyHeight = ssfn_dst.y;
+
+        terminalWidth = tagfb->common.framebuffer_width / keyWidth;
+        terminalHeight = tagfb->common.framebuffer_height / keyHeight;
+
+        memset(back_buffer, 0, tagfb->common.framebuffer_height * tagfb->common.framebuffer_pitch);
+        terminal_swap();
     }
 
     serial_printf("Colonel version 0.0.0-4 starting up...\n");
@@ -612,7 +626,7 @@ void kernel_main(unsigned long magic, unsigned long header)
             tarfs_init("/nightos/", module->mod_start, module->mod_end);
         }
     }*/
-    console_init();
+    console_init(terminalWidth, terminalHeight);
     syscall_init();
 
     //Load filesystem at hd0
@@ -629,49 +643,19 @@ void kernel_main(unsigned long magic, unsigned long header)
     fat_test();
 
     //Try opening console
-    file_node_t* console0 = open("/dev/console0", 0);
+    file_node_t* console0 = open("/dev/tty", 0);
     file_handle_t* hConsole = create_handle(console0);
     write(hConsole, "test", strlen("test")+1);
 
-    __asm__ volatile ("sti"); // set the interrupt flag
-
     process_init();
     process_create_idle();
+
+    __asm__ volatile ("sti"); // set the interrupt flag
+
     process_create_task("/usr/bin/bash", false);
 
     __asm__ volatile("cli");
     __asm__ volatile("hlt");
-
-    //process_create_task(&test_task);
-
-    /*while(1) {
-        terminal_resetline();
-        printf("> ");
-
-        for(int i = 0; i < 64; i++) {
-            if(commandline[i]) {
-                if(commandline[i] == '\n') {
-                    //Execute command
-                    if(commandline[0] == 'o' && commandline[1] == 'w' && commandline[2] == 'o') {
-                        //Flip all memory bits
-                        printf("\n");
-                        printf("OwO");
-
-                        for (size_t y = 0; y < VGA_HEIGHT; y++) {
-                            for (size_t x = 0; x < VGA_WIDTH; x++) {
-                                const size_t index = y * VGA_WIDTH + x;
-                                terminal_buffer[index] = ~(terminal_buffer[index]);
-                            }
-                        }
-
-                        asm volatile("cli");
-                        asm volatile("hlt");
-                    }
-                }
-                printf("%c", commandline[i]);
-            }
-        }
-    }*/
 }
 
 EXPORT_SYMBOL(terminal_write);

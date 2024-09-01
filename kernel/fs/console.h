@@ -12,6 +12,13 @@ struct console_pos {
     uint8_t y;
 };
 
-void console_init();
+struct winsize {
+    unsigned short ws_row;
+    unsigned short ws_col;
+    unsigned short ws_xpixel;  /* unused */
+    unsigned short ws_ypixel;  /* unused */
+};
+
+void console_init(int, int);
 
 #endif //NIGHTOS_CONSOLE_H

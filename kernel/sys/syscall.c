@@ -15,6 +15,9 @@
 #include <abi-bits/access.h>
 #include <bits/posix/iovec.h>
 #include "../../mlibc/abis/linux/fcntl.h"
+#include "../../mlibc/abis/linux/poll.h"
+#include "../../mlibc/options/posix/include/sys/poll.h"
+#include "../terminal.h"
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -72,13 +75,13 @@ int sys_open(long ptr, long mode) {
     int nameLen = strlen(nameBuf);
 
     if(nameLen > 4096) {
-        return -1; //dafuq?
+        return -EFAULT; //dafuq?
     }
 
     file_node_t* node = open(nameBuf, (int)mode);
 
     if(node == NULL) {
-        return -1;
+        return -ENOENT;
     }
 
     int fd = process_open_fd(node, mode);
@@ -273,7 +276,65 @@ long sys_fstat(long fd, long statbuf) {
 }
 
 int sys_poll(long fdbuf, long nfds, int timeout) {
-    return 0;
+    struct pollfd* pollfds = (struct pollfd*) fdbuf;
+
+    for(int i = 0; i < nfds; i++) {
+        if(!CHECK_PTR((uintptr_t) pollfds)) {
+            return -EFAULT;
+        }
+
+        pollfds++;
+    }
+
+    bool one_ready = false;
+    uint64_t time_at_start = get_counter();
+    uint64_t time_end = time_at_start + (timeout / 10) + 1;
+
+    while(!one_ready) {
+        pollfds = (struct pollfd*) fdbuf;
+
+        for(int i = 0; i < nfds; i++) {
+            if(pollfds->fd > get_current_process()->fd_table->capacity) {
+                pollfds->revents = POLLNVAL;
+
+                pollfds++;
+                continue;
+            }
+
+            file_handle_t* handle = get_current_process()->fd_table->handles[pollfds->fd];
+
+            if(handle == NULL) {
+                pollfds->revents = POLLNVAL;
+
+                pollfds++;
+                continue;
+            }
+
+            pollfds->revents = (short)poll(handle, pollfds->events);
+
+            if((pollfds->revents & (POLLIN | POLLOUT))) {
+                one_ready = true;
+            }
+        }
+
+        if(!one_ready) {
+            if(time_end < get_counter()) {
+                return 0;
+            }
+
+            schedule(false);
+        }
+    }
+
+    int countChanged = 0;
+
+    for(int i = 0; i < nfds; i++) {
+        if(pollfds->revents & (POLLIN | POLLOUT)) {
+            countChanged++;
+        }
+    }
+
+    return countChanged;
 }
 
 int sys_lseek(long fd, long offset, long whence) {
@@ -311,6 +372,10 @@ int sys_lseek(long fd, long offset, long whence) {
 int sys_pread64(long fd, unsigned long buffer, unsigned long size, unsigned long offset) {
     process_t* proc = get_current_process();
 
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
+
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
@@ -335,6 +400,10 @@ int sys_pread64(long fd, unsigned long buffer, unsigned long size, unsigned long
 
 int sys_pwrite64(long fd, unsigned long buffer, unsigned long size, unsigned long offset) {
     process_t* proc = get_current_process();
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
 
     file_handle_t* handle = proc->fd_table->handles[fd];
 
@@ -434,6 +503,10 @@ long sys_rt_sigreturn() {
 long sys_readv(long fd, const struct iovec* iov, int iovcnt) {
     process_t* proc = get_current_process();
 
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
+
     file_handle_t* handle = proc->fd_table->handles[fd];
 
     if(handle == NULL) {
@@ -459,6 +532,10 @@ long sys_readv(long fd, const struct iovec* iov, int iovcnt) {
 
 long sys_writev(long fd, const struct iovec* iov, int iovcnt) {
     process_t* proc = get_current_process();
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
 
     file_handle_t* handle = proc->fd_table->handles[fd];
 
@@ -562,12 +639,44 @@ long sys_access(long pathPtr, long mode) {
     process_thread_exit(exitCode);
 }
 
+int sys_getcwd(long buf, long size) {
+    if(!CHECK_PTR(buf)) {
+        return -EFAULT;
+    }
+
+    if(size == 0 || buf == NULL) {
+        return -EINVAL;
+    }
+
+    char* cwd = get_cwd_name();
+
+    if(strlen(cwd) > size) {
+        return -ERANGE;
+    }
+
+    strcpy((char*)buf, cwd);
+
+    return 0;
+}
+
 int sys_getpid() {
     if(get_current_process()->tgid != 0) {
         return get_current_process()->tgid;
     }
 
     return get_current_process()->id;
+}
+
+int sys_getpgrp() {
+    if(get_current_process()->tgid != 0) {
+        return get_current_process()->tgid;
+    }
+
+    return get_current_process()->id;
+}
+
+int sys_getppid() {
+    return get_current_process()->parent;
 }
 
 pid_t sys_fork() {
@@ -613,6 +722,28 @@ long sys_tcb_set(uintptr_t tcb) {
     return 0;
 }
 
+long sys_dup(long fd) {
+    process_t* proc = get_current_process();
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
+    }
+
+    file_handle_t* handle = proc->fd_table->handles[fd];
+
+    if(handle == NULL) {
+        return -1;
+    }
+
+    int newfd = process_open_fd(handle->fileNode, handle->flags);
+
+    file_handle_t* newHandle = proc->fd_table->handles[newfd];
+    newHandle->offset = handle->offset;
+    newHandle->flags = handle->flags;
+
+    return newfd;
+}
+
 long sys_nanosleep(struct timespec* timespec) {
     if(!CHECK_PTR((uintptr_t) timespec)) {
         return -EFAULT;
@@ -623,11 +754,15 @@ long sys_nanosleep(struct timespec* timespec) {
     sleep(timespec->tv_sec * 1000 + nanosecondsToMs + 1);
 }
 
-long sys_ioctl(long fd, unsigned long operation, unsigned long args, unsigned long result) {
+long sys_ioctl(long fd, unsigned long operation, unsigned long args) {
     process_t* proc = get_current_process();
 
     if(!CHECK_PTR(args)) {
         return -EFAULT;
+    }
+
+    if(fd > proc->fd_table->capacity) {
+        return -1;
     }
 
     file_handle_t* handle = proc->fd_table->handles[fd];
@@ -637,10 +772,10 @@ long sys_ioctl(long fd, unsigned long operation, unsigned long args, unsigned lo
     }
 
     if(handle->fileNode->file_ops.ioctl) {
-        handle->fileNode->file_ops.ioctl(handle->fileNode, operation, (void*)args);
+        return handle->fileNode->file_ops.ioctl(handle->fileNode, operation, (void*)args);
     }
 
-    return 0;
+    return -ENOTTY;
 }
 
 long sys_yield() {
@@ -919,117 +1054,118 @@ int sys_stub() {
  */
 
 syscall_t syscall_table[232] = {
-        (syscall_t)sys_read,    //SYS_READ
-        (syscall_t)sys_write,   //SYS_WRITE
-        (syscall_t)sys_open,    //SYS_OPEN
-        (syscall_t)sys_close,   //SYS_CLOSE
-        (syscall_t)sys_stat,    //SYS_STAT
-        (syscall_t)sys_fstat,   //SYS_FSTAT
-        (syscall_t)sys_lstat,   //SYS_LSTAT
-        (syscall_t)sys_poll,    //SYS_POLL
-        (syscall_t)sys_lseek,   //SYS_LSEEK
-        (syscall_t)sys_mmap,    //SYS_MMAP
-        (syscall_t)sys_mprotect,//SYS_MPROTECT
-        (syscall_t)sys_munmap,  //SYS_MUNMAP
-        (syscall_t)sys_brk,     //SYS_BRK
-        (syscall_t)sys_rt_sigaction,//SYS_RT_SIGACTION
-        (syscall_t)sys_rt_sigprocmask,//SYS_SIGPROCMASK
-        (syscall_t)sys_rt_sigreturn,//SYS_RT_SIGRETURN
-        (syscall_t)sys_ioctl,   //SYS_IOCTL
-        (syscall_t)sys_pread64, //SYS_PREAD64
-        (syscall_t)sys_pwrite64,//SYS_PWRITE64
-        (syscall_t)sys_readv,   //SYS_READV
-        (syscall_t)sys_writev,  //SYS_WRITEV
-        (syscall_t)sys_access,  //SYS_ACCESS
-        (syscall_t)sys_stub,    //SYS_PIPE
-        (syscall_t)sys_stub,    //SYS_SELECT
-        (syscall_t)sys_yield,   //SYS_SCHED_YIELD
-        (syscall_t)sys_stub,    //SYS_MREMAP
-        (syscall_t)sys_stub,    //SYS_MYSYNC
-        (syscall_t)sys_stub,    //SYS_MINCORE
-        (syscall_t)sys_stub,    //SYS_MADVISE
-        (syscall_t)sys_tcb_set, //SYS_TEMP_TCB_SET(will be replaced later)
-        (syscall_t)sys_stub,    //SYS_SHMAT
-        (syscall_t)sys_stub,    //SYS_SHMCTL
-        (syscall_t)sys_stub,    //SYS_DUP
-        (syscall_t)sys_stub,    //SYS_DUP2
-        (syscall_t)sys_stub,    //SYS_PAUSE
-        (syscall_t)sys_nanosleep,//SYS_NANOSLEEP
-        (syscall_t)sys_stub,    //SYS_GETITIMER
-        (syscall_t)sys_stub,    //SYS_ALARM
-        (syscall_t)sys_stub,    //SYS_SETITIMER
-        (syscall_t)sys_getpid,  //SYS_GETPID
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_clone,   //SYS_CLONE
-        (syscall_t)sys_fork,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_execve, //SYS_EXECVE
-        (syscall_t)sys_exit,   //SYS_EXIT
-        (syscall_t)sys_stub,   //SYS_WAIT4
-        (syscall_t)sys_stub,   //SYS_KILL
-        (syscall_t)sys_stub,   //SYS_UNAME
-        (syscall_t)sys_stub,   //SYS_SEMGET
-        (syscall_t)sys_stub,   //SYS_SEMOP
-        (syscall_t)sys_stub,   //SYS_SEMCTL
-        (syscall_t)sys_stub,   //SYS_SHMDT
-        (syscall_t)sys_stub,   //SYS_MSGGET
-        (syscall_t)sys_stub,   //SYS_MSGSND
-        (syscall_t)sys_stub,   //SYS_MSGRCV
-        (syscall_t)sys_stub,   //SYS_MSGCTL
-        (syscall_t)sys_stub,   //SYS_FCNTL
-        (syscall_t)sys_stub,   //SYS_FLOCK
-        (syscall_t)sys_stub,   //SYS_FSYNC
-        (syscall_t)sys_stub,   //SYS_FDATASYNC
-        (syscall_t)sys_stub,   //SYS_TRUNCATE
-        (syscall_t)sys_stub,   //SYS_GETDENTS
-        (syscall_t)sys_stub,   //SYS_GETCWD
-        (syscall_t)sys_stub,   //SYS_CHDIR
-        (syscall_t)sys_stub,   //SYS_FCHDIR
-        (syscall_t)sys_rename, //SYS_RENAME
-        (syscall_t)sys_mkdir,  //SYS_MKDIR
-        (syscall_t)sys_rmdir,  //SYS_RMDIR
-        (syscall_t)sys_create, //SYS_CREAT
-        (syscall_t)sys_link,   //SYS_LINK
-        (syscall_t)sys_unlink, //SYS_UNLINK
-        (syscall_t)sys_stub,   //SYS_SYMLINK
-        (syscall_t)sys_stub,   //SYS_READLINK
-        (syscall_t)sys_stub,   //SYS_CHMOD
-        (syscall_t)sys_stub,   //SYS_FCHMOD
-        (syscall_t)sys_stub,   //SYS_CHOWN
-        (syscall_t)sys_stub,   //SYS_FCHOWN
-        (syscall_t)sys_stub,   //SYS_LCHOWN
-        (syscall_t)sys_stub,   //SYS_UMASK
-        (syscall_t)sys_stub,   //SYS_GETTIMEOFDAY
-        (syscall_t)sys_stub,   //SYS_GETRLIMIT
-        (syscall_t)sys_stub,   //SYS_GETRUSAGE
-        (syscall_t)sys_stub,   //SYS_SYSINFO
-        (syscall_t)sys_stub,   //SYS_TIMES
-        (syscall_t)sys_stub,   //SYS_PTRACE
-        (syscall_t)sys_getuid, //SYS_GETUID
-        (syscall_t)sys_stub,   //SYS_SYSLOG
-        (syscall_t)sys_getgid,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
-        (syscall_t)sys_stub,
+        [0] = (syscall_t)sys_read,    //SYS_READ
+        [1] = (syscall_t)sys_write,   //SYS_WRITE
+        [2] = (syscall_t)sys_open,    //SYS_OPEN
+        [3] = (syscall_t)sys_close,   //SYS_CLOSE
+        [4] = (syscall_t)sys_stat,    //SYS_STAT
+        [5] = (syscall_t)sys_fstat,   //SYS_FSTAT
+        [6] = (syscall_t)sys_lstat,   //SYS_LSTAT
+        [7] = (syscall_t)sys_poll,    //SYS_POLL
+        [8] = (syscall_t)sys_lseek,   //SYS_LSEEK
+        [9] = (syscall_t)sys_mmap,    //SYS_MMAP
+        [10] = (syscall_t)sys_mprotect,//SYS_MPROTECT
+        [11] = (syscall_t)sys_munmap,  //SYS_MUNMAP
+        [12] = (syscall_t)sys_brk,     //SYS_BRK
+        [13] = (syscall_t)sys_rt_sigaction,//SYS_RT_SIGACTION
+        [14] = (syscall_t)sys_rt_sigprocmask,//SYS_SIGPROCMASK
+        [15] = (syscall_t)sys_rt_sigreturn,//SYS_RT_SIGRETURN
+        [16] = (syscall_t)sys_ioctl,   //SYS_IOCTL
+        [17] = (syscall_t)sys_pread64, //SYS_PREAD64
+        [18] = (syscall_t)sys_pwrite64,//SYS_PWRITE64
+        [19] = (syscall_t)sys_readv,   //SYS_READV
+        [20] = (syscall_t)sys_writev,  //SYS_WRITEV
+        [21] = (syscall_t)sys_access,  //SYS_ACCESS
+        [22] = (syscall_t)sys_stub,    //SYS_PIPE
+        [23] = (syscall_t)sys_stub,    //SYS_SELECT
+        [24] = (syscall_t)sys_yield,   //SYS_SCHED_YIELD
+        [25] = (syscall_t)sys_stub,    //SYS_MREMAP
+        [26] = (syscall_t)sys_stub,    //SYS_MYSYNC
+        [27] = (syscall_t)sys_stub,    //SYS_MINCORE
+        [28] = (syscall_t)sys_stub,    //SYS_MADVISE
+        [29] = (syscall_t)sys_tcb_set, //SYS_TEMP_TCB_SET(will be replaced later)
+        [30] = (syscall_t)sys_stub,    //SYS_SHMAT
+        [31] = (syscall_t)sys_stub,    //SYS_SHMCTL
+        [32] = (syscall_t)sys_dup,    //SYS_DUP
+        [33] = (syscall_t)sys_stub,    //SYS_DUP2
+        [34] = (syscall_t)sys_stub,    //SYS_PAUSE
+        [35] = (syscall_t)sys_nanosleep,//SYS_NANOSLEEP
+        [36] = (syscall_t)sys_stub,    //SYS_GETITIMER
+        [37] = (syscall_t)sys_stub,    //SYS_ALARM
+        [38] = (syscall_t)sys_stub,    //SYS_SETITIMER
+        [39] = (syscall_t)sys_getpid,  //SYS_GETPID
+        [40] = (syscall_t)sys_stub,    //SYS_SENDFILE
+        [41] = (syscall_t)sys_stub,    //SYS_SOCKET
+        [42] = (syscall_t)sys_stub,    //SYS_CONNECT
+        [43] = (syscall_t)sys_stub,    //SYS_ACCEPT
+        [44] = (syscall_t)sys_stub,    //SYS_SENDTO
+        [45] = (syscall_t)sys_stub,    //SYS_RECVFROM
+        [46] = (syscall_t)sys_stub,    //SYS_SENDMSG
+        [47] = (syscall_t)sys_stub,    //SYS_RECVMSG
+        [48] = (syscall_t)sys_stub,    //SYS_SHUTDOWN
+        [49] = (syscall_t)sys_stub,    //SYS_BIND
+        [50] = (syscall_t)sys_stub,    //SYS_LISTEN
+        [51] = (syscall_t)sys_stub,    //SYS_GETSOCKNAME
+        [52] = (syscall_t)sys_stub,    //SYS_GETPEERNAME
+        [53] = (syscall_t)sys_stub,    //SYS_SOCKETPAIR
+        [54] = (syscall_t)sys_stub,    //SYS_SETSOCKOPT
+        [55] = (syscall_t)sys_stub,    //SYS_GETSOCKOPT
+        [56] = (syscall_t)sys_clone,   //SYS_CLONE
+        [57] = (syscall_t)sys_fork,    //SYS_FORK
+        [58] = (syscall_t)sys_stub,    //SYS_VFORK
+        [59] = (syscall_t)sys_execve,  //SYS_EXECVE
+        [60] = (syscall_t)sys_exit,    //SYS_EXIT
+        [61] = (syscall_t)sys_stub,    //SYS_WAIT4
+        [62] = (syscall_t)sys_stub,    //SYS_KILL
+        [63] = (syscall_t)sys_stub,    //SYS_UNAME
+        [64] = (syscall_t)sys_stub,    //SYS_SEMGET
+        [65] = (syscall_t)sys_stub,    //SYS_SEMOP
+        [66] = (syscall_t)sys_stub,    //SYS_SEMCTL
+        [67] = (syscall_t)sys_stub,    //SYS_SHMDT
+        [68] = (syscall_t)sys_stub,    //SYS_MSGGET
+        [69] = (syscall_t)sys_stub,    //SYS_MSGSND
+        [70] = (syscall_t)sys_stub,    //SYS_MSGRCV
+        [71] = (syscall_t)sys_stub,    //SYS_MSGCTL
+        [72] = (syscall_t)sys_stub,    //SYS_FCNTL
+        [73] = (syscall_t)sys_stub,    //SYS_FLOCK
+        [74] = (syscall_t)sys_stub,    //SYS_FSYNC
+        [75] = (syscall_t)sys_stub,    //SYS_FDATASYNC
+        [76] = (syscall_t)sys_stub,    //SYS_TRUNCATE
+        [77] = (syscall_t)sys_stub,    //SYS_FTRUNCATE
+        [78] = (syscall_t)sys_stub,    //SYS_GETDENTS
+        [79] = (syscall_t)sys_getcwd,    //SYS_GETCWD
+        [80] = (syscall_t)sys_stub,    //SYS_CHDIR
+        [81] = (syscall_t)sys_stub,    //SYS_FCHDIR
+        [82] = (syscall_t)sys_rename,  //SYS_RENAME
+        [83] = (syscall_t)sys_mkdir,   //SYS_MKDIR
+        [84] = (syscall_t)sys_rmdir,   //SYS_RMDIR
+        [85] = (syscall_t)sys_create,  //SYS_CREAT
+        [86] = (syscall_t)sys_link,    //SYS_LINK
+        [87] = (syscall_t)sys_unlink,  //SYS_UNLINK
+        [88] = (syscall_t)sys_stub,    //SYS_SYMLINK
+        [89] = (syscall_t)sys_stub,    //SYS_READLINK
+        [90] = (syscall_t)sys_stub,    //SYS_CHMOD
+        [91] = (syscall_t)sys_stub,    //SYS_FCHMOD
+        [92] = (syscall_t)sys_stub,    //SYS_CHOWN
+        [93] = (syscall_t)sys_stub,    //SYS_FCHOWN
+        [94] = (syscall_t)sys_stub,    //SYS_LCHOWN
+        [95] = (syscall_t)sys_stub,    //SYS_UMASK
+        [96] = (syscall_t)sys_stub,    //SYS_GETTIMEOFDAY
+        [97] = (syscall_t)sys_stub,    //SYS_GETRLIMIT
+        [98] = (syscall_t)sys_stub,    //SYS_GETRUSAGE
+        [99] = (syscall_t)sys_stub,    //SYS_SYSINFO
+        [100] = (syscall_t)sys_stub,    //SYS_TIMES
+        [101] = (syscall_t)sys_stub,   //SYS_PTRACE
+        [102] = (syscall_t)sys_getuid, //SYS_GETUID
+        [103] = (syscall_t)sys_stub,   //SYS_SYSLOG
+        [104] = (syscall_t)sys_getgid, //SYS_GETGID
+        [105] = (syscall_t)sys_stub,   //SYS_SETUID
+        [106] = (syscall_t)sys_stub,   //SYS_SETGID
+        [107] = (syscall_t)sys_stub,   //SYS_GETEUID
+        [108] = (syscall_t)sys_stub,   //SYS_GETEGID
+        [109] = (syscall_t)sys_getpgrp,//SYS_SETPGID
+        [110] = (syscall_t)sys_getppid,//SYS_GETPPID
+        [111] = (syscall_t)sys_getpgrp,//SYS_GETPGRP
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
@@ -1121,7 +1257,6 @@ syscall_t syscall_table[232] = {
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_futex,
-        (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,
         (syscall_t)sys_stub,

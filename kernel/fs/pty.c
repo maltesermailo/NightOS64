@@ -237,14 +237,19 @@ int pty_ioctl(file_node_t *node, unsigned long request, void *args) {
     struct pty_data *pty = (struct pty_data *)node->fs;
 
     switch (request) {
-        /*case TCGETS:
+        case TCGETS:
             memcpy(args, pty->term_settings, sizeof(struct termios));
             return 0;
         case TCSETS:
             memcpy(pty->term_settings, args, sizeof(struct termios));
             return 0;
-            // ... other IOCTL commands ...*/
+        case TIOCGPGRP:
+            *((uint32_t*)args) = pty->session_leader;
+            return 0;
+        case TIOCSPGRP:
+            pty->session_leader = *(uint32_t*)args;
+            return 0;
         default:
-            return -ENOTTY;
+            return -ENOSYS;
     }
 }

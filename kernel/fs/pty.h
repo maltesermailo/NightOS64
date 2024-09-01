@@ -45,7 +45,9 @@ struct pty_data {
     circular_buffer_t *input_buffer;
     circular_buffer_t *output_buffer;
     struct termios *term_settings;
+
     pid_t session_leader;
+
     int index;
     bool raw;
     bool console;

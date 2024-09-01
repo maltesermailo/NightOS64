@@ -7,11 +7,14 @@
 #include "console.h"
 #include <stdio.h>
 #include <string.h>
+#include "../../mlibc/abis/linux/errno.h"
 #include "../terminal.h"
 #include "pty.h"
 #include "../keyboard.h"
 
-const char CONSOLE_NAME[] = "console0\0";
+const char CONSOLE_NAME[] = "tty\0";
+int terminalWidth = 0;
+int terminalHeight = 0;
 
 int console_input_read(struct FILE* node, char* buffer, size_t offset, size_t length) {
     return pty_slave_read(pty_get_slave(0), buffer, length, offset); // NOT YET IMPLEMENTED
@@ -35,8 +38,18 @@ int console_output_seek(struct FILE* node, size_t offset) {
 }
 
 int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
-    if(operation == TISTTY) {
-        return 1;
+    switch (operation) {
+        case TISTTY:
+            return 1;
+        case TIOCGWINSZ:
+            struct winsize* winsz = (struct winsize*)data;
+            winsz->ws_col = terminalWidth;
+            winsz->ws_row = terminalHeight;
+            return 0;
+        case TIOCSWINSZ:
+            return -ENOSYS;
+        default:
+            return pty_ioctl(pty_get_slave(0), operation, data);
     }
 
     if(operation == 0x030) {
@@ -51,7 +64,7 @@ int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
         }
     }
 
-    return 0;
+    return -EINVAL;
 }
 
 void key_event(key_event_t* event) {
@@ -60,7 +73,7 @@ void key_event(key_event_t* event) {
     }
 }
 
-void console_init() {
+void console_init(int terminalWidthIn, int terminalHeightIn) {
     file_node_t* node = calloc(1, sizeof(file_node_t));
     node->id = get_next_file_id();
     node->ref_count = 0;
@@ -76,7 +89,10 @@ void console_init() {
     pty_init();
     pty_create_pair(0);
 
+    terminalWidth = terminalWidthIn;
+    terminalHeight = terminalHeightIn;
+
     registerKeyEventHandler(key_event);
 
-    mount_directly("/dev/console0", node);
+    mount_directly("/dev/tty", node);
 }

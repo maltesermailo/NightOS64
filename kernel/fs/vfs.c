@@ -10,6 +10,7 @@
 #include "../terminal.h"
 #include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/errno.h"
+#include "../../mlibc/abis/linux/poll.h"
 
 file_node_t* root_node;
 tree_t* file_tree;
@@ -633,6 +634,20 @@ int move_file(file_node_t* node, char* newpath, int flags) {
 
     if(newFile == NULL) {
         return -EBUSY;
+    }
+
+    return 0;
+}
+
+int poll(file_handle_t* handle, int requested) {
+    requested &= POLLIN | POLLOUT | POLLRDHUP;
+
+    if(handle->fileNode->file_ops.poll) {
+        return handle->fileNode->file_ops.poll(handle->fileNode, requested);
+    }
+
+    if(handle->fileNode->type == FILE_TYPE_FILE || handle->fileNode->type == FILE_TYPE_DIR || handle->fileNode->type == FILE_TYPE_MOUNT_POINT) {
+        return requested;
     }
 
     return 0;

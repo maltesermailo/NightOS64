@@ -148,7 +148,7 @@ void process_create_task(char* path, bool is_kernel) {
     memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
     spin_unlock(&process->fd_table->lock);
 
-    file_node_t* console = open("/dev/console0", 0);
+    file_node_t* console = open("/dev/tty", 0);
     process_open_fd(console, 0);
     process_open_fd(console, 0);
     process_open_fd(console, 0);
