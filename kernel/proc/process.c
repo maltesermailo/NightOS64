@@ -12,6 +12,7 @@
 #include "../timer.h"
 #include <signal.h>
 #include <string.h>
+#include <asm-generic/errno.h>
 
 #define PUSH_PTR(stack, type, value) { \
             stack -= sizeof(type);     \
@@ -571,6 +572,31 @@ void wait_for_object(mutex_t* mutex) {
     spin_unlock(&mutex->lock);
 
     schedule(true);
+}
+
+int wait_for_object_timeout(mutex_t* mutex, unsigned long timeout) {
+    spin_lock(&mutex->lock);
+
+    list_insert(mutex->waiting, get_current_process());
+    __sync_or_and_fetch(&get_current_process()->flags, PROC_FLAG_SLEEP_INTERRUPTIBLE);
+    __sync_and_and_fetch(&get_current_process()->flags, ~(PROC_FLAG_ON_CPU));
+
+    process_t* process = get_current_process();
+    process->sleepTick = timeout;
+
+    spin_lock(sleep_lock);
+    list_insert(sleeping_queue, process);
+    spin_unlock(sleep_lock);
+
+    spin_unlock(&mutex->lock);
+
+    schedule(true);
+
+    if(get_counter() > timeout) {
+        return 1;
+    }
+
+    return 0;
 }
 
 void wakeup_waiting(list_t* queue) {

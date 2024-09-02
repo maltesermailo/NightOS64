@@ -225,6 +225,7 @@ void schedule_process(process_t* process);
 void schedule(bool sleep);
 
 void wait_for_object(mutex_t* mutex);
+int wait_for_object_timeout(mutex_t* mutex, unsigned long timeout);
 void wakeup_waiting(list_t* queue);
 
 /***

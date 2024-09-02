@@ -11,6 +11,7 @@
 
 mutex_t* create_mutex() {
     mutex_t* mutex = calloc(1, sizeof(mutex_t));
+    if (!mutex) return NULL;
     spin_unlock(&mutex->lock);
 
     mutex->owner = NULL;
@@ -35,6 +36,30 @@ void mutex_acquire(mutex_t* mutex) {
     mutex->owner = get_current_process();
 
     spin_unlock(&mutex->lock);
+}
+
+int mutex_acquire_timeout(mutex_t* mutex, unsigned long timeout_ms) {
+    unsigned long start_time = get_counter();
+
+    spin_lock(&mutex->lock);
+
+    while(mutex->owner) {
+        spin_unlock(&mutex->lock);
+        if (wait_for_object_timeout(mutex, timeout_ms - (get_current_time_ms() - start_time)) != 0) {
+            return -ETIMEDOUT;
+        }
+        spin_lock(&mutex->lock);
+
+        if (get_current_time_ms() - start_time >= timeout_ms) {
+            spin_unlock(&mutex->lock);
+            return -ETIMEDOUT;
+        }
+    }
+
+    mutex->owner = get_current_process();
+
+    spin_unlock(&mutex->lock);
+    return 0;
 }
 
 void mutex_wait(mutex_t* mutex) {
