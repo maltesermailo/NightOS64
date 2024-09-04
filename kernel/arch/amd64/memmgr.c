@@ -106,19 +106,21 @@ void memmgr_phys_free_page(int idx) {
 }
 
 uintptr_t kalloc_frame() {
-    __asm__ volatile("cli" ::: "memory");
     spin_lock(&PHYS_MEM_LOCK);
 
     bool restart = idx > 0;
 
     for(;;) {
+        uint64_t rflags = cli();
         if(!memory_map[idx]) {
             //Found free, yay
             memmgr_phys_mark_page(idx);
 
             spin_unlock(&PHYS_MEM_LOCK);
+            sti(rflags);
             return PAGE_TO_ADDRESS(idx);
         }
+        sti(rflags);
 
         if(idx >= BITMAP_SIZE) {
             if(restart) {
@@ -139,7 +141,7 @@ uintptr_t kalloc_frame() {
 }
 
 void kfree_frame(uintptr_t addr) {
-    __asm__ volatile("cli" ::: "memory");
+    uint64_t rflags = cli();
     spin_lock(&PHYS_MEM_LOCK);
     int frame_idx = ADDRESS_TO_PAGE((size_t)addr);
 
@@ -153,6 +155,7 @@ void kfree_frame(uintptr_t addr) {
             idx = frame_idx;
 
     spin_unlock(&PHYS_MEM_LOCK);
+    sti(rflags);
 }
 
 /**
@@ -738,8 +741,8 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
 void munmap(void* addr, size_t len) {
     //Page-align
-    if(!((size_t)addr & (PAGE_SIZE - 1))) {
-        addr = (void*)((size_t)((size_t*)addr + PAGE_SIZE) & (PAGE_SIZE - 1));
+    if(addr != 0 && (((uintptr_t)addr % PAGE_SIZE) != 0)) {
+        addr = (void*)((uintptr_t)((uintptr_t)addr) & ~(PAGE_SIZE - 1));
     }
 
     size_t count = len / 4096;
@@ -748,6 +751,10 @@ void munmap(void* addr, size_t len) {
     }
 
     for(size_t i = 1; i < count+1; i++) {
+        if(!memmgr_check_user((uintptr_t)addr + 0x1000 * i)) {
+            continue;
+        }
+
         memmgr_delete_page((uintptr_t)addr + 0x1000 * i);
         memmgr_reload((uintptr_t)addr + 0x1000 * i);
     }

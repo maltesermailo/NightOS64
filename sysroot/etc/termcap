@@ -1,0 +1,8 @@
+dumb|nightos-basic-term:\
+    :am:ms:\
+    :co#80:li#24:\
+    :cl=\E[H\E[J:\
+    :cm=\E[%i%d;%dH:\
+    :ho=\E[H:\
+    :cd=\E[J:\
+    :ce=\E[K:

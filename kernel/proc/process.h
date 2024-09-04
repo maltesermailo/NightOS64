@@ -10,7 +10,7 @@
 #include "../lock.h"
 #include "../mutex.h"
 #include "../idt.h"
-#include <signal.h>
+#include "../../mlibc/abis/linux/signal.h"
 
 #define PROC_FLAG_KERNEL 1<<0
 #define PROC_FLAG_RUNNING 1<<1 // whether the process is currently running
@@ -66,7 +66,7 @@
 #define CLONE_NEWNET 0x40000000
 #define CLONE_IO 0x80000000
 
-#define SIGSET_NWORDS (1024 / (8 * sizeof(uint32_t)))
+#define SIGSET_NWORDS (1024 / (8 * sizeof(long)))
 
 typedef int pid_t;
 
@@ -200,6 +200,7 @@ void process_thread_exit(int retval);
 void process_exit(int retval);
 void process_set_signal_handler(int signum, struct sigaction* sigaction);
 signal_handler_t* process_get_signal_handler(int signum);
+int has_pending_signals(struct process *p);
 void process_check_signals(regs_t* regs);
 void process_enter_signal(regs_t* regs, int signum);
 int process_signal_return();

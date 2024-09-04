@@ -31,4 +31,7 @@ void irq_install();
 void exception_handler(regs_t * regs);
 void syscall_entry(regs_t* regs);
 
+inline void sti(uint64_t rflags);
+inline uint64_t cli();
+
 #endif //NIGHTOS_IDT_H

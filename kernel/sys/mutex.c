@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "../timer.h"
+#include "../../mlibc/abis/linux/errno.h"
 
 mutex_t* create_mutex() {
     mutex_t* mutex = calloc(1, sizeof(mutex_t));
@@ -45,12 +46,12 @@ int mutex_acquire_timeout(mutex_t* mutex, unsigned long timeout_ms) {
 
     while(mutex->owner) {
         spin_unlock(&mutex->lock);
-        if (wait_for_object_timeout(mutex, timeout_ms - (get_current_time_ms() - start_time)) != 0) {
+        if (wait_for_object_timeout(mutex, timeout_ms - (get_counter() - start_time)) != 0) {
             return -ETIMEDOUT;
         }
         spin_lock(&mutex->lock);
 
-        if (get_current_time_ms() - start_time >= timeout_ms) {
+        if (get_counter() - start_time >= timeout_ms) {
             spin_unlock(&mutex->lock);
             return -ETIMEDOUT;
         }

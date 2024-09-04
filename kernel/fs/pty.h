@@ -8,6 +8,7 @@
 #include "../proc/process.h"
 #include "vfs.h"
 #include "../../libc/include/kernel/ring_buffer.h"
+#include "../../mlibc/abis/linux/termios.h"
 
 #define PTY_BUFFER_SIZE 1024
 #define MAX_PTY_PAIRS 16
@@ -36,10 +37,6 @@
 #define TIOCSWINSZ	0x5414
 
 #define TISTTY 0x9000
-
-struct termios {
-    int c_lflag;
-};  // Forward declaration, you'll need to define this elsewhere
 
 struct pty_data {
     circular_buffer_t *input_buffer;
@@ -79,5 +76,6 @@ int pty_master_write(file_node_t *node, char *buffer, size_t size, size_t offset
 void pty_open(file_node_t *node, int mode);
 void pty_close(file_node_t *node);
 int pty_ioctl(file_node_t *node, unsigned long request, void *args);
+int pty_poll(file_node_t* node, int requested);
 
 #endif // NIGHTOS_PTY_H

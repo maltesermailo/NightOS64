@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "io.h"
 #include "../../terminal.h"
+#include "../../proc/process.h"
 
 typedef struct {
     uint16_t    isr_low;      // The lower 16 bits of the ISR's address
@@ -32,8 +33,6 @@ extern void* isr_stub_table[];
 extern void* isr_stub_128;
 
 void exception_handler(regs_t * regs) {
-    __asm__ volatile ("cli");
-
     if(regs->int_no < 32) {
         if(regs->int_no == 1) {
             __asm__ volatile("sti");
@@ -44,6 +43,7 @@ void exception_handler(regs_t * regs) {
         printf("no: %d\n", regs->int_no);
         printf("err: 0x%x\n", regs->err_code);
 
+        __asm__ volatile ("cli");
         asm volatile("hlt");
     } else if (regs->int_no >= 32 && regs->int_no < 48) {
         if(irqHandlers[regs->int_no - 32]) {
@@ -51,10 +51,40 @@ void exception_handler(regs_t * regs) {
         }
     } else if(regs->int_no == 0x80) {
         //Syscalls baby!
+        __asm__ volatile("sti");
         syscall_entry(regs);
     }
 
+    if(get_current_process() != NULL) {
+        process_check_signals(regs);
+    }
+
     __asm__ volatile("sti");
+}
+
+void sti(uint64_t rflags) {
+    // Restore RFLAGS
+    __asm__ volatile (
+            "pushq %0\n\t"
+            "popfq"
+            :
+            : "r" (rflags)
+            );
+}
+
+uint64_t cli() {
+    uint64_t rflags;
+
+    // Save RFLAGS
+    __asm__ volatile (
+            "pushfq\n\t"
+            "popq %0"
+            : "=r" (rflags)
+            );
+
+    __asm__ volatile("cli");
+
+    return rflags;
 }
 
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {

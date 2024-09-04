@@ -175,5 +175,7 @@ void process_check_signals(regs_t* regs) {
             spin_unlock(&current->lock);
             handle_signal(current, i, regs);
         }
+
+        spin_unlock(&current->lock);
     }
 }

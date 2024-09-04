@@ -7,6 +7,7 @@
 #include "../proc/process.h"
 #include "../terminal.h"
 #include <stdint.h>
+#include "../../mlibc/abis/linux/poll.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -19,6 +20,7 @@ static struct file_operations pty_master_ops = {
         .open = pty_open,
         .close = pty_close,
         .ioctl = pty_ioctl,
+        .poll = pty_poll
 };
 
 static struct file_operations pty_slave_ops = {
@@ -27,6 +29,7 @@ static struct file_operations pty_slave_ops = {
         .open = pty_open,
         .close = pty_close,
         .ioctl = pty_ioctl,
+        .poll = pty_poll
 };
 
 int pty_init(void) {
@@ -43,7 +46,7 @@ int pty_create_pair(int pty_index) {
 
     pair->data->input_buffer = ring_buffer_create(PTY_BUFFER_SIZE, false);
     pair->data->output_buffer = ring_buffer_create(PTY_BUFFER_SIZE, false);
-    pair->data->term_settings = malloc(sizeof(struct termios));
+    pair->data->term_settings = calloc(1, sizeof(struct termios));
     pair->data->raw = false;
     pair->data->index = pty_index;
 
@@ -252,4 +255,22 @@ int pty_ioctl(file_node_t *node, unsigned long request, void *args) {
         default:
             return -ENOSYS;
     }
+}
+
+int pty_poll(file_node_t* node, int requested) {
+    int revents = 0;
+
+    struct pty_data *pty = (struct pty_data *)node->fs;
+
+    if(requested & POLLIN) {
+        if(find_newline(pty->input_buffer) != -1) {
+            revents |= POLLIN;
+        }
+    }
+
+    if(requested & POLLOUT) {
+        //Not yet implemented
+    }
+
+    return revents;
 }

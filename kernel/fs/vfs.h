@@ -136,7 +136,7 @@ int chown(file_node_t* file, unsigned int user, unsigned int group);
 int ioctl(file_node_t* file, unsigned long request, void* args);
 int fcntl(file_handle_t* file, int operation, void* data);
 list_dir_t* find(char* filename);
-int poll(file_handle_t* file, int events);
+int fpoll(file_handle_t* file, int events);
 int link(file_handle_t* file, char* path);
 
 char* get_full_path(file_node_t* node);

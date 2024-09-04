@@ -11,6 +11,8 @@ void terminal_write(const char* data, size_t size);
 void terminal_writestring(const char* data);
 void terminal_resetline();
 void terminal_swap();
+void terminal_clear();
+void terminal_setcursor(int x, int y);
 
 char* raw_itoa(unsigned int i);
 

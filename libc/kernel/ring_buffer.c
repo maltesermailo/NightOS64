@@ -63,6 +63,7 @@ int ring_buffer_write(circular_buffer_t* cb, int size, uint8_t* data) {
 
     size_t written = 0;
     while(written < size) {
+        uintptr_t rflags = cli();
         spin_lock(&cb->lock);
 
         cb->buffer[cb->tail] = data[written];
@@ -74,6 +75,7 @@ int ring_buffer_write(circular_buffer_t* cb, int size, uint8_t* data) {
 
         written++;
         spin_unlock(&cb->lock);
+        sti(rflags);
     }
 
     //Finished with writing, wake up sleepers on read
@@ -88,8 +90,8 @@ int ring_buffer_write(circular_buffer_t* cb, int size, uint8_t* data) {
 
 int ring_buffer_read(circular_buffer_t* cb, int size, uint8_t* buffer) {
     size_t written = 0;
-    printf("Awaiting size %d\n", size);
     while(written == 0) {
+        uintptr_t rflags = cli();
         spin_lock(&cb->lock);
 
         while(ring_buffer_available(cb) > 0 && written < size) {
@@ -100,31 +102,31 @@ int ring_buffer_read(circular_buffer_t* cb, int size, uint8_t* buffer) {
 
         if(written == 0) {
             spin_unlock(&cb->lock);
+            sti(rflags);
             //This mutex is nothing more than a simple wait queue.
             //If the mutex isnt acquired, it acquires it but doesnt block.
             //If it is acquired, it wont block, but will block on mutex_wait
             mutex_acquire_if_free(&cb->wait_queue_read);
             mutex_wait(&cb->wait_queue_read);
-            spin_lock(&cb->lock);
 
-            printf("Awaiting size %d\n", size);
-            printf("available %d\n", ring_buffer_available(cb));
+            rflags = cli();
+            spin_lock(&cb->lock);
 
             while(ring_buffer_available(cb) > 0 && written < size) {
                 buffer[written] = cb->buffer[cb->head];
                 cb->head = (cb->head + 1) % cb->max;
-
-                printf("Read one\n");
 
                 written++;
             }
 
             if(written == 0) {
                 spin_unlock(&cb->lock);
+                sti(rflags);
                 return written;
             }
         }
 
+        sti(rflags);
         spin_unlock(&cb->lock);
     }
 
@@ -159,10 +161,12 @@ int ring_buffer_available(circular_buffer_t* buffer) {
 }
 
 int ring_buffer_pop(circular_buffer_t* cb) {
+    uintptr_t rflags = cli();
     spin_lock(&cb->lock);
 
     if (ring_buffer_available(cb) == 0) {
         spin_unlock(&cb->lock);
+        sti(rflags);
         return 0;  // Buffer is empty
     }
 
@@ -170,6 +174,7 @@ int ring_buffer_pop(circular_buffer_t* cb) {
     cb->tail = (cb->tail - 1 + cb->max) % cb->max;
 
     spin_unlock(&cb->lock);
+    sti(rflags);
 
     // Wake up any waiting writers
     if (!mutex_acquire_if_free(&cb->wait_queue_write)) {
@@ -180,6 +185,7 @@ int ring_buffer_pop(circular_buffer_t* cb) {
 }
 
 int ring_buffer_peek(circular_buffer_t* cb, int offset, uint8_t* data) {
+    uintptr_t rflags = cli();
     spin_lock(&cb->lock);
 
     if (offset >= ring_buffer_available(cb)) {
@@ -191,10 +197,12 @@ int ring_buffer_peek(circular_buffer_t* cb, int offset, uint8_t* data) {
     *data = cb->buffer[index];
 
     spin_unlock(&cb->lock);
+    sti(rflags);
     return 1;  // Successfully peeked
 }
 
 int ring_buffer_read_last(circular_buffer_t* cb, uint8_t* data) {
+    uintptr_t rflags = cli();
     spin_lock(&cb->lock);
 
     if (ring_buffer_available(cb) == 0) {
@@ -206,5 +214,6 @@ int ring_buffer_read_last(circular_buffer_t* cb, uint8_t* data) {
     *data = cb->buffer[last_index];
 
     spin_unlock(&cb->lock);
+    sti(rflags);
     return 1;  // Successfully read last element
 }

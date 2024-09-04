@@ -85,7 +85,7 @@ int tarfs_read(file_node_t* node, char* buf, size_t offset, size_t length) {
 
     uintptr_t pointer = 512 + entry->begin;
     int size = oct2bin(entry->size, 11);
-    uintptr_t end = pointer + size;
+    uintptr_t end = size;
 
     //If offset is ahead of file
     if(offset > end) {
@@ -187,9 +187,9 @@ file_node_t* tarfs_find_dir(file_node_t* node, char* name) {
                 other[strlen(other)-1] = '\0';
             }
 
-            printf("Other: %s\n", other);
-
             if(strcmp(filename, other) == 0) {
+                printf("Other: %s\n", other);
+
                 tar_context_t* node_context = calloc(1, sizeof(tar_context_t));
                 node_context->fs = context->fs;
                 node_context->entry = current;

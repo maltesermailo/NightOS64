@@ -287,6 +287,23 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
                             free(file);
                             return (file_node_t *) current->value;
                         }
+                    } else {
+                        if(pch == NULL) {
+                            //Path is almost resolved, return parent for file creation
+                            if(outParent != NULL) {
+                                *outParent = fParent->value;
+                            }
+
+                            if(outFileName != NULL) {
+                                *outFileName = strdup(name);
+                            }
+
+                            free(file);
+                            return NULL;
+                        } else {
+                            free(file);
+                            return NULL;
+                        }
                     }
                 }
 
@@ -412,6 +429,10 @@ file_node_t* create(char* filename, int mode) {
 
     resolve_path("/", filename, &parent, &outFileName);
 
+    if(parent == NULL) {
+        return 0;
+    }
+
     parent->file_ops.create(parent, outFileName, mode);
     parent->size++;
 
@@ -436,6 +457,10 @@ file_node_t* mkdir(char* dirname) {
     char* filename = NULL;
 
     resolve_path("/", dirname, &parent, &filename);
+
+    if(parent == NULL) {
+        return NULL;
+    }
 
     if(parent->file_ops.mkdir(parent, filename)) {
         file_node_t* node = open(filename, 0);
@@ -463,6 +488,11 @@ file_node_t* mkdir_vfs(char* dirname) {
 
     resolve_path("/", dirname, &parent, &filename);
 
+    if(parent == NULL) {
+        printf("Warning: Parent of %s is not present in file tree\n", dirname);
+        return NULL;
+    }
+
     tree_node_t* treeNode = tree_find_child_root(file_tree, parent);
 
     if(!treeNode) {
@@ -488,6 +518,10 @@ file_node_t* mkdir_vfs(char* dirname) {
 
 int getdents(file_node_t* node, list_dir_t** buffer, int count) {
     int i = 0; //Total count of entries received.
+
+    if(count <= 0) {
+        return 0;
+    }
 
     list_dir_t* dir = calloc(count, sizeof(list_dir_t));
 
@@ -639,7 +673,7 @@ int move_file(file_node_t* node, char* newpath, int flags) {
     return 0;
 }
 
-int poll(file_handle_t* handle, int requested) {
+int fpoll(file_handle_t* handle, int requested) {
     requested &= POLLIN | POLLOUT | POLLRDHUP;
 
     if(handle->fileNode->file_ops.poll) {

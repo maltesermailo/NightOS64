@@ -9,7 +9,7 @@
 #include "../memmgr.h"
 #include "../../mlibc/abis/linux/errno.h"
 #include "../timer.h"
-#include <bits/ansi/time_t.h>
+#include "../../mlibc/options/ansi/include/bits/ansi/timespec.h"
 #include <signal.h>
 #include <abi-bits/stat.h>
 #include <abi-bits/access.h>
@@ -288,9 +288,13 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
 
     bool one_ready = false;
     uint64_t time_at_start = get_counter();
-    uint64_t time_end = time_at_start + (timeout / 10) + 1;
+    uint64_t time_end = timeout > 0 ? time_at_start + (timeout / 10) + 1 : -1;
 
     while(!one_ready) {
+        if (has_pending_signals(get_current_process())) {
+            return -ERESTART;
+        }
+
         pollfds = (struct pollfd*) fdbuf;
 
         for(int i = 0; i < nfds; i++) {
@@ -310,7 +314,7 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
                 continue;
             }
 
-            pollfds->revents = (short)poll(handle, pollfds->events);
+            pollfds->revents = (short)fpoll(handle, pollfds->events);
 
             if((pollfds->revents & (POLLIN | POLLOUT))) {
                 one_ready = true;
@@ -318,7 +322,11 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
         }
 
         if(!one_ready) {
-            if(time_end < get_counter()) {
+            if(timeout == 0) {
+                return 0;
+            }
+
+            if(timeout >= 0 && time_end < get_counter()) {
                 return 0;
             }
 
@@ -1034,17 +1042,32 @@ long sys_futex(long pointer, long action, long val, long timeout) {
     process_exit(exitCode);
 }
 
-int sys_ppoll(long fdbuf, long nfds, int timeout, long sigmask) {
+int sys_ppoll(long fdbuf, long nfds, long timespec, long sigmask) {
     if(!CHECK_PTR(sigmask)) {
         return -EFAULT;
+    }
+
+    if(timespec != NULL && !CHECK_PTR(timespec)) {
+        return -EFAULT;
+    }
+
+    int timeout = 0;
+
+    if(timespec != NULL) {
+        struct timespec* time = (struct timespec*) timespec;
+        long nanosecondsToMs = time->tv_nsec / 1000000;
+
+        timeout = time->tv_sec * 1000 + nanosecondsToMs;
+    } else {
+        timeout = -1;
     }
 
     sigset_t old_sigset;
     sigset_t* sigset = (sigset_t*)sigmask;
 
-    sys_rt_sigprocmask(SIG_SETMASK, sigset, &old_sigset);
+    sys_rt_sigprocmask(SIG_SETMASK, (long)sigset, (long)&old_sigset);
     int result = sys_poll(fdbuf, nfds, timeout);
-    sys_rt_sigprocmask(SIG_SETMASK, &old_sigset, NULL);
+    sys_rt_sigprocmask(SIG_SETMASK, (long)&old_sigset, 0);
 
     return result;
 }

@@ -139,7 +139,7 @@ void vfs_test() {
 }
 
 void fat_test() {
-    file_node_t* fatRoot = open("/fatfs", 0);
+    file_node_t* fatRoot = open("/mnt", 0);
 
     int count = get_size(fatRoot);
     printf("Fat Root Directory: %d entries\n", count);

@@ -6,13 +6,15 @@
 #define NIGHTOS_LOCK_H
 
 #include <stdatomic.h>
+#include <stdbool.h>
+
+extern void schedule(bool sleep);
 
 typedef atomic_flag spin_t;
 
 static inline void spin_lock(spin_t * lock) {
     while(atomic_flag_test_and_set(lock)) {
-        //Do nothing
-        ;;
+        schedule(false);
     }
 }
 

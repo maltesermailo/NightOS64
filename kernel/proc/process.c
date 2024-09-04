@@ -12,7 +12,7 @@
 #include "../timer.h"
 #include <signal.h>
 #include <string.h>
-#include <asm-generic/errno.h>
+#include "../../mlibc/abis/linux/errno.h"
 
 #define PUSH_PTR(stack, type, value) { \
             stack -= sizeof(type);     \

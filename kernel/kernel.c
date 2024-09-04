@@ -275,6 +275,31 @@ void terminal_writestring(const char* data)
 	terminal_write(data, strlen(data));
 }
 
+void terminal_clear() {
+    if(use_framebuffer) {
+        memset(back_buffer, 0, ssfn_dst.h * ssfn_dst.p);
+
+        terminal_swap();
+    } else {
+        for (size_t y = 0; y < VGA_HEIGHT; y++) {
+            for (size_t x = 0; x < VGA_WIDTH; x++) {
+                const size_t index = y * VGA_WIDTH + x;
+                terminal_buffer[index] = vga_entry(' ', terminal_color);
+            }
+        }
+    }
+}
+
+void terminal_setcursor(int x, int y) {
+    if(use_framebuffer) {
+        ssfn_dst.x = (ssfn_dst.w / terminal_width) * x;
+        ssfn_dst.y = (ssfn_dst.h / terminal_height) * y;
+    } else {
+        terminal_column = x;
+        terminal_row = y;
+    }
+}
+
 void terminal_resetline() {
     if(use_framebuffer) {
         ssfn_dst.x = 0;
@@ -630,7 +655,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     syscall_init();
 
     //Load filesystem at hd0
-    mount_directly("/mnt", fat_mount("/dev/hd0", "/fatfs"));
+    mount_directly("/mnt", fat_mount("/dev/hd0", "/mnt"));
     ramfs_init("/tmp");
 
     printf("Performing list test now...\n");
