@@ -24,8 +24,13 @@
 #include "symbol.h"
 #include "fs/ramfs.h"
 #include "proc/message.h"
-#define SSFN_CONSOLEBITMAP_TRUECOLOR        /* use the special renderer for 32 bit truecolor packed pixels */
-#define SSFN_CONSOLEBITMAP_CONTROL
+//#define SSFN_CONSOLEBITMAP_TRUECOLOR        /* use the special renderer for 32 bit truecolor packed pixels */
+//#define SSFN_CONSOLEBITMAP_CONTROL
+#define SSFN_IMPLEMENTATION
+#define SSFN_realloc realloc
+#define SSFN_free    free
+#define SSFN_memset  memset
+#define SSFN_memcmp  memcmp
 #include "ssfn.h"
 
 /* Hardware text mode color constants. */
@@ -73,13 +78,19 @@ size_t terminal_row;
 size_t terminal_column;
 size_t terminal_width;
 size_t terminal_height;
+size_t char_width;
+size_t char_height;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
 uint8_t* back_buffer;
+bool use_framebuffer = false;
+ssfn_t ctx = { 0 };
+ssfn_buf_t buf = { 0 };
+
 RSDP_t* rsdp;
+
 extern unsigned long long _physical_end;
 uintptr_t kernel_end = 0;
-bool use_framebuffer = false;
 
 extern char font_data_start[];
 extern char font_data_end[];
@@ -130,7 +141,7 @@ void terminal_initialize(int sizeX, int sizeY, int bytesPerLine)
 
         back_buffer = calloc(1, sizeY * bytesPerLine);
 
-        ssfn_src = (ssfn_font_t *) &font_data_start;
+        /*ssfn_src = (ssfn_font_t *) &font_data_start;
         ssfn_dst.ptr = (uint8_t *) back_buffer;
         ssfn_dst.p = bytesPerLine;
         ssfn_dst.fg = 0xFFFFFFFF;
@@ -138,7 +149,20 @@ void terminal_initialize(int sizeX, int sizeY, int bytesPerLine)
         ssfn_dst.w = sizeX;
         ssfn_dst.h = sizeY;
         ssfn_dst.x = 0;
-        ssfn_dst.y = 0;
+        ssfn_dst.y = 0;*/
+
+        buf = (ssfn_buf_t) {                                  /* the destination pixel buffer */
+                .ptr = (uint8_t *) back_buffer,                      /* address of the buffer */
+                .w = sizeX,                             /* width */
+                .h = sizeY,                             /* height */
+                .p = bytesPerLine,                         /* bytes per line */
+                .x = 0,                                       /* pen position */
+                .y = 0,
+                .fg = 0xFFFFFFFF                                /* foreground color */
+        };
+
+        ssfn_load(&ctx, &font_data_start);
+        ssfn_select(&ctx, SSFN_FAMILY_ANY, NULL, SSFN_STYLE_REGULAR | SSFN_STYLE_UNDERLINE | SSFN_STYLE_ABS_SIZE, 16);
     } else {
         terminal_row = 0;
         terminal_column = 0;
@@ -193,7 +217,7 @@ void wc_memcpy(void *dst, const void *src, size_t n) {
 
 void terminal_swap() {
     if(use_framebuffer) {
-        wc_memcpy(terminal_buffer, back_buffer, ssfn_dst.h * ssfn_dst.p);
+        wc_memcpy(terminal_buffer, back_buffer, buf.h * buf.p);
     }
 }
 
@@ -221,12 +245,13 @@ void terminal_rollover() {
 void terminal_putchar(char c)
 {
     if(use_framebuffer) {
+        char p[2] = { c, '\0' };
         /*if(c == '\b') {
-            ssfn_dst.x--;
+            ssfn_dst.x -= ssfn_src->width;
 
             if(ssfn_dst.x < 0) {
                 ssfn_dst.x = 0;
-                ssfn_dst.y--;
+                ssfn_dst.y -= ssfn_src->height;
 
                 if(ssfn_dst.y < 0) {
                     ssfn_dst.y = 0;
@@ -235,7 +260,8 @@ void terminal_putchar(char c)
             return;
         }*/
 
-        int err = ssfn_putc(c);
+        //int err = ssfn_putc(c);
+        int err = ssfn_render(&ctx, &buf, (const char*) &p);
 
         if(err < 0) {
             serial_printf("Print error: %d", err);
@@ -277,7 +303,7 @@ void terminal_writestring(const char* data)
 
 void terminal_clear() {
     if(use_framebuffer) {
-        memset(back_buffer, 0, ssfn_dst.h * ssfn_dst.p);
+        memset(back_buffer, 0, buf.h * buf.p);
 
         terminal_swap();
     } else {
@@ -292,8 +318,8 @@ void terminal_clear() {
 
 void terminal_setcursor(int x, int y) {
     if(use_framebuffer) {
-        ssfn_dst.x = (ssfn_dst.w / terminal_width) * x;
-        ssfn_dst.y = (ssfn_dst.h / terminal_height) * y;
+        buf.x = (buf.w / terminal_width) * x;
+        buf.y = (buf.h / terminal_height) * y;
     } else {
         terminal_column = x;
         terminal_row = y;
@@ -302,13 +328,13 @@ void terminal_setcursor(int x, int y) {
 
 void terminal_resetline() {
     if(use_framebuffer) {
-        ssfn_dst.x = 0;
+        buf.x = 0;
 
-        for(int i = 0; i < ssfn_dst.p; i++) {
-            ssfn_putc(' ');
+        for(int i = 0; i < buf.p; i++) {
+            //ssfn_putc(' ');
         }
 
-        ssfn_dst.x = 0;
+        buf.x = 0;
     } else {
         terminal_column = 0;
 
@@ -583,13 +609,13 @@ void kernel_main(unsigned long magic, unsigned long header)
 
         terminal_initialize(tagfb->common.framebuffer_width, tagfb->common.framebuffer_height, tagfb->common.framebuffer_pitch); //Re-initialize the terminal
 
-        printf("O");
-        int keyWidth = ssfn_dst.x;
+        /*printf("/");
+        char_width = ssfn_dst.x;
         printf("\n");
-        int keyHeight = ssfn_dst.y;
+        char_height = ssfn_dst.y;*/
 
-        terminalWidth = tagfb->common.framebuffer_width / keyWidth;
-        terminalHeight = tagfb->common.framebuffer_height / keyHeight;
+        terminalWidth = tagfb->common.framebuffer_width / 16;
+        terminalHeight = tagfb->common.framebuffer_height / 16;
 
         memset(back_buffer, 0, tagfb->common.framebuffer_height * tagfb->common.framebuffer_pitch);
         terminal_swap();

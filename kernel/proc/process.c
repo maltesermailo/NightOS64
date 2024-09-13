@@ -163,11 +163,16 @@ void process_create_task(char* path, bool is_kernel) {
 
     printf("Before 0x%x\n", userStack);
 
+    char* envp[2];
+
     push_string_to_userstack(&userStack, "PATH=/usr/bin");
-    uintptr_t envp = userStack;
+    envp[0] = (char*)userStack;
+    push_string_to_userstack(&userStack, "TERM=nightos");
+    envp[1] = (char*)userStack;
 
     PUSH_PTR(userStack, uintptr_t, 0); //ENVP ZERO
-    PUSH_PTR(userStack, uintptr_t, envp);
+    PUSH_PTR(userStack, char*, envp[1]);
+    PUSH_PTR(userStack, char*, envp[0]);
     PUSH_PTR(userStack, uintptr_t, 0); //ARGV ZERO
     PUSH_PTR(userStack, uintptr_t, 0); //ARGC
 

@@ -36,19 +36,6 @@ int console_input_read(struct FILE* node, char* buffer, size_t offset, size_t le
     return pty_slave_read(pty_get_slave(0), buffer, length, offset); // NOT YET IMPLEMENTED
 }
 
-int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t length) {
-    if(length > 2048) {
-        return -1;
-    }
-
-    char printBuffer[length];
-    memcpy(printBuffer, buffer, length);
-
-    terminal_write(printBuffer, length);
-
-    return length;
-}
-
 void handle_escape_sequence(char c) {
     switch (c) {
         case 'H':
@@ -112,6 +99,20 @@ void handle_console_char(char c) {
     }
 }
 
+int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t length) {
+    if(length > 2048) {
+        return -1;
+    }
+
+    for(int i = 0; i < length; i++) {
+        handle_console_char(buffer[i]);
+    }
+
+    terminal_swap();
+
+    return length;
+}
+
 int console_output_seek(struct FILE* node, size_t offset) {
     return 0;
 }
@@ -124,6 +125,8 @@ int console_ioctl(struct FILE* node, unsigned long operation, void* data) {
             struct winsize* winsz = (struct winsize*)data;
             winsz->ws_col = terminalWidth;
             winsz->ws_row = terminalHeight;
+            winsz->ws_xpixel = 0;
+            winsz->ws_ypixel = 0;
             return 0;
         case TIOCSWINSZ:
             return -ENOSYS;

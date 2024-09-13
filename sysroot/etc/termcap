@@ -1,8 +1,15 @@
-dumb|nightos-basic-term:\
+nightos|ansi|nightos-basic-term:\
     :am:ms:\
     :co#80:li#24:\
     :cl=\E[H\E[J:\
     :cm=\E[%i%d;%dH:\
     :ho=\E[H:\
     :cd=\E[J:\
-    :ce=\E[K:
+    :ce=\E[K:\
+    :kb=\010:kbs=\010:ka=\177:\
+    :kl=\E[D:kr=\E[C:ku=\E[A:kd=\E[B:\
+    :le=\E[D:nd=\E[C:up=\E[A:do=\E[B:\
+    :ic=\E[@:dc=\E[P:\
+    :im=\E[4h:ei=\E[4l:\
+    :bc=\010:bs:\
+    :rs=\Ec:

@@ -56,6 +56,10 @@ int pty_create_pair(int pty_index) {
     if(pty_index == 0) {
         pair->data->console = true;
         pair->data->term_settings->c_lflag = ECHO | ICANON;
+        pair->data->term_settings->c_cc[VERASE] = '\b';
+        pair->data->term_settings->c_cc[VEOF] = 0x04;
+        pair->data->term_settings->obaud = 38400;
+        pair->data->term_settings->ibaud = 38400;
     }
 
     if (!pair->data->term_settings) {
@@ -169,7 +173,7 @@ int pty_write_to_input(int pty_index, const char* buffer, size_t size) {
         if (!(pty->term_settings->c_lflag & ICANON) || pty->raw) {
             // In raw mode or non-canonical mode, just write the character directly
             if (ring_buffer_write(pty->input_buffer, 1, &c) > 0) {
-                if (pty->term_settings->c_lflag & ECHO) {
+                if (pty->term_settings->c_lflag & ECHO && c != 0x8) {
                     echo_char(pty, pty_index, c);
                 }
                 written++;
@@ -246,6 +250,13 @@ int pty_ioctl(file_node_t *node, unsigned long request, void *args) {
         case TCSETS:
             memcpy(pty->term_settings, args, sizeof(struct termios));
             return 0;
+        case TCSETSW:
+            memcpy(pty->term_settings, args, sizeof(struct termios));
+            return 0;
+        case TCSETSF:
+            ring_buffer_discard_readable(pty->input_buffer);
+            memcpy(pty->term_settings, args, sizeof(struct termios));
+            return 0;
         case TIOCGPGRP:
             *((uint32_t*)args) = pty->session_leader;
             return 0;
@@ -263,8 +274,14 @@ int pty_poll(file_node_t* node, int requested) {
     struct pty_data *pty = (struct pty_data *)node->fs;
 
     if(requested & POLLIN) {
-        if(find_newline(pty->input_buffer) != -1) {
-            revents |= POLLIN;
+        if(pty->term_settings->c_lflag & ICANON) {
+            if(find_newline(pty->input_buffer) != -1) {
+                revents |= POLLIN;
+            }
+        } else {
+            if(ring_buffer_available(pty->input_buffer)) {
+                revents |= POLLIN;
+            }
         }
     }
 

@@ -190,6 +190,7 @@ int ring_buffer_peek(circular_buffer_t* cb, int offset, uint8_t* data) {
 
     if (offset >= ring_buffer_available(cb)) {
         spin_unlock(&cb->lock);
+        sti(rflags);
         return 0;  // Not enough data
     }
 
@@ -207,6 +208,7 @@ int ring_buffer_read_last(circular_buffer_t* cb, uint8_t* data) {
 
     if (ring_buffer_available(cb) == 0) {
         spin_unlock(&cb->lock);
+        sti(rflags);
         return 0;  // Buffer is empty
     }
 
@@ -216,4 +218,14 @@ int ring_buffer_read_last(circular_buffer_t* cb, uint8_t* data) {
     spin_unlock(&cb->lock);
     sti(rflags);
     return 1;  // Successfully read last element
+}
+
+void ring_buffer_discard_readable(circular_buffer_t* cb) {
+    uintptr_t rflags = cli();
+
+    spin_lock(&cb->lock);
+    cb->head = cb->tail;
+    spin_unlock(&cb->lock);
+
+    sti(rflags);
 }

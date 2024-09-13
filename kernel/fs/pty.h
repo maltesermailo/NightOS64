@@ -12,8 +12,6 @@
 
 #define PTY_BUFFER_SIZE 1024
 #define MAX_PTY_PAIRS 16
-#define ECHO 1
-#define ICANON 2
 
 #define TCGETS		0x5401
 #define TCSETS		0x5402

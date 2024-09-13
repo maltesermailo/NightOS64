@@ -167,15 +167,18 @@ void process_check_signals(regs_t* regs) {
         return;
     }
 
+    uintptr_t rflags = cli();
     spin_lock(&current->lock);
 
     for (int i = 1; i < 32; i++) {
         if (sigismember(&current->pending_signals, i) && !sigismember(&current->blocked_signals, i)) {
             sigdelset(&current->pending_signals, i);
             spin_unlock(&current->lock);
+            sti(rflags);
             handle_signal(current, i, regs);
         }
 
         spin_unlock(&current->lock);
+        sti(rflags);
     }
 }
