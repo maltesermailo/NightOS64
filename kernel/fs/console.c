@@ -58,7 +58,7 @@ void handle_escape_sequence(char c) {
     }
 }
 
-void handle_console_char(char c) {
+bool handle_console_char(char c) {
     switch (console.state) {
         case STATE_NORMAL:
             //ESCAPE
@@ -81,6 +81,9 @@ void handle_console_char(char c) {
             if (c >= '0' && c <= '9') {
                 console.state = STATE_PARSE_PARAMS;
                 console.params[console.param_idx] = c - '0';
+            } else if (c == '?') {
+                console.state = STATE_NORMAL;
+                return false;
             } else {
                 handle_escape_sequence(c);
                 console.state = STATE_NORMAL;
@@ -97,6 +100,8 @@ void handle_console_char(char c) {
             }
             break;
     }
+
+    return true;
 }
 
 int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t length) {
@@ -105,7 +110,9 @@ int console_output_write(struct FILE* node, char* buffer, size_t offset, size_t 
     }
 
     for(int i = 0; i < length; i++) {
-        handle_console_char(buffer[i]);
+        if(!handle_console_char(buffer[i])) {
+            break;
+        }
     }
 
     terminal_swap();

@@ -13,3 +13,4 @@ nightos|ansi|nightos-basic-term:\
     :im=\E[4h:ei=\E[4l:\
     :bc=\010:bs:\
     :rs=\Ec:
+    :pt@:

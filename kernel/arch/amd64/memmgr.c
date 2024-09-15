@@ -46,7 +46,7 @@ int idx = 0;
 /****************************************************************/
 /*********************VIRTUAL MEMORY MANAGEMENT******************/
 // Identity map of all 512 GB of supported memory, this allows the kernel to fully access the memory addressable using 1 GiB Pages
-static uint64_t* IDENTITY_MAP_PD[512] __attribute__((aligned(4096)));
+static uint64_t IDENTITY_MAP_PD[512] __attribute__((aligned(4096)));
 /****************************************************************/
 
 //Static location of the identity boot page map
@@ -1084,17 +1084,17 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     spin_unlock(&PHYS_MEM_LOCK);
 
     //Apply Identity Mapping for the entire supported address space
-    uint64_t* IDENTITY_MAP_PD_TEMP = (uint64_t *) ((uintptr_t) IDENTITY_MAP_PD - 0xffffff0000000000ull);
+    uint64_t* IDENTITY_MAP_PD_TEMP = (uint64_t *) (((uintptr_t) &IDENTITY_MAP_PD) - 0xffffff0000000000ull + ((uintptr_t) &_bootstrap_end));
 
     serial_printf("IDENTITY MAP LOC: 0x%x\n", IDENTITY_MAP_PD_TEMP);
 
     for(uint64_t i = 0; i < 512; i++) {
-        IDENTITY_MAP_PD_TEMP[i] = 0;
+        IDENTITY_MAP_PD[i] = 0;
     }
 
     //Identity map 512 GiB of memory to high memory
     for(uint64_t i = 0; i < 512; i++) {
-        IDENTITY_MAP_PD_TEMP[i] = i * 0x40000000ULL | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE;
+        IDENTITY_MAP_PD[i] = (i * 0x40000000ULL | PAGE_PRESENT | PAGE_WRITABLE | PAGE_LARGE);
     }
 
     PAGE_MAP[509] = (uintptr_t)IDENTITY_MAP_PD_TEMP | PAGE_PRESENT | PAGE_WRITABLE;

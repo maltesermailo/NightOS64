@@ -137,7 +137,7 @@ iso_limine_target = custom_target('nightos-limine.iso',
                                'cp limine.conf isodir/boot/limine/ && ' +
                                'cp ' + kernel.full_path() + ' isodir/boot/ &&' +
                                'cd sysroot/ && ' +
-                               'tar -cvf ../rootfs.tar * && ' +
+                               'tar -cvf ../rootfs.tar * .inputrc && ' +
                                'cd .. &&' +
                                'cp rootfs.tar isodir/boot/ && ' +
                                'cp -v ../limine/bin/limine-bios.sys ../limine/bin/limine-bios-cd.bin ../limine/bin/limine-uefi-cd.bin isodir/boot/limine/ &&' +
