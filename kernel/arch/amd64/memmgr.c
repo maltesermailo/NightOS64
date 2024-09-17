@@ -967,7 +967,7 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
         uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMapNew[i] & PAGE_MASK);
 
         //printf("PML4 entry is 0x%x\n", pageDirectoryPointer);
-        if(pageDirectoryPointer != KERNEL_MEMORY) {
+        if(pageMapNew[i] & PAGE_PRESENT) {
             printf("PML4 Entry #%d is set.\n", i);
         }
     }

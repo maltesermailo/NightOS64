@@ -19,4 +19,6 @@ char* raw_itoa(unsigned int i);
 int
 printf (const char *format, ...);
 
+int log(const char* format, ...);
+
 #endif //NIGHTOS_TERMINAL_H

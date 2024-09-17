@@ -244,7 +244,9 @@ pid_t process_fork() {
     process->main_thread.priority = parent->main_thread.priority;
 
     //Save parent process state
-    setjmp(&process->main_thread);
+    if(setjmp(&process->main_thread)) {
+        return process->id;
+    }
     process->main_thread.user_stack = parent->main_thread.user_stack;
     process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
     process->main_thread.rip = (uintptr_t) fork_exit;
@@ -258,8 +260,8 @@ pid_t process_fork() {
     process->uid = parent->uid;
     process->gid = parent->gid;
     process->flags = parent->flags;
-    process->flags &= ~PROC_FLAG_RUNNING;
-    process->flags &= ~PROC_FLAG_ON_CPU;
+    process->flags &= ~(PROC_FLAG_RUNNING);
+    process->flags &= ~(PROC_FLAG_ON_CPU);
 
     process->fd_table = calloc(1, sizeof(fd_table_t));
     process->fd_table->capacity = parent->fd_table->capacity;
@@ -283,8 +285,15 @@ pid_t process_fork() {
     spin_unlock(&process->fd_table->lock);
 
     list_insert(process_list, process);
-    tree_insert_child(process_tree, NULL, process);
     list_insert(thread_queue, process);
+
+    tree_node_t* treeNode = tree_find_child_root(process_tree, parent);
+
+    if(!treeNode) {
+        treeNode = process_tree->head;
+    }
+
+    tree_insert_child(process_tree, treeNode, process);
 
     return process->id;
 }
