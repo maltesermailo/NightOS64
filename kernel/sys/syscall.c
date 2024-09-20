@@ -16,6 +16,7 @@
 #include <bits/posix/iovec.h>
 #include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/poll.h"
+#include "../../mlibc/abis/linux/wait.h"
 #include "../../mlibc/options/posix/include/sys/poll.h"
 #include "../terminal.h"
 
@@ -647,6 +648,70 @@ long sys_access(long pathPtr, long mode) {
     process_thread_exit(exitCode);
 }
 
+bool is_selected(pid_t pid, process_t* proc, process_t* parent) {
+    if (pid < -1) {
+        if (proc->tgid == -pid)
+            return true;
+    } else if (pid == 0) {
+        if (proc->tgid == parent->id)
+            return true;
+    } else if (pid > 0) {
+        if (proc->id == pid)
+            return true;
+    } else {
+        return true;
+    }
+    return false;
+}
+
+//Basic implementation of sys_wait4 to implement deleting processes for bash.
+int sys_wait4(pid_t pid, unsigned long status, int flags, unsigned long rusage) {
+    bool no_hang = flags & WNOHANG;
+
+    while(!no_hang) {
+        uintptr_t rflags = cli();
+        process_tree_t* tree = acquire_process_tree_lock();
+
+        tree_node_t* my_node = tree_find_child_root(tree, get_current_process());
+
+        if(my_node->children->length == 0) {
+            release_process_tree_lock();
+
+            sti(rflags);
+            return -1;
+        }
+
+        list_t* list = process_get_all_children(get_current_process());
+
+        for(list_entry_t* child = list->head; child; child = child->next) {
+            process_t* process = (process_t*) child->value;
+
+            if(process->flags & PROC_FLAG_FINISHED) {
+                pid_t proc_pid = process->id;
+                process_reap(process);
+
+                release_process_tree_lock();
+
+                sti(rflags);
+                return proc_pid;
+            }
+
+            if(is_selected(pid, process, get_current_process())) {
+                release_process_tree_lock();
+                sti(rflags);
+
+                return process->id;
+            }
+        }
+
+        release_process_tree_lock();
+        sti(rflags);
+        schedule(true);
+    }
+
+    return 0;
+}
+
 int sys_getcwd(long buf, long size) {
     if(!CHECK_PTR(buf)) {
         return -EFAULT;
@@ -1153,7 +1218,7 @@ syscall_t syscall_table[272] = {
         [58] = (syscall_t)sys_stub,    //SYS_VFORK
         [59] = (syscall_t)sys_execve,  //SYS_EXECVE
         [60] = (syscall_t)sys_exit,    //SYS_EXIT
-        [61] = (syscall_t)sys_stub,    //SYS_WAIT4
+        [61] = (syscall_t)sys_wait4,   //SYS_WAIT4
         [62] = (syscall_t)sys_stub,    //SYS_KILL
         [63] = (syscall_t)sys_stub,    //SYS_UNAME
         [64] = (syscall_t)sys_stub,    //SYS_SEMGET

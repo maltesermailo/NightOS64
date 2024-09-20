@@ -249,13 +249,19 @@ pid_t process_fork() {
     }
     process->main_thread.user_stack = parent->main_thread.user_stack;
     process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
-    process->main_thread.rip = (uintptr_t) fork_exit;
-    process->main_thread.rsp = process->main_thread.user_stack;
+    process->main_thread.rip = (uintptr_t) &fork_exit;
 
     regs_t registers;
-    memcpy(&registers, process->saved_registers, sizeof(regs_t));
+    memcpy(&registers, parent->saved_registers, sizeof(regs_t));
     registers.rax = 0;
-    PUSH_PTR(process->main_thread.kernel_stack, regs_t, registers);
+
+    unsigned long kernelStack = process->main_thread.kernel_stack;
+
+    PUSH_PTR(kernelStack, regs_t, registers);
+
+    process->main_thread.rsp = kernelStack;
+    process->main_thread.rbp = kernelStack;
+    process->saved_registers = &registers;
 
     process->uid = parent->uid;
     process->gid = parent->gid;
@@ -568,6 +574,8 @@ void schedule(bool sleep) {
     __sync_or_and_fetch(&pcb.current_process->flags, PROC_FLAG_ON_CPU);
 
     set_stack_pointer(pcb.current_process->main_thread.kernel_stack);
+    process_set_current_pml(pcb.current_process->page_directory->page_directory);
+    load_page_map(pcb.current_page_map);
     longjmp(&pcb.current_process->main_thread);
 }
 
@@ -668,6 +676,42 @@ void process_terminate(process_t* process, int retval) {
     process->flags = PROC_FLAG_FINISHED;
 }
 
+void process_reap(process_t * proc) {
+    if(!(proc->flags & PROC_FLAG_FINISHED)) {
+        return;
+    }
+
+    tree_node_t* node = tree_find_child_root(process_tree, proc);
+
+    if(node) {
+        tree_remove(process_tree, node);
+    }
+
+    list_entry_t* listEntry = list_find(process_list, proc);
+
+    if(listEntry) {
+        int i = 0;
+
+        while(listEntry) {
+            listEntry = listEntry->prev;
+            i++;
+        }
+
+        list_remove_by_index(process_list, i);
+    }
+
+    proc->page_directory->process_count--;
+
+    if(proc->page_directory->process_count <= 0) {
+        spin_lock(&proc->page_directory->lock);
+        process_free_pml(proc->page_directory->page_directory);
+
+        free(proc->page_directory);
+    }
+
+    free(proc);
+}
+
 void process_thread_exit(int retval) {
     process_t* process = get_current_process();
 
@@ -722,6 +766,10 @@ void process_exit(int retval) {
         process->fd_table = NULL;
     }
 
+    if(process->cwd != NULL) {
+        free(process->cwd);
+        process->cwd = NULL;
+    }
 
     process->flags = PROC_FLAG_FINISHED;
 
@@ -892,4 +940,41 @@ char* get_cwd_name() {
     }
 
     return current->cwd;
+}
+
+void process_get_children_recur(tree_node_t* node, list_t* list) {
+    for(list_entry_t* child = node->children->head; child; child = child->next) {
+        tree_node_t* child_node = (tree_node_t*)child->value;
+
+        list_insert(list, child_node->value);
+
+        process_get_children_recur(child_node, list);
+    }
+}
+
+list_t* process_get_all_children(process_t* process) {
+    list_t* list = list_create();
+
+    tree_node_t* node = tree_find_child_root(process_tree, process);
+
+    if(!node) {
+        return NULL;
+    }
+
+    process_get_children_recur(node, list);
+
+    return list;
+}
+
+/**
+ * Acquires the current process tree, thereby locking it
+ * @return
+ */
+process_tree_t* acquire_process_tree_lock() {
+    spin_lock(process_lock);
+
+    return process_tree;
+}
+void release_process_tree_lock() {
+    spin_unlock(process_lock);
 }

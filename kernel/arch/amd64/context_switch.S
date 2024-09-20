@@ -70,9 +70,9 @@ swapgs_end_%1:
     pop rbx
     pop rax
 
-    swapgs_if_necessary end
-
     add rsp, 16
+
+    swapgs_if_necessary end
 
     iretq
 

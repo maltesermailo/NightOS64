@@ -72,6 +72,8 @@ typedef int pid_t;
 
 struct process;
 
+typedef tree_t process_tree_t;
+
 typedef struct kernel_thread {
     //Important pointers
     uintptr_t rsp;
@@ -198,6 +200,7 @@ pid_t process_clone(struct clone_args* args, size_t size);
 //Process management functions
 void process_thread_exit(int retval);
 void process_exit(int retval);
+void process_reap(process_t * proc);
 void process_set_signal_handler(int signum, struct sigaction* sigaction);
 signal_handler_t* process_get_signal_handler(int signum);
 int has_pending_signals(struct process *p);
@@ -205,6 +208,7 @@ void process_check_signals(regs_t* regs);
 void process_enter_signal(regs_t* regs, int signum);
 int process_signal_return();
 void process_set_signal_mask(int how, sigset_t* new);
+list_t* process_get_all_children(process_t* process);
 
 //Process memory functions
 uintptr_t process_get_current_pml();
@@ -218,6 +222,13 @@ void process_close_fd(int fd);
 process_t* get_current_process();
 file_node_t* get_cwd();
 char* get_cwd_name();
+
+/**
+ * Acquires the current process tree, thereby locking it
+ * @return
+ */
+process_tree_t* acquire_process_tree_lock();
+void release_process_tree_lock();
 
 int execve(char* path, char** argv, char** envp);
 

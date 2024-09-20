@@ -29,6 +29,18 @@
 #define FLAG_WP 0x80
 #define FLAG_WC 0x88
 
+typedef struct VirtualMemoryRegion {
+    uintptr_t start;
+    uintptr_t end;
+    uintptr_t flags;
+} vma_t;
+
+struct page {
+    uint32_t flags;
+    vma_t* vma;
+
+    struct page* next;
+};
 
 void memmgr_init(struct multiboot_tag_mmap* info, uintptr_t kernel_end);
 

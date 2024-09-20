@@ -198,6 +198,10 @@ void* memmgr_get_page_physical(uintptr_t virtaddr) {
  * @return the virtual memory address for direct access by kernel
  */
 void* memmgr_get_from_physical(uintptr_t physAddr) {
+    if(physAddr == 0x1000) {
+        return (void*)0x1000;
+    }
+
     return (void*)(physAddr | KERNEL_MEMORY);
 }
 
@@ -417,7 +421,7 @@ void memmgr_delete_page(uintptr_t virtualAddr) {
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     if(pageDirectoryPointer == 0 || (uintptr_t)pageMap[INDEX_PML4] & PAGE_LARGE) {
@@ -449,7 +453,7 @@ void memmgr_map_frame_to_virtual(uintptr_t frame_addr, uintptr_t virtual_addr, u
     uint64_t INDEX_PD = PD_INDEX(virtual_addr);
     uint64_t INDEX_PT = PT_INDEX(virtual_addr);
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     int pageFlags = flags;
@@ -535,7 +539,7 @@ bool memmgr_change_flags(uintptr_t virt, int flags) {
 
     uint64_t* pagePtr = null;
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     if(pageDirectoryPointer == 0) {
@@ -585,7 +589,7 @@ uint8_t memmgr_get_page_level(uintptr_t virt) {
 
     uint64_t* pagePtr = null;
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     if(pageDirectoryPointer == 0) {
@@ -944,7 +948,7 @@ void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew) {
                         continue;
                     }
 
-                    printf("Copying page %d-%d-%d-%d\n", i, j, k, l);
+                    //printf("Copying page %d-%d-%d-%d\n", i, j, k, l);
 
                     if(page & PAGE_USER) {
                         uintptr_t page_frame = kalloc_frame();
@@ -979,7 +983,7 @@ bool __attribute__((optimize("O0"))) memmgr_check_user(uintptr_t virtualAddr) {
     uint64_t INDEX_PD = PD_INDEX(virtualAddr);
     uint64_t INDEX_PT = PT_INDEX(virtualAddr);
 
-    uint64_t* pageMap = memmgr_get_current_pml4();
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
 
     if(!((uintptr_t)pageMap[INDEX_PML4] & PAGE_USER) || pageDirectoryPointer == 0) {
