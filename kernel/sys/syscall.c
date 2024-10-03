@@ -11,14 +11,16 @@
 #include "../timer.h"
 #include "../../mlibc/options/ansi/include/bits/ansi/timespec.h"
 #include <signal.h>
-#include <abi-bits/stat.h>
-#include <abi-bits/access.h>
-#include <bits/posix/iovec.h>
+#include "../../mlibc/abis/linux/stat.h"
+#include "../../mlibc/abis/linux/access.h"
+#include "../../mlibc/abis/linux/seek-whence.h"
+#include "../../mlibc/options/posix/include/bits/posix/iovec.h"
 #include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/poll.h"
 #include "../../mlibc/abis/linux/wait.h"
 #include "../../mlibc/options/posix/include/sys/poll.h"
 #include "../terminal.h"
+#include "../serial.h"
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -320,6 +322,8 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
             if((pollfds->revents & (POLLIN | POLLOUT))) {
                 one_ready = true;
             }
+
+            pollfds++;
         }
 
         if(!one_ready) {
@@ -337,10 +341,14 @@ int sys_poll(long fdbuf, long nfds, int timeout) {
 
     int countChanged = 0;
 
+    pollfds = (struct pollfd*) fdbuf;
+
     for(int i = 0; i < nfds; i++) {
         if(pollfds->revents & (POLLIN | POLLOUT)) {
             countChanged++;
         }
+
+        pollfds++;
     }
 
     return countChanged;
@@ -873,7 +881,7 @@ long sys_clone(unsigned long flags, unsigned long stack, unsigned long parent_ti
 }
 
 long sys_execve(long pathname, long argv, long envp) {
-    if(CHECK_PTR(pathname) || CHECK_PTR(argv) || CHECK_PTR(envp)) {
+    if(!(CHECK_PTR(pathname) || CHECK_PTR(argv) || CHECK_PTR(envp))) {
         return -EINVAL;
     }
 
@@ -1449,6 +1457,8 @@ void syscall_entry(regs_t* regs) {
 
     if(syscall_table[syscallNo]) {
         get_current_process()->saved_registers = regs;
+
+        serial_printf("Got syscall with params %d(%d,%d,%d,%d,%d)", syscallNo, regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 
         int returnCode = syscall_table[syscallNo](regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
 

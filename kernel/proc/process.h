@@ -203,6 +203,7 @@ void process_exit(int retval);
 void process_reap(process_t * proc);
 void process_set_signal_handler(int signum, struct sigaction* sigaction);
 signal_handler_t* process_get_signal_handler(int signum);
+void process_send_signal(process_t* proc, int signum);
 int has_pending_signals(struct process *p);
 void process_check_signals(regs_t* regs);
 void process_enter_signal(regs_t* regs, int signum);
@@ -222,6 +223,7 @@ void process_close_fd(int fd);
 process_t* get_current_process();
 file_node_t* get_cwd();
 char* get_cwd_name();
+process_t* get_process_by_id(int pid);
 
 /**
  * Acquires the current process tree, thereby locking it

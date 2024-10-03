@@ -484,6 +484,7 @@ int printf(const char* restrict format, ...) {
                 return -1;
             }
             print(format, amount);
+            serial_print(format, amount);
             format += amount;
             written += amount;
             continue;
@@ -501,6 +502,7 @@ int printf(const char* restrict format, ...) {
             }
             if (!print(&c, sizeof(c)))
                 return -1;
+            serial_print(&c, sizeof(c));
             written++;
         } else if (*format == 's') {
             format++;
@@ -513,6 +515,7 @@ int printf(const char* restrict format, ...) {
             }
             if (!print(str, len))
                 return -1;
+            serial_print(str, len);
             written += len;
         } else if(*format == 'd' || *format == 'x' || *format == 'u') {
             long i = va_arg(parameters, long);
@@ -526,6 +529,7 @@ int printf(const char* restrict format, ...) {
 
             if(!print(buf, strlen(buf)))
                 return -1;
+            serial_print(buf, strlen(buf));
             written += strlen(buf);
         } else {
             format = format_begun_at;
@@ -537,6 +541,7 @@ int printf(const char* restrict format, ...) {
             }
             if (!print(format, len))
                 return -1;
+            serial_print(format, len);
             written += len;
             format += len;
         }

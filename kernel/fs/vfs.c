@@ -168,70 +168,69 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
     if(file[0] == '/') {
         fCwd = file_tree->head;
     } else {
-        if(fCwd == NULL) {
-            tree_node_t* current = file_tree->head;
+        tree_node_t *current = file_tree->head;
+        cwd = strdup(cwd);
+        char *pch = (char *) NULL;
+        char *save = NULL;
+        printf("Resolving cwd: %s\n", cwd);
+        pch = (char *) strtok_r(cwd, "/", &save);
 
-            cwd = strdup(cwd);
-            char* pch = (char *) NULL;
-            char* save = NULL;
-            printf("Resolving cwd: %s\n", cwd);
-
-            pch = (char *) strtok_r(cwd, "/", &save);
-
-            do {
-                if(strcmp(pch, "..") == 0) {
-                    //Funny.
-                    if(current == file_tree->head) {
-                        return root_node;
-                    }
-
-                    if(current->parent != NULL) {
-                        current = current->parent;
-                    }
-
-                    pch = (char *) strtok_r(NULL, "/", &save);
-
-                    continue;
-                } else if(strcmp(pch, ".") == 0) {
-                    pch = (char *) strtok_r(NULL, "/", &save);
-
-                    continue;
-                } else {
-                    char* name = pch;
-                    fCwd = current; // save temporarily in fCwd
-
-                    current = get_child(current, pch);
-
-                    if(current == NULL) {
-                        //No node found, try fs
-                        file_node_t* fs_node = fCwd->value;
-                        if(fs_node->file_ops.find_dir) {
-                            file_node_t* node = fs_node->file_ops.find_dir(fs_node, name);
-
-                            if(node != NULL) {
-                                //Add caching of node and continue traversal
-                                current = cache_node(fCwd, node);
-
-                                if(pch == NULL) {
-                                    fCwd = current;
-                                    break;
-                                }
-
-                                continue;
-                            }
-                        }
-
-                        free(cwd);
-                        //We couldn't resolve cwd, wtf?
-                        return NULL;
-                    }
+        do {
+            if (strcmp(pch, "..") == 0) {
+                //Funny.
+                if (current == file_tree->head) {
+                    return root_node;
                 }
-            } while(pch != null);
 
-            free(cwd);
-            if(current != NULL) {
-                fCwd = current;
+                if (current->parent != NULL) {
+                    current = current->parent;
+                }
+
+                pch = (char *) strtok_r(NULL, "/", &save);
+
+                continue;
+            } else if (strcmp(pch, ".") == 0) {
+                pch = (char *) strtok_r(NULL, "/", &save);
+
+                continue;
+            } else {
+                char *name = pch;
+                fCwd = current; // save temporarily in fCwd
+
+                current = get_child(current, pch);
+
+                if (current == NULL && name != NULL) {
+                    //No node found, try fs
+                    file_node_t *fs_node = fCwd->value;
+                    if (fs_node->file_ops.find_dir) {
+                        file_node_t *node = fs_node->file_ops.find_dir(fs_node, name);
+
+                        if (node != NULL) {
+                            //Add caching of node and continue traversal
+                            current = cache_node(fCwd, node);
+
+                            if (pch == NULL) {
+                                fCwd = current;
+                                break;
+                            }
+
+                            continue;
+                        }
+                    }
+
+                    //We couldn't resolve cwd, wtf?
+                    current = file_tree->head;
+                    break;
+                }
             }
+        } while (pch != null);
+
+        if(cwd != NULL) {
+            free(cwd);
+        }
+
+        if (current != NULL) {
+            fCwd = current;
         }
     }
 
@@ -272,7 +271,7 @@ file_node_t* resolve_path(char* cwd, char* file, file_node_t** outParent, char**
 
             pch = (char *) strtok_r(NULL, "/", &save);
 
-            if(current == NULL) {
+            if(current == NULL && name != NULL) {
                 //No node found, try fs
                 file_node_t* fs_node = fParent->value;
                 if(fs_node->file_ops.find_dir) {

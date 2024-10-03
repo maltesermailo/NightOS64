@@ -34,6 +34,8 @@ char* push_string_to_userstack(uintptr_t* stack, const char* str) {
 
     // Copy the string to the stack
     memcpy((void*)*stack, str, len);
+
+    return (char*) *stack;
 }
 
 static struct process_control_block pcb; //currently the only one, we're running single core
@@ -411,7 +413,7 @@ void process_free_pml(uintptr_t pml) {
 int execve(char* path, char** argv, char** envp) {
     process_t* process = get_current_process();
 
-    if(process == NULL) return -1;
+    if(process == NULL) return -EINVAL;
 
     if(process->tgid != 0) {
         return -2; //Can't replace image in thread
@@ -426,6 +428,45 @@ int execve(char* path, char** argv, char** envp) {
 
     file_handle_t* handleElf = create_handle(node);
 
+    int argc = 0;
+    if(argv) {
+        while(argv[argc]) {
+            if(!CHECK_PTR((uintptr_t) argv[argc])) return -EFAULT;
+            argc++;
+        }
+    }
+
+    int envc = 0;
+    if(envp) {
+        while(envp[envc]) {
+            if(!CHECK_PTR((uintptr_t) envp[envc])) return -EFAULT;
+            envc++;
+        }
+    }
+
+    char** new_argv = calloc(1, sizeof(char*) * argc);
+    char** new_envp = calloc(1, sizeof(char*) * envc);
+
+    for(int i = 0; i < argc; i++) {
+        char* arg = malloc(strlen(argv[i]) + 1);
+        memcpy(arg, argv[i], strlen(argv[i]));
+
+        arg[strlen(argv[i]) + 1] = 0;
+
+        new_argv[i] = arg;
+    }
+
+    for(int i = 0; i < envc; i++) {
+        char* arg = malloc(strlen(envp[i]) + 1);
+        memcpy(arg, envp[i], strlen(envp[i]));
+
+        arg[strlen(envp[i]) + 1] = 0;
+
+        new_envp[i] = arg;
+    }
+
+    load_page_map(0);
+
     spin_lock(&process->page_directory->lock);
     if(process->page_directory->process_count == 1) {
         process_free_pml(process->page_directory->page_directory);
@@ -439,12 +480,8 @@ int execve(char* path, char** argv, char** envp) {
     spin_unlock(&process->page_directory->lock);
     spin_lock(&process->page_directory->lock);
 
-    memmgr_clone_page_map((uint64_t *) 0x1000, (uint64_t *) process->page_directory->page_directory); //Clone from init pml
+    memmgr_clone_page_map((uint64_t *) 0x1000, (uint64_t *) memmgr_get_from_physical(process->page_directory->page_directory)); //Clone from init pml
     load_page_map(process->page_directory->page_directory);
-
-    process->main_thread.user_stack = (uintptr_t) (mmap(0, 16384, false) + 16384);
-
-    process->flags = PROC_FLAG_RUNNING;
 
     if(process->fd_table->length > 0) {
         for(int i = 0; i < process->fd_table->capacity; i++) {
@@ -464,12 +501,9 @@ int execve(char* path, char** argv, char** envp) {
         free(process->fd_table);
     }
 
-    process->fd_table = calloc(1, sizeof(fd_table_t));
-    process->fd_table->capacity = 32;
-    process->fd_table->length = 0;
-    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
-    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
-    spin_unlock(&process->fd_table->lock);
+    if(process->cwd) {
+        free(process->cwd);
+    }
 
     elf_t* elf = load_elf(handleElf);
     if(exec_elf(elf, 0, 0, 0)) {
@@ -477,10 +511,69 @@ int execve(char* path, char** argv, char** envp) {
         return -1;
     }
 
+    process->main_thread.process = process;
+    process->main_thread.priority = 0;
+    process->main_thread.user_stack = (uintptr_t) (mmap(0, 16384, false) + 16384);
     process->main_thread.rip = (uintptr_t)elf->entrypoint;
+
+    process->flags = (process->flags & PROC_FLAG_KERNEL) ? PROC_FLAG_KERNEL : 0;
+    process->flags |= PROC_FLAG_RUNNING;
+    process->cwd_file = open("/", 0);
+    //Always make sure to clean this string up!!!
+    process->cwd = strdup("/");
+
+    process->fd_table = calloc(1, sizeof(fd_table_t));
+    process->fd_table->capacity = 32;
+    process->fd_table->length = 0;
+    process->fd_table->handles = malloc(sizeof(file_node_t*) * process->fd_table->capacity);
+    memset(process->fd_table->handles, 0, sizeof(file_node_t*) * process->fd_table->capacity);
+    spin_unlock(&process->fd_table->lock);
+
+    file_node_t* console = open("/dev/tty", 0);
+    process_open_fd(console, 0);
+    process_open_fd(console, 0);
+    process_open_fd(console, 0);
+
+    set_stack_pointer(process->main_thread.kernel_stack);
+
+    unsigned long userStack = process->main_thread.user_stack;
+
+    char** final_envp = calloc(1, sizeof(char) * envc);
+    char** final_argv = calloc(1, sizeof(char) * argc);
+
+    for(int i = 0; i < envc; i++) {
+        push_string_to_userstack(&userStack, new_envp[i]);
+        final_envp[i] = (char*)userStack;
+
+        free(new_envp[i]);
+    }
+
+    for(int i = 0; i < argc; i++) {
+        push_string_to_userstack(&userStack, new_argv[i]);
+        final_argv[i] = (char*)userStack;
+
+        free(new_argv[i]);
+    }
+    free(new_argv);
+    free(new_envp);
+
+    PUSH_PTR(userStack, uintptr_t, 0); //ENVP ZERO
+    for(int i = 0; i < envc; i++) {
+        PUSH_PTR(userStack, char*, final_argv[i]);
+    }
+    PUSH_PTR(userStack, uintptr_t, 0); //ARGV ZERO
+    for(int i = 0; i < envc; i++) {
+        PUSH_PTR(userStack, char*, final_argv[i]);
+    }
+    PUSH_PTR(userStack, uintptr_t, argc); //ARGC
+
+    free(final_envp);
+    free(final_argv);
+
+    process->main_thread.user_stack = userStack;
     process->main_thread.rsp = process->main_thread.user_stack;
 
-    enter_user(process->main_thread.rip, process->main_thread.rsp);
+    enter_user(process->main_thread.rip, process->main_thread.user_stack);
 }
 
 int process_open_fd(file_node_t* node, int mode) {
@@ -891,6 +984,7 @@ void process_enter_signal(regs_t* regs, int signum) {
     PUSH_PTR(rsp, regs_t, *regs);
     PUSH_PTR(rsp, long, signum);
     PUSH_PTR(rsp, sigset_t, get_current_process()->blocked_signals);
+    PUSH_PTR(rsp, unsigned long, (uintptr_t)get_current_process()->signalHandlers[signum].sa_restorer);
 
     asm volatile(
             "pushq %0\n"
@@ -964,6 +1058,18 @@ list_t* process_get_all_children(process_t* process) {
     process_get_children_recur(node, list);
 
     return list;
+}
+
+process_t* get_process_by_id(int pid) {
+    for(list_entry_t* entry = process_list->head; entry; entry = entry->next) {
+        process_t* proc = (process_t*)entry->value;
+
+        if(proc->id == pid) {
+            return proc;
+        }
+    }
+
+    return NULL;
 }
 
 /**

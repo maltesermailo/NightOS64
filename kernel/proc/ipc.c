@@ -160,6 +160,23 @@ void handle_signal(process_t* process, int signum, regs_t* regs) {
     process_enter_signal(regs, signum);
 }
 
+void process_send_signal(process_t* proc, int signum) {
+    if(proc->flags & PROC_FLAG_FINISHED) {
+        return;
+    }
+
+    if(signum > 32) {
+        return;
+    }
+
+    uintptr_t rflags = cli();
+    spin_lock(&proc->lock);
+
+    sigaddset(&proc->pending_signals, signum);
+    spin_unlock(&proc->lock);
+    sti(rflags);
+}
+
 void process_check_signals(regs_t* regs) {
     process_t* current = get_current_process();
 

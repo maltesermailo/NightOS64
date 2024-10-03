@@ -3,10 +3,23 @@
 //
 #include "../../memmgr.h"
 #include "../../lock.h"
+#include "../../../mlibc/abis/linux/errno.h"
 
 #define MAX_SIZE_CLASSES 512
 
 static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
+static struct size_class defaultSizeClasses[10] = {
+        {.size = 8, .slabs = NULL},
+        {.size = 16, .slabs = NULL},
+        {.size = 32, .slabs = NULL},
+        {.size = 64, .slabs = NULL},
+        {.size = 128, .slabs = NULL},
+        {.size = 256, .slabs = NULL},
+        {.size = 512, .slabs = NULL},
+        {.size = 1024, .slabs = NULL},
+        {.size = 2048, .slabs = NULL},
+        {.size = 4096, .slabs = NULL}
+};
 
 struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     uint8_t perPage = (4096 / sizeClass->size);
@@ -70,7 +83,8 @@ void* kmalloc(size_t size) {
                 slab = slab->next;
             }
 
-            slab->next = kmalloc_for_size(&registeredSizeClasses[i]);
+            kmalloc_for_size(&registeredSizeClasses[i]);
+            slab = slab->next;
             slab->bitmap[0] |= 1 << 0;
             slab->free_objects--;
 
@@ -78,7 +92,56 @@ void* kmalloc(size_t size) {
         }
     }
 
-    return NULL;
+    int shift = 0;
+
+    while ( shift < 10 )
+    {
+        if ( defaultSizeClasses[shift].size > size ) break;
+        shift += 1;
+    }
+
+    if(defaultSizeClasses[shift].size > size) {
+        return NULL; //Size larger than a whole page, please use liballoc or direct mmap!
+    }
+
+    if(!defaultSizeClasses[shift].slabs) {
+        defaultSizeClasses[shift].slabs = kmalloc_for_size(&defaultSizeClasses[shift]);
+    }
+
+    struct slab* slab = defaultSizeClasses[shift].slabs;
+
+    while(slab) {
+        if(slab->free_objects > 0) {
+            for(int j = 0; j < slab->total_objects; j++) {
+                int index = (j / 64);
+                int bit = (j % 64);
+
+                unsigned long bitmap = slab->bitmap[index];
+
+                if((bitmap & (1 << bit)) == 0) {
+                    slab->bitmap[index] |= (1 << bit);
+                    slab->free_objects--;
+
+                    return slab->memory + (64 * index * slab->object_size) + (bit * slab->object_size);
+                }
+            }
+        } else {
+            slab = slab->next;
+        }
+    }
+
+    //If we got here, no slabs are free
+    slab = defaultSizeClasses[shift].slabs;
+    while(slab->next) {
+        slab = slab->next;
+    }
+
+    kmalloc_for_size(&defaultSizeClasses[shift]);
+    slab = slab->next;
+    slab->bitmap[0] |= 1 << 0;
+    slab->free_objects--;
+
+    return slab->memory;
 }
 
 void kfree(void* ptr) {
