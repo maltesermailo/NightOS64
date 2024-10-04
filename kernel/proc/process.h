@@ -160,6 +160,7 @@ typedef struct process {
 
 typedef struct process_control_block {
     volatile process_t* current_process;
+    volatile process_t* previous_process;
     process_t* kernel_idle_process;
 
     int core;

@@ -40,3 +40,7 @@ void gdt_install() {
 void set_stack_pointer(uintptr_t stack) {
     tss.rsp[0] = stack;
 }
+
+void set_ist(int index, uintptr_t stack) {
+    tss.ist[index] = stack;
+}

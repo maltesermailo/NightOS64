@@ -117,6 +117,9 @@ void idt_install() {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
+    //Set Page fault stack
+    idt[0xD].ist = 0x1;
+
     //remember to reroute this if more isrs come, rn syscall is at 48
     idt_set_descriptor(0x80, isr_stub_table[48], 0x8E | 0x60);
 

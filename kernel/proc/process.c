@@ -132,8 +132,8 @@ void process_create_task(char* path, bool is_kernel) {
 
     process->main_thread.process = process;
     process->main_thread.priority = 0;
-    process->main_thread.user_stack = (uintptr_t) (mmap(0, 16384, false) + 16384);
-    process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
+    process->main_thread.user_stack = (uintptr_t) (memmgr_create_stack(1, 16384) + 16384);
+    process->main_thread.kernel_stack = (uintptr_t) (memmgr_create_stack(false, 16384) + 16384);
     process->main_thread.rip = (uintptr_t)elf->entrypoint;
 
     process->uid = 0;
@@ -209,7 +209,7 @@ void process_create_idle() {
     process->main_thread.process = process;
     process->main_thread.priority = 0;
     process->main_thread.rip = (uintptr_t) &idle;
-    process->main_thread.kernel_stack = (uintptr_t) malloc(16384);
+    process->main_thread.kernel_stack = (uintptr_t) memmgr_create_stack(0, 4096);
     process->main_thread.rsp = process->main_thread.kernel_stack;
 
     process->uid = 0;
@@ -250,7 +250,7 @@ pid_t process_fork() {
         return process->id;
     }
     process->main_thread.user_stack = parent->main_thread.user_stack;
-    process->main_thread.kernel_stack = (uintptr_t) (malloc(16384) + 16384);
+    process->main_thread.kernel_stack = (uintptr_t) (memmgr_create_stack(false, 16384) + 16384);
     process->main_thread.rip = (uintptr_t) &fork_exit;
 
     regs_t registers;
@@ -652,6 +652,7 @@ void schedule(bool sleep) {
         schedule_process(pcb.current_process);
     }
 
+    pcb.previous_process = pcb.current_process;
     pcb.current_process = get_next_process();
 
     if(pcb.current_process == null) {
@@ -815,6 +816,10 @@ void process_thread_exit(int retval) {
 
     process->status = retval;
     process->flags = PROC_FLAG_FINISHED;
+    //Clear stack
+    for(int i = 0; i < 0x5000; i += 0x1000) {
+        memmgr_delete_page(process->main_thread.kernel_stack - 0x5000 + i);
+    }
     //Now we wait until someone cleans it up.
 
     schedule(true);
@@ -1003,6 +1008,10 @@ file_node_t* get_cwd() {
 
     if(current == NULL) return NULL;
 
+    if(current->cwd == NULL) {
+        current->cwd = "/";
+    }
+
     if(current->cwd_file == NULL) {
         file_node_t* cwd_file = open(current->cwd, 0);
 
@@ -1021,6 +1030,10 @@ char* get_cwd_name() {
     process_t* current = get_current_process();
 
     if(current == NULL) return "/";
+
+    if(current->cwd == NULL) {
+        current->cwd = "/";
+    }
 
     if(current->cwd_file == NULL) {
         file_node_t* cwd_file = open(current->cwd, 0);

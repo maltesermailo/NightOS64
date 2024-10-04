@@ -9,6 +9,7 @@
 #include "../../proc/process.h"
 #include "../../lock.h"
 #include "../../serial.h"
+#include "../../gdt.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -305,6 +306,129 @@ void* memmgr_create_or_get_page(uintptr_t virtualAddr, int flags, int create) {
     return (void *) (pageTable[INDEX_PT] & PAGE_MASK);
 }
 
+/**
+ * Creates a new virtual memory mapping
+ * @param virtualAddr the virtual addr to map to
+ * @param frame the frame to insert at the desired level
+ * @param flags the flags for the new page, must include PAGE_PRESENT if you want it to be usable
+ * @param create whether to create new page entries
+ * @param level the level for the frame and also the maximum creation level
+ * @return
+ */
+void* memmgr_create_or_get_raw(uintptr_t virtualAddr, uintptr_t frame, int flags, int create, int level) {
+    uint64_t INDEX_PML4 = PML4_INDEX(virtualAddr);
+    uint64_t INDEX_PDP = PDP_INDEX(virtualAddr);
+    uint64_t INDEX_PD = PD_INDEX(virtualAddr);
+    uint64_t INDEX_PT = PT_INDEX(virtualAddr);
+
+#ifdef DEBUG
+    printf("Virtual addr: 0x%x\n", virtualAddr);
+    printf("INDICES: 0x%x, 0x%x, 0x%x, 0x%x\n", INDEX_PML4, INDEX_PDP, INDEX_PD, INDEX_PT);
+#endif
+
+    uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[INDEX_PML4] & PAGE_MASK);
+
+    //If PDP doesnt exist, either return or try to create
+    if(pageMap[INDEX_PML4] == 0) {
+        if(!create) {
+            return NULL;
+        }
+
+        if(level <= 3) {
+            uintptr_t pdp_frame = kalloc_frame();
+
+            if(pdp_frame == UINT64_MAX) {
+                //PANIC
+            }
+
+            pageMap[INDEX_PML4] = pdp_frame | flags;
+
+            pageDirectoryPointer = (uint64_t*)(pdp_frame | KERNEL_MEMORY);
+            memset(pageDirectoryPointer, 0, 0x1000);
+        } else {
+            pageMap[INDEX_PML4] = frame | flags;
+            memset((uint64_t*)(frame | KERNEL_MEMORY), 0, 0x1000);
+
+            return (void *) (pageMap[INDEX_PML4] & PAGE_MASK);
+        }
+    }
+
+    uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
+
+    //If PD doesnt exist, either return or try to create
+    if(pageDirectoryPointer[INDEX_PDP] == 0) {
+        if(!create) return NULL;
+
+        if(level <= 2) {
+            uintptr_t pd_frame = kalloc_frame();
+            pageDirectoryPointer[INDEX_PDP] = pd_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
+
+            pageDirectory = (uint64_t*)(pd_frame | KERNEL_MEMORY);
+            memset(pageDirectory, 0, 0x1000);
+        } else {
+            pageDirectoryPointer[INDEX_PDP] = frame | flags;
+
+            pageDirectory = (uint64_t*)(frame | KERNEL_MEMORY);
+            memset(pageDirectory, 0, 0x1000);
+
+            return (void *) (pageDirectoryPointer[INDEX_PDP] & PAGE_MASK);
+        }
+    }
+
+    if(pageDirectoryPointer[INDEX_PDP] & PAGE_LARGE) {
+        //Skip large page
+        return 0;
+    }
+
+    uint64_t* pageTable = memmgr_get_from_physical(pageDirectory[INDEX_PD] & PAGE_MASK);
+
+    //If PT doesnt exist, either return or try to create
+    if(pageDirectory[INDEX_PD] == 0) {
+        if(!create) return NULL;
+
+        if(level <= 1) {
+            uintptr_t pt_frame = kalloc_frame();
+            pageDirectory[INDEX_PD] = pt_frame | PAGE_PRESENT | PAGE_WRITABLE | flags;
+
+#ifdef DEBUG
+            printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
+#endif
+
+            pageTable = (uint64_t*)(pt_frame | KERNEL_MEMORY);
+            memset(pageTable, 0, 0x1000);
+        } else {
+            pageDirectory[INDEX_PD] = frame | flags;
+
+#ifdef DEBUG
+            printf("Creating page table at 0x%x with index 0x%x in PD 0x%x\n", pt_frame, INDEX_PD, pageDirectory);
+#endif
+
+            pageTable = (uint64_t*)(frame | KERNEL_MEMORY);
+            memset(pageTable, 0, 0x1000);
+
+            return (void *) (pageDirectory[INDEX_PD] & PAGE_MASK);
+        }
+    }
+
+    if(pageDirectory[INDEX_PD] & PAGE_LARGE) {
+        //Skip large page
+        return 0;
+    }
+
+    //If page doesnt exist, either return or try to create
+    if(pageTable[INDEX_PT] == 0) {
+        if(!create) return NULL;
+#ifdef DEBUG
+        printf("Creating new page\n");
+#endif
+        pageTable[INDEX_PT] = frame | flags;
+    }
+
+    //Return address of new page
+    return (void *) (pageTable[INDEX_PT] & PAGE_MASK);
+}
+
 void* get_free_page(size_t len) {
     uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
     uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0] & PAGE_MASK);
@@ -442,7 +566,9 @@ void memmgr_delete_page(uintptr_t virtualAddr) {
 
     uintptr_t frame = pageTable[INDEX_PT];
 
-    kfree_frame(frame);
+    if(frame & PAGE_PRESENT) {
+        kfree_frame(frame & PAGE_MASK);
+    }
 
     pageTable[INDEX_PT] = 0;
 }
@@ -761,6 +887,69 @@ void munmap(void* addr, size_t len) {
 
         memmgr_delete_page((uintptr_t)addr + 0x1000 * i);
         memmgr_reload((uintptr_t)addr + 0x1000 * i);
+    }
+}
+
+/**
+ * Allocates a new stack
+ * @param user whether it is a userspace stack
+ * @param len the length of the memory region
+ */
+void* memmgr_create_stack(bool user, uint64_t len) {
+    if(!user) {
+        uintptr_t start_addr = (uintptr_t)(_end);
+        start_addr += kernel_heap_length;
+
+        if((((uintptr_t)start_addr % PAGE_SIZE) != 0)) {
+            start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
+        }
+
+        //Divide by pages, so we get to count of pages to create
+        size_t count = len / 4096;
+        if(len % 4096 != 0) {
+            count++;
+        }
+
+#ifdef DEBUG
+        printf("Start addr: %x\n", start_addr);
+#endif
+
+        //Create the actual pages and reload the TLB at that location
+        memmgr_create_or_get_raw(start_addr, 0, MEMMGR_PAGE_FLAG_STACK_GUARD, 1, 0);
+
+        for(size_t i = 1; i < count+1; i++) {
+            memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_PRESENT | PAGE_WRITABLE, 1);
+        }
+
+        //Increase kernel heap so we dont get overwritten on sbrk
+        kernel_heap_length += len;
+
+        return (void*)start_addr + 0x1000;
+    } else {
+#ifdef DEBUG
+        printf("Get next free page...\n");
+#endif
+        //Search new space
+        uintptr_t start_addr = (uintptr_t) get_free_page(len + 4096);
+
+        //Divide by pages, so we get to count of pages to create
+        size_t count = len / 4096;
+        if(len % 4096 != 0) {
+            count++;
+        }
+
+#ifdef DEBUG
+        printf("Start addr: 0x%x, Count: %d\n", start_addr, count);
+#endif
+
+        memmgr_create_or_get_raw(start_addr, 0, MEMMGR_PAGE_FLAG_STACK_GUARD, 1, 0);
+
+        //Create the actual pages and reload the TLB at that location
+        for(size_t i = 1; i < count+1; i++) {
+            memmgr_create_or_get_page(start_addr + 0x1000 * i, PAGE_USER | PAGE_PRESENT | PAGE_WRITABLE, 1);
+        }
+
+        return (void*)start_addr + 0x1000;
     }
 }
 
@@ -1104,6 +1293,8 @@ void memmgr_init(struct multiboot_tag_mmap* tag, uintptr_t kernel_end) {
     PAGE_MAP[509] = (uintptr_t)IDENTITY_MAP_PD_TEMP | PAGE_PRESENT | PAGE_WRITABLE;
 
     kernel_heap_length = 0x0;
+
+    set_ist(0, (uintptr_t) memmgr_create_stack(false, 16384)); //Setup Interrupt Stack for Page Fault
 
     //Reload PML to apply our mappings
     reloadPML();

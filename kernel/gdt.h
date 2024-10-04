@@ -49,5 +49,6 @@ typedef struct {
 
 void gdt_install();
 void set_stack_pointer(uintptr_t stack);
+void set_ist(int index, uintptr_t stack);
 
 #endif //NIGHTOS_GDT_H
