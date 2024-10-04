@@ -768,6 +768,8 @@ void kernel_main(unsigned long magic, unsigned long header)
     printf("Performing FAT test now...\n");
     fat_test();
 
+    kmalloc_test();
+
     //Try opening console
     file_node_t* console0 = open("/dev/tty", 0);
     file_handle_t* hConsole = create_handle(console0);

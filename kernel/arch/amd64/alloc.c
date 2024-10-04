@@ -6,6 +6,7 @@
 #include "../../../mlibc/abis/linux/errno.h"
 
 #define MAX_SIZE_CLASSES 512
+#define DEFAULT_SIZE_CLASSES 10
 
 static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
 static struct size_class defaultSizeClasses[10] = {
@@ -20,6 +21,8 @@ static struct size_class defaultSizeClasses[10] = {
         {.size = 2048, .slabs = NULL},
         {.size = 4096, .slabs = NULL}
 };
+
+static int registeredSizeClassesCount = 0;
 
 struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     uint8_t perPage = (4096 / sizeClass->size);
@@ -53,7 +56,7 @@ struct slab* kmalloc_for_size(struct size_class* sizeClass) {
 }
 
 void* kmalloc(size_t size) {
-    for(int i = 0; i < MAX_SIZE_CLASSES; i++) {
+    for(int i = 0; i < registeredSizeClassesCount; i++) {
         if(registeredSizeClasses[i].size == size) {
             struct slab* slab = registeredSizeClasses[i].slabs;
 
@@ -147,6 +150,31 @@ void* kmalloc(size_t size) {
 void kfree(void* ptr) {
     if (ptr == NULL) return;
 
+    //Search in default size classes first, because they are cheaper and more widespread
+    for (int i = 0; i < DEFAULT_SIZE_CLASSES; i++) {
+        if (defaultSizeClasses[i].size > 0) {
+            struct slab* slab = registeredSizeClasses[i].slabs;
+
+            while (slab) {
+                if (ptr >= slab->memory && ptr < slab->memory + 4096) {
+                    // Found the correct slab
+                    ptrdiff_t offset = (char*)ptr - (char*)slab->memory;
+                    int objectIndex = offset / slab->object_size;
+                    int bitmapIndex = objectIndex / 64;
+                    int bitOffset = objectIndex % 64;
+
+                    // Clear the bit in the bitmap
+                    slab->bitmap[bitmapIndex] &= ~(1UL << bitOffset);
+
+                    slab->free_objects++;
+
+                    return;
+                }
+                slab = slab->next;
+            }
+        }
+    }
+
     for (int i = 0; i < MAX_SIZE_CLASSES; i++) {
         if (registeredSizeClasses[i].size > 0) {
             struct slab* slab = registeredSizeClasses[i].slabs;
@@ -198,6 +226,7 @@ void alloc_register_object_size(size_t size) {
             registeredSizeClasses[i].slabs = NULL;
 
             kmalloc_for_size(&registeredSizeClasses[i]);
+            registeredSizeClassesCount++;
             return;
         }
     }

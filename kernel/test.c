@@ -9,6 +9,15 @@
 #include "fs/vfs.h"
 #include "serial.h"
 #include "terminal.h"
+#include "memmgr.h"
+
+void kmalloc_test() {
+    void* ptr1 = kmalloc(32);
+    void* ptr2 = kmalloc(45);
+
+    kfree(ptr1);
+    kfree(ptr2);
+}
 
 void list_test() {
     list_t* list = list_create();
