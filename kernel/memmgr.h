@@ -10,12 +10,22 @@
 #include <stdbool.h>
 #include "alloc.h"
 
-#define MAP_PRIVATE 2
-
 #define PROT_EXEC 1<<0
 #define PROT_READ 1<<1
 #define PROT_WRITE 1<<2
 #define PROT_NONE 0
+
+#define MEMMGR_PAGE_FLAG_COW 1 << 9
+
+/**
+ * This flag is only available when the page is set to non-present!
+ *
+ * Currently we use the first bit after the present bit to check if stack guard
+ * The other bits are reserved.
+ *
+ * Setting the stack guard flag notifies the memory manager to not use this page when allocating a new page
+ */
+#define MEMMGR_PAGE_FLAG_STACK_GUARD 1 << 1
 
 #define CHECK_PTR(ptr) (ptr < 0xfffffe0000000000ull && memmgr_check_user(ptr))
 
@@ -64,6 +74,9 @@ void munmap(void* addr, size_t len);
  * @param is_kernel if is_kernel is set, the length of the map is increased
  */
 void* mmap(void* addr, size_t len, bool is_kernel);
+
+void* memmgr_create_stack(bool user, uint64_t size);
+void memmgr_delete_page(uintptr_t virtualAddr);
 
 void memmgr_clone_page_map(uint64_t* pageMapOld, uint64_t* pageMapNew);
 /**
