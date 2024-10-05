@@ -4,3 +4,6 @@
 [submodule "apps/bash"]
 	path = apps/bash
 	url = https://git.savannah.gnu.org/git/bash.git
+[submodule "apps/coreutils"]
+	path = apps/coreutils
+	url = https://github.com/maltesermailo/coreutils
