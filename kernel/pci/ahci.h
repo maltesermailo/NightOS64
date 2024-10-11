@@ -8,6 +8,15 @@
 #include <stdint.h>
 #include "io.h"
 
+typedef enum DriveType {
+    DRIVE_TYPE_UNKNOWN = 0,
+    DRIVE_TYPE_ATA,
+    DRIVE_TYPE_SATA_HDD,
+    DRIVE_TYPE_SATA_SSD,
+    DRIVE_TYPE_OPTICAL,
+    DRIVE_TYPE_REMOVABLE
+} drive_type_t;
+
 //***************************SATA DEFINITIONS**********************************/
 #define	SATA_SIG_ATA	0x00000101	// SATA drive
 #define	SATA_SIG_ATAPI	0xEB140101	// SATAPI drive
@@ -46,8 +55,11 @@
 #define ATA_CMD_IDENTIFY_PACKET   0xA1
 #define ATA_CMD_IDENTIFY          0xEC
 
-#define ATAPI_CMD_READ       0xA8
-#define ATAPI_CMD_EJECT      0x1B
+#define ATAPI_CMD_READ          0xA8
+#define ATAPI_CMD_EJECT         0x1B
+#define ATAPI_CMD_WRITE         0xAA
+#define ATAPI_CMD_INQUIRY       0x12
+#define ATAPI_CMD_READ_CAPACITY 0x25
 
 #define ATA_IDENT_DEVICETYPE   0
 #define ATA_IDENT_CYLINDERS    2
@@ -69,6 +81,14 @@
 #define AHCI_DEV_SEMB 2
 #define AHCI_DEV_PM 3
 #define AHCI_DEV_SATAPI 4
+
+#define INQUIRY_PERIPHERAL_DEVICE_TYPE(data) ((data)->peripheral_device_type_and_qualifier & 0x1F)
+#define INQUIRY_PERIPHERAL_QUALIFIER(data) (((data)->peripheral_device_type_and_qualifier >> 5) & 0x07)
+#define INQUIRY_REMOVABLE_MEDIUM(data) (((data)->device_type_modifier >> 7) & 0x01)
+
+#define INQUIRY_RESPONSE_DATA_FORMAT(data) ((data)->response_data_format & 0x0F)
+#define INQUIRY_HISUP(data) (((data)->response_data_format >> 4) & 0x01)
+#define INQUIRY_NORMACA(data) (((data)->response_data_format >> 5) & 0x01)
 
 typedef enum
 {
@@ -510,6 +530,25 @@ typedef struct __attribute((packed)) ATADeviceInformation
     uint16_t res7[96];
 } ata_device_info_t;
 
+typedef struct __attribute((packed)) ATAPIDeviceInformation {
+    uint8_t peripheral_device_type_and_qualifier;
+    uint8_t device_type_modifier;
+    uint8_t version;
+    uint8_t response_data_format;
+    uint8_t additional_length;
+    uint8_t flags1;
+    uint8_t flags2;
+    uint8_t flags3;
+    char vendor_identification[8];
+    char product_identification[16];
+    char product_revision_level[4];
+} atapi_device_info_t;
+
+typedef struct {
+    uint32_t lba_last;         // Last Logical Block Address
+    uint32_t block_size;       // Block size in bytes
+} __attribute__((packed)) ATAPI_READ_CAPACITY_DATA;
+
 typedef struct IOControlBlock {
     io_request_t* ioRequest;
 } io_cb_t;
@@ -518,10 +557,11 @@ typedef struct SATADevice {
     int port;
     uint64_t size;
     file_node_t* node;
+    drive_type_t deviceType;
 
     io_cb_t requests[32];
 } sata_device_t;
 
 void ahci_setup(void* abar, uint16_t interruptVector);
-void ahci_send_command(io_request_t* ioRequest, int sataCommand);
+void ahci_send_command(struct SATADevice* sataDevice, io_request_t* ioRequest, int sataCommand);
 #endif //NIGHTOS_AHCI_H

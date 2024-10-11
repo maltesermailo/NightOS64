@@ -15,6 +15,9 @@ void kmalloc_test() {
     void* ptr1 = kmalloc(32);
     void* ptr2 = kmalloc(45);
 
+    printf("[KMALLOC_TEST] PTR1 is 0x%x", ptr1);
+    printf("[KMALLOC_TEST] PTR2 is 0x%x", ptr2);
+
     kfree(ptr1);
     kfree(ptr2);
 }

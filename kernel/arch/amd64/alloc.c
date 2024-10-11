@@ -26,7 +26,7 @@ static int registeredSizeClassesCount = 0;
 
 struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     uint8_t perPage = (4096 / sizeClass->size);
-    uint8_t bitmapSize = perPage / 8;
+    uint8_t bitmapSize = perPage / 64;
     if(bitmapSize % 8 != 0) {
         bitmapSize = (bitmapSize + 8) & ~(8 - 1);
     }
@@ -99,11 +99,11 @@ void* kmalloc(size_t size) {
 
     while ( shift < 10 )
     {
-        if ( defaultSizeClasses[shift].size > size ) break;
+        if ( defaultSizeClasses[shift].size >= size ) break;
         shift += 1;
     }
 
-    if(defaultSizeClasses[shift].size > size) {
+    if(defaultSizeClasses[shift].size < size) {
         return NULL; //Size larger than a whole page, please use liballoc or direct mmap!
     }
 
@@ -153,7 +153,7 @@ void kfree(void* ptr) {
     //Search in default size classes first, because they are cheaper and more widespread
     for (int i = 0; i < DEFAULT_SIZE_CLASSES; i++) {
         if (defaultSizeClasses[i].size > 0) {
-            struct slab* slab = registeredSizeClasses[i].slabs;
+            struct slab* slab = defaultSizeClasses[i].slabs;
 
             while (slab) {
                 if (ptr >= slab->memory && ptr < slab->memory + 4096) {
@@ -229,6 +229,45 @@ void alloc_register_object_size(size_t size) {
             registeredSizeClassesCount++;
             return;
         }
+    }
+}
+
+/**
+ * Bootstraps the allocator for its own use.
+ * The allocator needs 40 bytes for the slab structure and the default size
+ */
+void alloc_init() {
+    uint16_t perPage = (4096 / 40);
+    uint16_t bitmapSize = perPage / 64;
+    if(bitmapSize % 8 != 0) {
+        bitmapSize = (bitmapSize + 8) & ~(8 - 1);
+    }
+
+    struct slab* slab = sbrk(4096);
+
+    slab->total_objects = perPage;
+    slab->free_objects = perPage;
+    slab->object_size = 40;
+
+    slab->memory = (void*)slab;
+    slab->bitmap = sbrk(4096); //This memory will be later assigned to our 16 byte default class
+    slab->bitmap[0] = 1;
+
+    registeredSizeClasses[0].size = 40;
+    registeredSizeClasses[0].slabs = slab;
+
+    struct slab* eightByteSlab = kmalloc(sizeof(struct slab)); //Use our bootstrapped allocator to set up our second slab
+    eightByteSlab->total_objects = 512;
+    eightByteSlab->free_objects = 512;
+    eightByteSlab->object_size = 8;
+    eightByteSlab->memory = slab->bitmap;
+    eightByteSlab->bitmap = (slab->bitmap + (bitmapSize / 8));
+    eightByteSlab->bitmap[0] = 255; //First 8 slots are set
+
+    defaultSizeClasses[0].slabs = eightByteSlab;
+
+    for(int i = 1; i < DEFAULT_SIZE_CLASSES; i++) {
+        kmalloc_for_size(&defaultSizeClasses[i]);
     }
 }
 

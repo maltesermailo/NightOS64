@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include "../../libc/include/string.h"
+#include "../terminal.h"
 
 list_t hard_drives;
 sata_device_t* sataDevice;
@@ -32,12 +33,12 @@ int get_next_free(int portNumber) {
     return -1;
 }
 
-void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
-    HBA_PORT* port = &hba->ports[sataDevice->port];
+void ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, int ataCommand) {
+    HBA_PORT* port = &hba->ports[ataDevice->port];
 
     uint64_t offset = ioRequest->offset / 512; //Convert to LBA
 
-    int cmdIndex = get_next_free(sataDevice->port);
+    int cmdIndex = get_next_free(ataDevice->port);
 
     if(cmdIndex == -1) {
         return;
@@ -53,7 +54,7 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
 
     cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
     cmdHeader->prdtl = 1;
-    cmdHeader->w = 0;
+    cmdHeader->w = ioRequest->type == IO_WRITE;
 
     commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
     commandFIS->command = ataCommand; //Command
@@ -80,6 +81,8 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     } else {
         //PRDT supports 8K byte reads per PRDT, but since we are using paging and our physical pages might be scattered, we do 4K per PRDT. Easier to manage.
         int countOfPRDTs = ioRequest->count / 4096;
+
+        cmdHeader->prdtl = countOfPRDTs;
 
         if(countOfPRDTs > 8) {
             printf("WARNING: ATA Read tried to read more than 32 KB!");
@@ -137,6 +140,118 @@ void ahci_send_command(io_request_t* ioRequest, int ataCommand) {
     }
 }
 
+bool atapi_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, int atapiCommand) {
+    HBA_PORT* port = &hba->ports[ataDevice->port];
+
+    uint64_t offset = ioRequest->offset / 2048; //Convert to LBA
+
+    int cmdIndex = get_next_free(ataDevice->port);
+
+    if(cmdIndex == -1) {
+        return false;
+    }
+
+    void* ptrCmdHeader = memmgr_get_from_physical(((uintptr_t)port->clbu) << 32 | port->clb);
+    HBA_CMD_HEADER* cmdHeader = (HBA_CMD_HEADER*)ptrCmdHeader;
+    cmdHeader += cmdIndex;
+
+    HBA_CMD_TBL* cmdTable = (HBA_CMD_TBL*) memmgr_get_from_physical((((uintptr_t)cmdHeader->ctbau) << 32 | cmdHeader->ctba));
+    FIS_REG_H2D* commandFIS = (FIS_REG_H2D*)(cmdTable->cfis);
+    memset(commandFIS, 0, 5 * 4);
+
+    cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
+    cmdHeader->prdtl = 1;
+    cmdHeader->w = ioRequest->type == IO_WRITE;
+    cmdHeader->a = 1; //ATAPI command
+
+    commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
+    commandFIS->command = ATA_CMD_PACKET; //Command
+    commandFIS->c = 1; //Command Type
+    commandFIS->device = 0xA0;  // Select Master
+
+    uint8_t atapi_packet[12] = {0};
+    atapi_packet[0] = atapiCommand;
+    atapi_packet[2] = (offset >> 24) & 0xFF;
+    atapi_packet[3] = (offset >> 16) & 0xFF;
+    atapi_packet[4] = (offset >> 8) & 0xFF;
+    atapi_packet[5] = offset & 0xFF;
+    atapi_packet[7] = (ioRequest->count / 2048) >> 8;
+    atapi_packet[8] = (ioRequest->count / 2048) & 0xFF;
+
+    // Copy ATAPI packet to command table
+    memcpy(cmdTable->acmd, atapi_packet, 12);
+
+    //TODO: Allow buffers larger than 8k
+    uintptr_t bufferPhys = (uintptr_t) memmgr_get_page_physical((uintptr_t) ioRequest->buffer);
+
+    if(ioRequest->count < 4096) {
+        cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
+        cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
+        cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
+    } else {
+        //PRDT supports 8K byte reads per PRDT, but since we are using paging and our physical pages might be scattered, we do 4K per PRDT. Easier to manage.
+        int countOfPRDTs = ioRequest->count / 4096;
+
+        cmdHeader->prdtl = countOfPRDTs;
+
+        if(countOfPRDTs > 8) {
+            printf("WARNING: ATA Read tried to read more than 32 KB!");
+            //Not supported
+            return false;
+        }
+
+        int remaining = ioRequest->count;
+
+        for(int i = 0; i < countOfPRDTs; i++) {
+            int count = remaining > 4096 ? 4096 : remaining;
+
+            cmdTable->prdt_entry[0].dba = (uintptr_t)memmgr_get_page_physical(
+                    (uintptr_t) (ioRequest->buffer + i * 4096));
+            cmdTable->prdt_entry[0].dbau = ((uintptr_t)memmgr_get_page_physical(
+                    (uintptr_t) (ioRequest->buffer + i * 4096)) >> 32);
+            cmdTable->prdt_entry[0].dbc = (count - 1) | 1;
+
+            remaining -= count;
+        }
+    }
+
+    unsigned long spin = 0;
+
+    while ((port->tfd & (ATA_SR_BSY | ATA_SR_DRQ)) && spin < 1000000)
+    {
+        spin++;
+    }
+    if (spin == 1000000)
+    {
+        printf("Port is hung\n");
+        return false;
+    }
+
+    port->is = ~0;
+
+    port->ci |= 1 << cmdIndex;
+
+    while(true) {
+        if((port->ci & (1 << cmdIndex)) == 0) {
+            break;
+        }
+
+        if(port->is & HBA_PxIS_TFES) {
+            printf("READ DISK ERROR");
+            panic();
+
+            return false;
+        }
+    }
+
+    if(port->tfd & (ATA_SR_ERR | ATA_SR_DF)) {
+        printf("IDENTIFY command failed. Status: 0x%02X, Error: 0x%02X\n", port->tfd & 0xFF, (port->tfd >> 8) & 0xFF);
+        return false;
+    }
+
+    return true;
+}
+
 int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
 
@@ -146,7 +261,7 @@ int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     ioRequest->offset = offset;
     ioRequest->buffer = calloc(1, length);
 
-    ahci_send_command(ioRequest, ATA_CMD_READ_DMA_EXT);
+    ahci_send_command(thisDevice, ioRequest, ATA_CMD_READ_DMA_EXT);
 
     memcpy(buf, ioRequest->buffer, length);
 
@@ -167,7 +282,45 @@ int ahci_write(file_node_t* node, char* buf, size_t offset, size_t length) {
 
     memcpy(ioRequest->buffer, buf, length);
 
-    ahci_send_command(ioRequest, ATA_CMD_WRITE_DMA_EXT);
+    ahci_send_command(thisDevice, ioRequest, ATA_CMD_WRITE_DMA_EXT);
+
+    free(ioRequest->buffer);
+    free(ioRequest);
+
+    return length;
+}
+
+int atapi_read(file_node_t* node, char* buf, size_t offset, size_t length) {
+    struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
+
+    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
+    ioRequest->type = IO_READ;
+    ioRequest->count = length;
+    ioRequest->offset = offset;
+    ioRequest->buffer = calloc(1, length);
+
+    atapi_send_command(thisDevice, ioRequest, ATAPI_CMD_READ);
+
+    memcpy(buf, ioRequest->buffer, length);
+
+    free(ioRequest->buffer);
+    free(ioRequest);
+
+    return length;
+}
+
+int atapi_write(file_node_t* node, char* buf, size_t offset, size_t length) {
+    struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
+
+    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
+    ioRequest->type = IO_WRITE;
+    ioRequest->count = length;
+    ioRequest->offset = offset;
+    ioRequest->buffer = calloc(1, length);
+
+    memcpy(ioRequest->buffer, buf, length);
+
+    atapi_send_command(thisDevice, ioRequest, ATAPI_CMD_WRITE);
 
     free(ioRequest->buffer);
     free(ioRequest);
@@ -180,10 +333,27 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
     node->type = FILE_TYPE_BLOCK_DEVICE;
     node->fs = sataDevice;
     node->size = sataDevice->size;
-    snprintf(node->name, 16, "hd%d", sataDevice->port);
+
+    switch (sataDevice->deviceType) {
+        case DRIVE_TYPE_SATA_HDD:
+        case DRIVE_TYPE_SATA_SSD:
+        case DRIVE_TYPE_ATA:
+            snprintf(node->name, 16, "hd%d", sataDevice->port);
+            node->file_ops.read = ahci_read;
+            node->file_ops.write = ahci_write;
+
+            break;
+        case DRIVE_TYPE_OPTICAL:
+        case DRIVE_TYPE_REMOVABLE:
+            snprintf(node->name, 16, "cd%d", sataDevice->port);
+            node->file_ops.read = atapi_read;
+            node->file_ops.write = atapi_write;
+            break;
+        case DRIVE_TYPE_UNKNOWN:
+            snprintf(node->name, 16, "unknown_drive%d", sataDevice->port);
+            break;
+    }
     node->ref_count = 0;
-    node->file_ops.read = ahci_read;
-    node->file_ops.write = ahci_write;
 
     return node;
 }
@@ -300,13 +470,16 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
 
         if(mem->ports[i].sig == SATA_SIG_ATA) {
             sataDevice = calloc(1, sizeof(sata_device_t));
+
             io_request_t ioRequest;
             ioRequest.buffer = malloc(512);
             memset(ioRequest.buffer, 0, 512);
             ioRequest.count = 512;
             ioRequest.offset = 0;
 
-            ahci_send_command(&ioRequest, ATA_CMD_IDENTIFY);
+            sataDevice->deviceType = DRIVE_TYPE_SATA_HDD;
+
+            ahci_send_command(sataDevice, &ioRequest, ATA_CMD_IDENTIFY);
 
             //TODO: Parse Identify Packet
             ata_device_info_t* deviceInfo = (ata_device_info_t*)ioRequest.buffer;
@@ -326,6 +499,62 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
             mount_directly(pathDup, node);
             free(pathDup);
             printf("Mounted hdd at %s\n", path);
+
+            free(ioRequest.buffer);
+        }
+
+        if(mem->ports[i].sig == SATA_SIG_ATAPI) {
+            struct SATADevice* ataDevice = calloc(1, sizeof(sata_device_t));
+            io_request_t ioRequest;
+            ioRequest.buffer = malloc(36);
+            memset(ioRequest.buffer, 0, 36);
+            ioRequest.count = 36;
+            ioRequest.offset = 0;
+
+            if(!atapi_send_command(ataDevice, &ioRequest, ATAPI_CMD_INQUIRY)) {
+                printf("[ATAPI] Couldn't send inquiry command to port %d.\n", ataDevice->port);
+                free(ioRequest.buffer);
+                continue;
+            }
+
+            //TODO: Parse Identify Packet
+            atapi_device_info_t* deviceInfo = (atapi_device_info_t*)ioRequest.buffer;
+
+            switch(INQUIRY_PERIPHERAL_DEVICE_TYPE(deviceInfo)) {
+                case 0x05:
+                    ataDevice->deviceType = DRIVE_TYPE_OPTICAL;
+                    break;
+                default:
+                    ataDevice->deviceType = DRIVE_TYPE_ATA;
+                    break;
+            }
+
+            free(ioRequest.buffer);
+            ioRequest.buffer = malloc(sizeof(ATAPI_READ_CAPACITY_DATA));
+            ioRequest.count = sizeof(ATAPI_READ_CAPACITY_DATA);
+
+            if(!atapi_send_command(ataDevice, &ioRequest, ATAPI_CMD_READ_CAPACITY)) {
+                printf("[ATAPI] Couldn't send read capacity command to port %d.\n", ataDevice->port);
+                free(ioRequest.buffer);
+                continue;
+            }
+            ATAPI_READ_CAPACITY_DATA* capacityData = (ATAPI_READ_CAPACITY_DATA*)ioRequest.buffer;
+            capacityData->lba_last = __builtin_bswap32(capacityData->lba_last);
+            capacityData->block_size = __builtin_bswap32(capacityData->block_size);
+
+            file_node_t* node = create_ahci_device(ataDevice);
+
+            char* path = calloc(32, sizeof(char));
+            snprintf(path, 32, "/%s/%s", "dev", node->name);
+            char* pathDup = strdup(path);
+
+            sataDevice->node = node;
+            sataDevice->port = i;
+            sataDevice->size = (capacityData->lba_last+1) * capacityData->block_size;
+
+            mount_directly(pathDup, node);
+            free(pathDup);
+            printf("Mounted ATAPI device at %s\n", path);
         }
     }
 }

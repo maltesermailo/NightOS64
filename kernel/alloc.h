@@ -31,14 +31,15 @@ void kfree(void* ptr);
  * @param size the size of the individual object
  */
 void alloc_register_object_size(size_t size);
+void alloc_init();
 
 #define SLAB_SIZE 4096
 
 struct slab {
     void* memory;
     size_t object_size;
-    uint8_t total_objects;
-    uint8_t free_objects;
+    uint16_t total_objects;
+    uint16_t free_objects;
     unsigned long* bitmap;  // To track free/used objects
     struct slab* next;
 };

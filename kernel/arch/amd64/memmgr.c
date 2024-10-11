@@ -1008,7 +1008,7 @@ void* sbrk(intptr_t len) {
 
     void* ptr = 0;
 
-    if(len > 0) {
+    if(len >= 0) {
         //Map new kernel space
         //printf("Mapping from %d to %d\n", kernel_heap_length, kernel_heap_length + len);
         ptr = mmap(0, kernel_heap_length + len, true) + kernel_heap_length;
