@@ -129,5 +129,6 @@ typedef struct IsoEntry {
 
 int parseFromAscii(char* ascii, int len);
 file_node_t* isofs_mount(char* device, char* name);
+file_node_t* isofs_find_dir(file_node_t* node, char* name);
 
 #endif //NIGHTOS_ISOFS_H
