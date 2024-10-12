@@ -61,6 +61,7 @@ file_node_t* isofs_find_dir(file_node_t* node, char* name) {
 
         //TODO: FILE OPS
         newNode->file_ops.find_dir = isofs_find_dir;
+        newNode->file_ops.read_dir = isofs_read_dir;
         newNode->file_ops.read = NULL;
         newNode->file_ops.write = NULL;
         newNode->file_ops.get_size = NULL;
@@ -376,7 +377,7 @@ file_node_t* isofs_mount(char* device, char* name) {
       root->ref_count = 0;
 
       //These 3 functions are mostly needed for the root directory.
-      root->file_ops.find_dir = NULL;
+      root->file_ops.find_dir = isofs_find_dir;
       root->file_ops.read_dir = isofs_read_dir;
       root->file_ops.get_size = isofs_get_size;
     }

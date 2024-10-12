@@ -54,6 +54,7 @@ typedef enum DriveType {
 #define ATA_CMD_PACKET            0xA0
 #define ATA_CMD_IDENTIFY_PACKET   0xA1
 #define ATA_CMD_IDENTIFY          0xEC
+#define ATA_CMD_IDENTIFY_DMA      0xEE
 
 #define ATAPI_CMD_READ          0xA8
 #define ATAPI_CMD_EJECT         0x1B
@@ -563,5 +564,5 @@ typedef struct SATADevice {
 } sata_device_t;
 
 void ahci_setup(void* abar, uint16_t interruptVector);
-void ahci_send_command(struct SATADevice* sataDevice, io_request_t* ioRequest, int sataCommand);
+bool ahci_send_command(struct SATADevice* sataDevice, io_request_t* ioRequest, int sataCommand);
 #endif //NIGHTOS_AHCI_H
