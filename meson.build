@@ -1,5 +1,5 @@
 project('nightos', 'c',
-        version : '0.1',
+        version : '0.0.0-5',
         default_options : ['c_std=gnu11', 'buildtype=debugoptimized'])
 
 # Define variables

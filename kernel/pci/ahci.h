@@ -55,6 +55,7 @@ typedef enum DriveType {
 #define ATA_CMD_IDENTIFY_PACKET   0xA1
 #define ATA_CMD_IDENTIFY          0xEC
 #define ATA_CMD_IDENTIFY_DMA      0xEE
+#define ATA_CMD_NATIVE_MAX_ADDRESS 0xF8
 
 #define ATAPI_CMD_READ          0xA8
 #define ATAPI_CMD_EJECT         0x1B
@@ -554,11 +555,29 @@ typedef struct IOControlBlock {
     io_request_t* ioRequest;
 } io_cb_t;
 
+#define DISK_CACHE_MAX_SIZE 32768
+
+typedef struct disk_cache_entry {
+  uint64_t offset;
+  uint8_t* data;
+  uint64_t size;
+  bool dirty;
+} disk_cache_entry_t;
+
+//This represents a page cache for a disk drive.
+//Every ATA device will have a disk cache on driver level.
+typedef struct disk_cache {
+  list_t entries;
+
+  uint64_t total_size;
+} disk_cache;
+
 typedef struct SATADevice {
     int port;
     uint64_t size;
     file_node_t* node;
     drive_type_t deviceType;
+    disk_cache* diskCache;
 
     io_cb_t requests[32];
 } sata_device_t;

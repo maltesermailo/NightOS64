@@ -49,6 +49,7 @@ struct file_operations {
     int (*write) (struct FILE*, char*, size_t, size_t);
     size_t (*seek) (struct FILE*, size_t);
     void (*open) (struct FILE*, int);
+    //Also synonymous for flush
     void (*close) (struct FILE*);
     int (*read_dir) (struct FILE*, struct list_dir*, int);
     bool (*mkdir) (struct FILE*, char*);
@@ -150,6 +151,7 @@ bool insert_file(file_node_t* parent, file_node_t* new);
 
 //Sets up the virtual file system
 void vfs_install();
+void vfs_teardown();
 
 //Utility
 int get_next_file_id();

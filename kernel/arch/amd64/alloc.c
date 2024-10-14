@@ -9,7 +9,7 @@
 #define DEFAULT_SIZE_CLASSES 10
 
 static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
-static struct size_class defaultSizeClasses[10] = {
+static struct size_class defaultSizeClasses[12] = {
         {.size = 8, .slabs = NULL},
         {.size = 16, .slabs = NULL},
         {.size = 32, .slabs = NULL},
@@ -19,16 +19,21 @@ static struct size_class defaultSizeClasses[10] = {
         {.size = 512, .slabs = NULL},
         {.size = 1024, .slabs = NULL},
         {.size = 2048, .slabs = NULL},
-        {.size = 4096, .slabs = NULL}
+        {.size = 4096, .slabs = NULL},
+        {.size = 8192, .slabs = NULL},
+        {.size = 16384, .slabs = NULL},
 };
 
 static int registeredSizeClassesCount = 0;
 
 struct slab* kmalloc_for_size(struct size_class* sizeClass) {
-    uint8_t perPage = (4096 / sizeClass->size);
-    uint8_t bitmapSize = perPage / 64;
-    if(bitmapSize % 8 != 0) {
+    uint16_t perPage = (4096 / sizeClass->size);
+    uint8_t bitmapSize = 8;
+    if(perPage > 512) {
+      bitmapSize = perPage / 64;
+      if(bitmapSize % 8 != 0) {
         bitmapSize = (bitmapSize + 8) & ~(8 - 1);
+      }
     }
 
     struct slab* slab = malloc(sizeof(struct slab));
@@ -38,8 +43,13 @@ struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     slab->free_objects = perPage;
     slab->object_size = sizeClass->size;
 
-    slab->memory = sbrk(4096);
-    slab->bitmap = calloc(1, bitmapSize);
+    if(perPage >= 1) {
+      slab->memory = sbrk(4096);
+      slab->bitmap = calloc(1, bitmapSize);
+    } else {
+      slab->memory = sbrk(sizeClass->size);
+      slab->bitmap = calloc(1, bitmapSize);
+    }
 
     struct slab* ptr = sizeClass->slabs;
     if(ptr == NULL) {

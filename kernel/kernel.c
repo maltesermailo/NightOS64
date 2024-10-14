@@ -696,8 +696,8 @@ void kernel_main(unsigned long magic, unsigned long header)
         terminal_swap();
     }
 
-    serial_printf("Colonel version 0.0.0-4 starting up...\n");
-    printf("Colonel version 0.0.0-4 starting up...\n");
+    serial_printf("Colonel version 0.0.0-5 starting up...\n");
+    printf("Colonel version 0.0.0-5 starting up...\n");
 
     //Setup interrupts
     pic_setup();

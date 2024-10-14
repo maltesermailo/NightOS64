@@ -278,7 +278,7 @@ int fat_read_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, s
     return bytes_read;
 }
 
-int fat_read(struct FILE *file, char *data, size_t size, size_t offset) {
+int fat_read(struct FILE *file, char *data, size_t offset, size_t size) {
     fat_entry_t *entry = (fat_entry_t*)file->fs;
     fat_fs_t *fs = entry->fatFs;
 
@@ -389,7 +389,7 @@ int fat_remove_dir_entry(fat_fs_t *fs, file_node_t *file) {
     return -1; // Entry not found
 }
 
-int fat_write(struct FILE *file, char *data, size_t size, size_t offset) {
+int fat_write(struct FILE *file, char *data, size_t offset, size_t size) {
     fat_entry_t *entry = (fat_entry_t*)file->fs;
     fat_fs_t *fs = entry->fatFs;
 
@@ -544,6 +544,7 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
                 newNode->file_ops.mkdir = fat_mkdir;
                 newNode->file_ops.delete = fat_delete;
                 newNode->file_ops.create = fat_create_file;
+                newNode->file_ops.open = fat_open;
                 return newNode;
             }
         }
@@ -605,6 +606,7 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
             newNode->file_ops.mkdir = fat_mkdir;
             newNode->file_ops.delete = fat_delete;
             newNode->file_ops.create = fat_create_file;
+            newNode->file_ops.open = fat_open;
             return newNode;
         }
     }

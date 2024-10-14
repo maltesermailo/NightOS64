@@ -749,8 +749,16 @@ void process_terminate(process_t* process, int retval) {
                 continue;
             }
 
-            free(process->fd_table->handles[i]);
+            file_handle_t* handle = process->fd_table->handles[i];
+
+            if(handle->fileNode->file_ops.close) {
+              handle->fileNode->file_ops.close(handle->fileNode); //Signal file system driver to flush
+            }
+
+            free(handle);
+
             process->fd_table->handles[i] = NULL;
+            process->fd_table->length--;
 
             i++;
             length--;

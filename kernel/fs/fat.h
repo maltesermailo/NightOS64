@@ -131,6 +131,7 @@ typedef struct FatEntry {
 } fat_entry_t;
 
 file_node_t* fat_mount(char* device, char* name);
+void fat_open(file_node_t* node, int mode);
 bool fat_create_file(file_node_t *dir, char *name, int mode);
 int fat_read(file_node_t *file, char *data, size_t size, size_t offset);
 int fat_write(file_node_t *file, char *data, size_t size, size_t offset);

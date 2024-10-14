@@ -59,15 +59,9 @@ file_node_t* isofs_find_dir(file_node_t* node, char* name) {
 
         newNode->fs = newEntry;
 
-        //TODO: FILE OPS
         newNode->file_ops.find_dir = isofs_find_dir;
         newNode->file_ops.read_dir = isofs_read_dir;
-        newNode->file_ops.read = NULL;
-        newNode->file_ops.write = NULL;
-        newNode->file_ops.get_size = NULL;
-        newNode->file_ops.mkdir = NULL;
-        newNode->file_ops.delete = NULL;
-        newNode->file_ops.create = NULL;
+        newNode->file_ops.read = isofs_read;
         return newNode;
       }
 
@@ -124,14 +118,9 @@ file_node_t* isofs_find_dir(file_node_t* node, char* name) {
 
       newNode->fs = newEntry;
 
-      //TODO: FILE OPS
       newNode->file_ops.find_dir = isofs_find_dir;
-      newNode->file_ops.read = NULL;
-      newNode->file_ops.write = NULL;
-      newNode->file_ops.get_size = NULL;
-      newNode->file_ops.mkdir = NULL;
-      newNode->file_ops.delete = NULL;
-      newNode->file_ops.create = NULL;
+      newNode->file_ops.read_dir = isofs_read_dir;
+      newNode->file_ops.read = isofs_read;
       return newNode;
     }
 
@@ -315,6 +304,21 @@ int isofs_get_size(file_node_t* node) {
 
   free(isoDirPointer);
   return count;
+}
+
+int isofs_read(struct FILE *file, char *data, size_t size, size_t offset) {
+  iso_entry_t* entry = (iso_entry_t*)file->fs;
+  iso_fs_t *fs = entry->isoFs;
+  iso_directory_t* record = entry->entry;
+
+  if(offset + size > record->data_length) {
+    size -= ((offset + size) - record->data_length);
+  }
+
+  // Write data
+  int result = fs->physicalDevice->file_ops.read(fs->physicalDevice, data, offset, size);
+
+  return result;
 }
 
 file_node_t* isofs_mount(char* device, char* name) {

@@ -1,26 +1,27 @@
 //
 // Created by Jannik on 19.06.2024.
 //
-#include "../idt.h"
-#include "../proc/process.h"
-#include "../../libc/include/string.h"
 #include "../../libc/include/kernel/hashtable.h"
-#include <stdio.h>
-#include "../memmgr.h"
-#include "../../mlibc/abis/linux/errno.h"
-#include "../timer.h"
-#include "../../mlibc/options/ansi/include/bits/ansi/timespec.h"
-#include <signal.h>
-#include "../../mlibc/abis/linux/stat.h"
+#include "../../libc/include/string.h"
 #include "../../mlibc/abis/linux/access.h"
-#include "../../mlibc/abis/linux/seek-whence.h"
-#include "../../mlibc/options/posix/include/bits/posix/iovec.h"
+#include "../../mlibc/abis/linux/errno.h"
 #include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/poll.h"
+#include "../../mlibc/abis/linux/seek-whence.h"
+#include "../../mlibc/abis/linux/stat.h"
 #include "../../mlibc/abis/linux/wait.h"
+#include "../../mlibc/options/ansi/include/bits/ansi/timespec.h"
+#include "../../mlibc/options/posix/include/bits/posix/iovec.h"
 #include "../../mlibc/options/posix/include/sys/poll.h"
-#include "../terminal.h"
+#include "../fs/cache.h"
+#include "../idt.h"
+#include "../memmgr.h"
+#include "../proc/process.h"
 #include "../serial.h"
+#include "../terminal.h"
+#include "../timer.h"
+#include <signal.h>
+#include <stdio.h>
 
 typedef int (*syscall_t)(long,long,long,long,long);
 
@@ -718,6 +719,24 @@ int sys_wait4(pid_t pid, unsigned long status, int flags, unsigned long rusage) 
     }
 
     return 0;
+}
+
+long sys_fsync(int fd) {
+  process_t* proc = get_current_process();
+
+  if(fd > proc->fd_table->capacity) {
+    return -1;
+  }
+
+  file_handle_t* handle = proc->fd_table->handles[fd];
+
+  if(handle == NULL) {
+    return -1;
+  }
+
+  vfs_cache_flush(handle->fileNode);
+
+  return 0;
 }
 
 int sys_getcwd(long buf, long size) {

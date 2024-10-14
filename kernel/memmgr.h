@@ -91,6 +91,7 @@ void memmgr_clear_page_map(uintptr_t pageMap);
 
 void* memmgr_map_mmio(uintptr_t addr, size_t len, int flags, bool is_kernel);
 void* memmgr_get_mmio(uintptr_t addr);
+void* memmgr_get_mmio_physical(uintptr_t addr);
 
 void load_page_map(uintptr_t pageMap);
 

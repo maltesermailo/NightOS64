@@ -11,6 +11,7 @@
 #include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/errno.h"
 #include "../../mlibc/abis/linux/poll.h"
+#include "cache.h"
 
 file_node_t* root_node;
 tree_t* file_tree;
@@ -552,7 +553,7 @@ int read(file_handle_t* handle, char* buffer, size_t length) {
         return -1;
     }
 
-    return node->file_ops.read(node, buffer, handle->offset, length);
+    return vfs_cache_read(node, buffer, handle->offset, length);
 }
 
 int write(file_handle_t* handle, char* buffer, size_t length) {
@@ -562,7 +563,7 @@ int write(file_handle_t* handle, char* buffer, size_t length) {
         handle->offset = node->size;
     }
 
-    return node->file_ops.write(node, buffer, handle->offset, length);
+    return vfs_cache_write(node, buffer, handle->offset, length);
 }
 
 int delete(char* filename) {
@@ -764,6 +765,10 @@ int get_next_file_id() {
  */
 tree_t* debug_get_file_tree() {
     return file_tree;
+}
+
+void vfs_teardown() {
+  tree_destroy(file_tree);
 }
 
 void vfs_install() {

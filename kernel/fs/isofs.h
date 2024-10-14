@@ -132,5 +132,6 @@ file_node_t* isofs_mount(char* device, char* name);
 file_node_t* isofs_find_dir(file_node_t* node, char* name);
 int isofs_read_dir(file_node_t* node, list_dir_t* entries, int count);
 int isofs_get_size(file_node_t* node);
+int isofs_read(struct FILE *file, char *data, size_t size, size_t offset);
 
 #endif //NIGHTOS_ISOFS_H

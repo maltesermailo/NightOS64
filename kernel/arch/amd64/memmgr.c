@@ -26,6 +26,7 @@
 #define MMIO_MEMORY   0xfffffe0000000000ull
 /* Defines the offset from virtual memory to physical memory */
 #define LOW_MEMORY 0x7fffffffffull
+#define LOW_MMIO_MEMORY 0xffffffffull
 
 /**** FUNCTIONS FOR PAGE ID *********/
 #define PML4_INDEX(addr) (((addr) >> 39) & 0x1FF)
@@ -208,6 +209,10 @@ void* memmgr_get_from_physical(uintptr_t physAddr) {
 
 void* memmgr_get_mmio(uintptr_t physAddr) {
     return (void*)(physAddr | MMIO_MEMORY);
+}
+
+void* memmgr_get_mmio_physical(uintptr_t addr) {
+  return (void*)(addr & LOW_MMIO_MEMORY);
 }
 
 extern void load_page_map0(uintptr_t pageMap);
