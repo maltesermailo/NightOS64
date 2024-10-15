@@ -17,11 +17,11 @@ static void cache_remove_entry(int i, vfs_cache_entry_t* entry) {
 static void cache_add_entry(vfs_cache_entry_t* entry) {
   list_insert(&cache->entries, entry);
 
-  cache->total_size -= entry->size;
+  cache->total_size += entry->size;
 }
 
-static void cache_evict() {
-  while (cache->total_size > CACHE_MAX_SIZE && cache->entries.head) {
+static void cache_evict(bool flush) {
+  while ((cache->total_size > CACHE_MAX_SIZE || flush) && cache->entries.head) {
     vfs_cache_entry_t* to_evict = cache->entries.head;
     cache_remove_entry(0, to_evict);
 
@@ -46,12 +46,12 @@ static vfs_cache_entry_t* cache_find(file_node_t* file, size_t offset, size_t si
         int64_t size_variance = ((entry->offset + entry->size) - (offset + size));
 
         if(size_variance > 0) {
-          uint8_t* new_data = calloc(1, entry->size + size_variance);
+          uint8_t* new_data = kcalloc(1, entry->size + size_variance);
 
           memcpy(new_data, old_data, entry->size);
           entry->data = new_data;
           entry->size = entry->size + size_variance;
-          free(old_data);
+          kfree(old_data);
         }
       }
 
@@ -82,14 +82,14 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
   entry->file = file;
   entry->offset = offset;
   entry->size = size;
-  entry->data = malloc(size);
+  entry->data = kmalloc(size);
   entry->dirty = false;
 
   int read = file->file_ops.read(file, (char*)entry->data, offset, size);
   if (read > 0) {
     memcpy(buffer, entry->data, read);
     cache_add_entry(entry);
-    cache_evict();
+    cache_evict(false);
   } else {
     kfree(entry->data);
     kfree(entry);
@@ -117,7 +117,7 @@ int vfs_cache_write(file_node_t* file, const char* buffer, size_t offset, size_t
     cache_add_entry(entry);
   }
 
-  cache_evict();
+  cache_evict(false);
   return size;
 }
 

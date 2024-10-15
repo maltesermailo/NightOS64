@@ -584,4 +584,5 @@ typedef struct SATADevice {
 
 void ahci_setup(void* abar, uint16_t interruptVector);
 bool ahci_send_command(struct SATADevice* sataDevice, io_request_t* ioRequest, int sataCommand);
+bool atapi_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, int ataCommand);
 #endif //NIGHTOS_AHCI_H

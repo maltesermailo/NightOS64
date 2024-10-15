@@ -28,7 +28,7 @@ static void ahci_cache_remove_entry(disk_cache* cache, int i, disk_cache_entry_t
 static void ahci_cache_add_entry(disk_cache* cache, disk_cache_entry_t* entry) {
   list_insert(&cache->entries, entry);
 
-  cache->total_size -= entry->size;
+  cache->total_size += entry->size;
 }
 
 static void ahci_cache_evict(struct SATADevice* device) {
@@ -47,6 +47,35 @@ static void ahci_cache_evict(struct SATADevice* device) {
 
       if(!ahci_send_command(device, ioRequest, ATA_CMD_WRITE_DMA_EXT)) {
         return;
+      }
+
+      kfree(ioRequest);
+    }
+    ahci_cache_remove_entry(cache, 0, to_evict);
+
+    kfree(to_evict->data);
+    kfree(to_evict);
+  }
+}
+
+static void ahci_cache_flush(struct SATADevice* device) {
+  disk_cache* cache = device->diskCache;
+
+  while (cache->entries.head) {
+    disk_cache_entry_t* to_evict = cache->entries.head->value;
+
+    if (to_evict->dirty) {
+      // Write back dirty data to the actual file
+      io_request_t* ioRequest = kcalloc(1, sizeof(io_request_t));
+      ioRequest->type = IO_WRITE;
+      ioRequest->count = to_evict->size;
+      ioRequest->offset = to_evict->offset;
+      ioRequest->buffer = to_evict->data;
+
+      if(device->deviceType == DRIVE_TYPE_SATA_HDD) {
+        ahci_send_command(device, ioRequest, ATA_CMD_WRITE_DMA_EXT);
+      } else {
+        atapi_send_command(device, ioRequest, ATAPI_CMD_WRITE);
       }
 
       kfree(ioRequest);
@@ -95,150 +124,6 @@ int get_next_free(int portNumber) {
     }
 
     return -1;
-}
-
-FIS_REG_H2D* ahci_send_meta_command(struct SATADevice* ataDevice, io_request_t* ioRequest, int ataCommand) {
-  HBA_PORT* port = &hba->ports[ataDevice->port];
-
-  uint64_t offset = ioRequest->offset / 512; //Convert to LBA
-
-  int cmdIndex = get_next_free(ataDevice->port);
-
-  if(cmdIndex == -1) {
-    return false;
-  }
-
-  void* ptrCmdHeader = memmgr_get_from_physical(((uintptr_t)port->clbu) << 32 | port->clb);
-  HBA_CMD_HEADER* cmdHeader = (HBA_CMD_HEADER*)ptrCmdHeader;
-  cmdHeader += cmdIndex;
-
-  HBA_CMD_TBL* cmdTable = (HBA_CMD_TBL*) memmgr_get_from_physical((((uintptr_t)cmdHeader->ctbau) << 32 | cmdHeader->ctba));
-  FIS_REG_H2D* commandFIS = (FIS_REG_H2D*)(cmdTable->cfis);
-  memset(commandFIS, 0, 5 * 4);
-
-  cmdHeader->cfl = sizeof(FIS_REG_D2H) / sizeof(uint32_t);
-  cmdHeader->prdtl = 1;
-  cmdHeader->w = 0;
-  cmdHeader->prdbc = 0;
-  cmdHeader->p = 1;
-
-  commandFIS->fis_type = FIS_TYPE_REG_H2D; //To Device
-  commandFIS->command = ataCommand; //Command
-  commandFIS->c = 1; //Command Type
-
-  //TODO: Allow buffers larger than 8k
-  uintptr_t bufferPhys = (uintptr_t) memmgr_get_page_physical((uintptr_t) ioRequest->buffer);
-
-  if(ioRequest->count < 4096) {
-    cmdTable->prdt_entry[0].dba = (uintptr_t)bufferPhys;
-    cmdTable->prdt_entry[0].dbau = ((uintptr_t)bufferPhys >> 32);
-    cmdTable->prdt_entry[0].dbc = (ioRequest->count - 1) | 1;
-  } else {
-    //PRDT supports 8K byte reads per PRDT, but since we are using paging and our physical pages might be scattered, we do 4K per PRDT. Easier to manage.
-    int countOfPRDTs = ioRequest->count / 4096;
-
-    cmdHeader->prdtl = countOfPRDTs;
-
-    if(countOfPRDTs > 8) {
-      printf("WARNING: ATA Read tried to read more than 32 KB!");
-      //Not supported
-      return false;
-    }
-
-    int remaining = ioRequest->count;
-
-    for(int i = 0; i < countOfPRDTs; i++) {
-      int count = remaining > 4096 ? 4096 : remaining;
-
-      cmdTable->prdt_entry[0].dba = (uintptr_t)memmgr_get_page_physical(
-          (uintptr_t) (ioRequest->buffer + i * 4096));
-      cmdTable->prdt_entry[0].dbau = ((uintptr_t)memmgr_get_page_physical(
-                                          (uintptr_t) (ioRequest->buffer + i * 4096)) >> 32);
-      cmdTable->prdt_entry[0].dbc = (count - 1) | 1;
-
-      remaining -= count;
-    }
-  }
-
-  printf("Command FIS:\n");
-  printf("  FIS Type: 0x%x\n", commandFIS->fis_type);
-  printf("  PM Port: %d\n", commandFIS->pmport);
-  printf("  Command: 0x%x\n", commandFIS->command);
-  printf("  Features: 0x%x\n", commandFIS->featurel | (commandFIS->featureh << 8));
-  printf("  LBA: 0x%x\n", (unsigned long)commandFIS->lba0 |
-                              ((unsigned long)commandFIS->lba1 << 8) |
-                              ((unsigned long)commandFIS->lba2 << 16) |
-                              ((unsigned long)commandFIS->lba3 << 24) |
-                              ((unsigned long)commandFIS->lba4 << 32) |
-                              ((unsigned long)commandFIS->lba5 << 40));
-  printf("  Device: 0x%x\n", commandFIS->device);
-  printf("  Control: 0x%x\n", commandFIS->control);
-
-  printf("Command Header:\n");
-  printf("  Flags: 0x%x\n", *(uint16_t*)cmdHeader);
-  printf("  PRDTL: %d\n", cmdHeader->prdtl);
-  printf("  PRDBC: %d\n", cmdHeader->prdbc);
-
-  unsigned long spin = 0;
-
-  uint32_t tfd = port->tfd;
-  if (tfd & ATA_SR_ERR) {
-    // Clear error by reading the error register
-    uint8_t error = (tfd >> 8) & 0xFF;
-    printf("Clearing pre-existing error: 0x%x\n", error);
-  }
-
-  while ((port->tfd & (ATA_SR_BSY | ATA_SR_DRQ)) && spin < 1000000)
-  {
-    spin++;
-  }
-  if (spin == 1000000)
-  {
-    printf("Port is hung\n");
-    return NULL;
-  }
-
-  asm volatile ("mfence" ::: "memory");
-
-  printf("Port status before command:\n");
-  printf("  TFD: 0x%x\n", port->tfd);
-  printf("  SSTS: 0x%x\n", port->ssts);
-  printf("  SCTL: 0x%x\n", port->sctl);
-  printf("  SERR: 0x%x\n", port->serr);
-
-  port->is = ~0;
-
-  port->ci |= 1 << cmdIndex;
-
-  asm volatile ("mfence" ::: "memory");
-
-  printf("Port status after command:\n");
-  printf("  TFD: 0x%x\n", port->tfd);
-  printf("  SSTS: 0x%x\n", port->ssts);
-  printf("  SCTL: 0x%x\n", port->sctl);
-  printf("  SERR: 0x%x\n", port->serr);
-
-  while(true) {
-    if((port->ci & (1 << cmdIndex)) == 0) {
-      break;
-    }
-
-    if(port->is & HBA_PxIS_TFES) {
-      printf("READ DISK ERROR");
-      panic();
-
-      return NULL;
-    }
-  }
-
-  if(port->tfd & (ATA_SR_ERR | ATA_SR_DF)) {
-    printf("ATA command failed. Cmd: 0x%x, Status: 0x%x, Error: 0x%x\n", ataCommand, port->tfd & 0xFF, (port->tfd >> 8) & 0xFF);
-    return NULL;
-  }
-
-  printf("ATA: %d bytes transferred \n", cmdHeader->prdbc);
-
-  return commandFIS;
 }
 
 bool ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, int ataCommand) {
@@ -540,8 +425,14 @@ int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     ioRequest->offset = offset;
     ioRequest->buffer = entry->data;
 
-    if(!ahci_send_command(thisDevice, ioRequest, ATA_CMD_READ_DMA_EXT)) {
-      return -1;
+    if(thisDevice->deviceType == DRIVE_TYPE_SATA_HDD) {
+      if(!ahci_send_command(thisDevice, ioRequest, ATA_CMD_READ_DMA_EXT)) {
+        return -1;
+      }
+    } else if (thisDevice->deviceType == DRIVE_TYPE_OPTICAL) {
+      if(!atapi_send_command(thisDevice, ioRequest, ATAPI_CMD_READ)) {
+        return -1;
+      }
     }
 
     memcpy(buf, ioRequest->buffer, length);
@@ -566,29 +457,14 @@ int ahci_write(file_node_t* node, char* buf, size_t offset, size_t length) {
     } else {
       // Cache miss, create new entry
       entry = kmalloc(sizeof(disk_cache_entry_t));
-      entry->file = file;
       entry->offset = offset;
-      entry->size = size;
-      entry->data = kmalloc(size);
-      memcpy(entry->data, buffer, size);
+      entry->size = length;
+      entry->data = kmalloc(length);
+      memcpy(entry->data, buf, length);
       entry->dirty = true;
-      cache_add_entry(entry);
+      ahci_cache_add_entry(thisDevice->diskCache, entry);
+      ahci_cache_evict(thisDevice);
     }
-
-    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
-    ioRequest->type = IO_WRITE;
-    ioRequest->count = length;
-    ioRequest->offset = offset;
-    ioRequest->buffer = calloc(1, length);
-
-    memcpy(ioRequest->buffer, buf, length);
-
-    if(!ahci_send_command(thisDevice, ioRequest, ATA_CMD_WRITE_DMA_EXT)) {
-      return -1;
-    }
-
-    free(ioRequest->buffer);
-    free(ioRequest);
 
     return length;
 }
@@ -614,25 +490,11 @@ int atapi_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     return length;
 }
 
-int atapi_write(file_node_t* node, char* buf, size_t offset, size_t length) {
-    struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
 
-    io_request_t* ioRequest = calloc(1, sizeof(io_request_t));
-    ioRequest->type = IO_WRITE;
-    ioRequest->count = length;
-    ioRequest->offset = offset;
-    ioRequest->buffer = calloc(1, length);
+void ahci_close(file_node_t* node) {
+  struct SATADevice* thisDevice = (struct SATADevice*)node->fs;
 
-    memcpy(ioRequest->buffer, buf, length);
-
-    if(!atapi_send_command(thisDevice, ioRequest, ATAPI_CMD_WRITE)) {
-      return -1;
-    }
-
-    free(ioRequest->buffer);
-    free(ioRequest);
-
-    return length;
+  ahci_cache_flush(thisDevice);
 }
 
 file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
@@ -648,6 +510,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
             snprintf(node->name, 16, "hd%d", sataDevice->port);
             node->file_ops.read = ahci_read;
             node->file_ops.write = ahci_write;
+            node->file_ops.close = ahci_close;
 
             break;
         case DRIVE_TYPE_OPTICAL:
@@ -655,6 +518,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
             snprintf(node->name, 16, "cd%d", sataDevice->port);
             node->file_ops.read = atapi_read;
             node->file_ops.write = atapi_write;
+            node->file_ops.close = ahci_close;
             break;
         case DRIVE_TYPE_UNKNOWN:
             snprintf(node->name, 16, "unknown_drive%d", sataDevice->port);

@@ -4,6 +4,7 @@
 
 #ifndef NIGHTOS_HASHTABLE_H
 #define NIGHTOS_HASHTABLE_H
+#include <stdbool.h>
 
 struct ht_entry {
     char* key;
