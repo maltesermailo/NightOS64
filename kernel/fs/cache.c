@@ -5,6 +5,7 @@
 #include "cache.h"
 #include "../alloc.h"
 #include <string.h>
+#include "../terminal.h"
 
 vfs_cache_t* cache;
 
@@ -22,7 +23,7 @@ static void cache_add_entry(vfs_cache_entry_t* entry) {
 
 static void cache_evict(bool flush) {
   while ((cache->total_size > CACHE_MAX_SIZE || flush) && cache->entries.head) {
-    vfs_cache_entry_t* to_evict = cache->entries.head;
+    vfs_cache_entry_t* to_evict = (vfs_cache_entry_t*) cache->entries.head;
     cache_remove_entry(0, to_evict);
 
     if (to_evict->dirty) {
@@ -39,7 +40,7 @@ static vfs_cache_entry_t* cache_find(file_node_t* file, size_t offset, size_t si
   for (list_entry_t* list_entry = cache->entries.head; list_entry != NULL; list_entry = list_entry->next) {
     vfs_cache_entry_t* entry = (vfs_cache_entry_t*) list_entry->value;
     if (entry->file == file &&
-        entry->offset <= offset) {
+        entry->offset <= offset && ((entry->offset + entry->size) >= offset)) {
       if(entry->offset + entry->size < offset + size) {
         uint8_t* old_data = entry->data;
 
@@ -71,12 +72,16 @@ void vfs_cache_init(void) {
 int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) {
   vfs_cache_entry_t* entry = cache_find(file, offset, size);
 
+  printf("VFS: Cache: read\n");
+
   if (entry) {
     // Cache hit
+    printf("VFS: Cache: hit\n");
     memcpy(buffer, entry->data + (offset - entry->offset), size);
     return size;
   }
 
+  printf("VFS: Cache: miss\n");
   // Cache miss
   entry = kmalloc(sizeof(vfs_cache_entry_t));
   entry->file = file;

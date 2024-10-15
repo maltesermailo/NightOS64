@@ -45,8 +45,14 @@ static void ahci_cache_evict(struct SATADevice* device) {
       ioRequest->offset = to_evict->offset;
       ioRequest->buffer = to_evict->data;
 
-      if(!ahci_send_command(device, ioRequest, ATA_CMD_WRITE_DMA_EXT)) {
-        return;
+      if(device->deviceType == DRIVE_TYPE_SATA_HDD) {
+        if(!ahci_send_command(device, ioRequest, ATA_CMD_WRITE_DMA_EXT)) {
+          return;
+        }
+      } else if (device->deviceType == DRIVE_TYPE_OPTICAL) {
+        if(!atapi_send_command(device, ioRequest, ATAPI_CMD_WRITE)) {
+          return;
+        }
       }
 
       kfree(ioRequest);
@@ -90,7 +96,7 @@ static void ahci_cache_flush(struct SATADevice* device) {
 static disk_cache_entry_t* ahci_cache_find(disk_cache* cache, size_t offset, size_t size) {
   for (list_entry_t* list_entry = cache->entries.head; list_entry != NULL; list_entry = list_entry->next) {
     disk_cache_entry_t* entry = (disk_cache_entry_t*) list_entry->value;
-    if (entry->offset <= offset) {
+    if (entry->offset <= offset && ((entry->offset + entry->size) >= offset)) {
       if(entry->offset + entry->size < offset + size) {
         uint8_t *old_data = entry->data;
 
@@ -201,6 +207,7 @@ bool ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, in
         }
     }
 
+#ifdef DEBUG
     printf("Command FIS:\n");
     printf("  FIS Type: 0x%x\n", commandFIS->fis_type);
     printf("  PM Port: %d\n", commandFIS->pmport);
@@ -219,6 +226,7 @@ bool ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, in
     printf("  Flags: 0x%x\n", *(uint16_t*)cmdHeader);
     printf("  PRDTL: %d\n", cmdHeader->prdtl);
     printf("  PRDBC: %d\n", cmdHeader->prdbc);
+#endif
 
     unsigned long spin = 0;
 
@@ -241,11 +249,13 @@ bool ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, in
 
     asm volatile ("mfence" ::: "memory");
 
+#ifdef DEBUG
     printf("Port status before command:\n");
     printf("  TFD: 0x%x\n", port->tfd);
     printf("  SSTS: 0x%x\n", port->ssts);
     printf("  SCTL: 0x%x\n", port->sctl);
     printf("  SERR: 0x%x\n", port->serr);
+#endif
 
     port->is = ~0;
 
@@ -253,11 +263,13 @@ bool ahci_send_command(struct SATADevice* ataDevice, io_request_t* ioRequest, in
 
     asm volatile ("mfence" ::: "memory");
 
+#ifdef DEBUG
     printf("Port status after command:\n");
     printf("  TFD: 0x%x\n", port->tfd);
     printf("  SSTS: 0x%x\n", port->ssts);
     printf("  SCTL: 0x%x\n", port->sctl);
     printf("  SERR: 0x%x\n", port->serr);
+#endif
 
     while(true) {
         if((port->ci & (1 << cmdIndex)) == 0) {
@@ -517,7 +529,7 @@ file_node_t* create_ahci_device(struct SATADevice* sataDevice) {
         case DRIVE_TYPE_REMOVABLE:
             snprintf(node->name, 16, "cd%d", sataDevice->port);
             node->file_ops.read = atapi_read;
-            node->file_ops.write = atapi_write;
+            node->file_ops.write = ahci_write;
             node->file_ops.close = ahci_close;
             break;
         case DRIVE_TYPE_UNKNOWN:
@@ -663,10 +675,12 @@ void ahci_setup(void* abar, uint16_t interruptVector) {
 
             sataDevice->deviceType = DRIVE_TYPE_SATA_HDD;
 
+#ifdef DEBUG
             printf("Port setup:\n");
             printf("  CLB: 0x%x\n", (unsigned long)mem->ports[i].clb | ((unsigned long)mem->ports[i].clbu << 32));
             printf("  FB: 0x%x\n", (unsigned long)mem->ports[i].fb | ((unsigned long)mem->ports[i].fbu << 32));
             printf("  CMD: 0x%x\n", mem->ports[i].cmd);
+#endif
 
             ahci_send_command(sataDevice, &ioRequest, ATA_CMD_IDENTIFY);
 
