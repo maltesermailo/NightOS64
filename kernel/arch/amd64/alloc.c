@@ -6,7 +6,7 @@
 #include "../../../mlibc/abis/linux/errno.h"
 
 #define MAX_SIZE_CLASSES 512
-#define DEFAULT_SIZE_CLASSES 10
+#define DEFAULT_SIZE_CLASSES 12
 
 static struct size_class registeredSizeClasses[MAX_SIZE_CLASSES];
 static struct size_class defaultSizeClasses[12] = {
@@ -300,7 +300,7 @@ void* liballoc_alloc( int pages )
 {
     unsigned int size = pages * page_size;
 
-    char *p2 = (char*) sbrk(size);
+    char *p2 = (char*) mmap(0, size, true);
     if ( p2 == -1) return NULL;
 
     return p2;

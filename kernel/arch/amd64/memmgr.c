@@ -434,9 +434,9 @@ void* memmgr_create_or_get_raw(uintptr_t virtualAddr, uintptr_t frame, int flags
     return (void *) (pageTable[INDEX_PT] & PAGE_MASK);
 }
 
-void* get_free_page(size_t len) {
+void* get_free_page(size_t len, bool is_kernel) {
     uint64_t* pageMap = memmgr_get_from_physical((uintptr_t)memmgr_get_current_pml4());
-    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[0] & PAGE_MASK);
+    uint64_t* pageDirectoryPointer = memmgr_get_from_physical(pageMap[is_kernel ? 510 : 0] & PAGE_MASK);
 
     //printf("Page map loc: 0x%x\n", pageMap);
     //printf("Page directory pointer: 0x%x\n", pageDirectoryPointer);
@@ -450,7 +450,7 @@ void* get_free_page(size_t len) {
     uint64_t freeMemory = 0;
     uint64_t baseAddress = 0;
 
-    //Go through every page direcotry
+    //Go through every page directory
     for(int i = 0; i < 512; i++) {
         uint64_t* pageDirectory = memmgr_get_from_physical(pageDirectoryPointer[i] & PAGE_MASK);
         //printf("Page directory: %d, 0x%x\n", i, pageDirectory);
@@ -469,14 +469,14 @@ void* get_free_page(size_t len) {
             freeMemory += 0x40000000UL;
 
             if(freeMemory > len) {
-                return (void*)baseAddress;
+              return is_kernel ? (void*)KERNEL_ENTRY + baseAddress: (void*)baseAddress;
             }
 
             continue;
         }
 
 
-        if(!(pageDirectoryPointer[i] & PAGE_USER)) {
+        if(!is_kernel && !(pageDirectoryPointer[i] & PAGE_USER)) {
             //No user page directory, skip
             continue;
         }
@@ -503,13 +503,13 @@ void* get_free_page(size_t len) {
 #ifdef DEBUG
                     printf("cool: 0x%x\n", baseAddress);
 #endif
-                    return (void*)baseAddress;
+                    return is_kernel ? (void*)KERNEL_ENTRY + baseAddress: (void*)baseAddress;
                 }
 
                 continue;
             }
 
-            if(!(pageDirectory[j] & PAGE_USER)) {
+            if(!is_kernel && !(pageDirectory[j] & PAGE_USER)) {
                 //No user page table, skip
                 continue;
             }
@@ -535,7 +535,7 @@ void* get_free_page(size_t len) {
 #ifdef DEBUG
                     printf("cool2: 0x%x\n", baseAddress);
 #endif
-                    return (void*)baseAddress;
+                    return is_kernel ? (void*)KERNEL_ENTRY + baseAddress: (void*)baseAddress;
                 }
             }
         }
@@ -801,10 +801,11 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
 
     if(addr == 0) {
         if(is_kernel) {
-            uintptr_t start_addr = (uintptr_t)(_end);
+            /*uintptr_t start_addr = (uintptr_t)(_end);
             if((((uintptr_t)start_addr % PAGE_SIZE) != 0)) {
                 start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
-            }
+            }*/
+            uintptr_t start_addr = (uintptr_t) get_free_page(len, true);
 
             //Divide by pages, so we get to count of pages to create
             size_t count = len / 4096;
@@ -828,7 +829,7 @@ void* mmap(void* addr, size_t len, bool is_kernel) {
             printf("Get next free page...\n");
 #endif
             //Search new space
-            uintptr_t start_addr = (uintptr_t) get_free_page(len);
+            uintptr_t start_addr = (uintptr_t) get_free_page(len, is_kernel);
 
             //Divide by pages, so we get to count of pages to create
             size_t count = len / 4096;
@@ -902,12 +903,13 @@ void munmap(void* addr, size_t len) {
  */
 void* memmgr_create_stack(bool user, uint64_t len) {
     if(!user) {
-        uintptr_t start_addr = (uintptr_t)(_end);
+        /*uintptr_t start_addr = (uintptr_t)(_end);
         start_addr += kernel_heap_length;
 
         if((((uintptr_t)start_addr % PAGE_SIZE) != 0)) {
             start_addr = (uintptr_t)((uintptr_t)start_addr + PAGE_SIZE) & ~(PAGE_SIZE - 1);
-        }
+        }*/
+        uintptr_t start_addr = (uintptr_t) get_free_page(len + 4096, true);
 
         //Divide by pages, so we get to count of pages to create
         size_t count = len / 4096;
@@ -935,7 +937,7 @@ void* memmgr_create_stack(bool user, uint64_t len) {
         printf("Get next free page...\n");
 #endif
         //Search new space
-        uintptr_t start_addr = (uintptr_t) get_free_page(len + 4096);
+        uintptr_t start_addr = (uintptr_t) get_free_page(len + 4096, false);
 
         //Divide by pages, so we get to count of pages to create
         size_t count = len / 4096;

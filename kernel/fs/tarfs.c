@@ -8,7 +8,7 @@
 #include "../memmgr.h"
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
+#include "../../libc/include/string.h"
 
 //Adapted tar from Jason Lee
 /*
@@ -374,8 +374,12 @@ int tarfs_get_size(file_node_t* node) {
                 strncat(entry_name, next->prefix, 155);
                 strncat(entry_name, next->name, 100);
 
-                if(strstr("/", entry_name) != 0) {
-                    break;
+                if(((strchr(entry_name, '/') - entry_name) != (strlen(entry_name)-1)) && strchr(entry_name, '/') != 0) {
+                  free(entry_name);
+
+                  next = next->next;
+
+                  continue;
                 }
 
                 count++;

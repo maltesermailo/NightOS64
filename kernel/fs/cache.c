@@ -31,28 +31,42 @@ static void cache_evict(bool flush) {
       to_evict->file->file_ops.write(to_evict->file, (char*)to_evict->data, to_evict->offset, to_evict->size);
     }
 
-    kfree(to_evict->data);
+    free(to_evict->data);
     kfree(to_evict);
   }
 }
 
-static vfs_cache_entry_t* cache_find(file_node_t* file, size_t offset, size_t size) {
+static vfs_cache_entry_t* cache_find(file_node_t* file, size_t offset, size_t size, bool is_write) {
   for (list_entry_t* list_entry = cache->entries.head; list_entry != NULL; list_entry = list_entry->next) {
     vfs_cache_entry_t* entry = (vfs_cache_entry_t*) list_entry->value;
     if (entry->file == file &&
-        entry->offset <= offset && ((entry->offset + entry->size) >= offset)) {
+        entry->offset <= offset && ((entry->offset + entry->size) > offset)) {
+      if(!is_write && (entry->offset + entry->size) > entry->file->size) {
+        if(entry->offset > entry->file->size) {
+          size = 0;
+
+          return NULL;
+        } else {
+          size = (entry->file->size - entry->offset);
+        }
+      }
+
       if(entry->offset + entry->size < offset + size) {
         uint8_t* old_data = entry->data;
+        uint64_t old_size = entry->size;
 
-        int64_t size_variance = ((entry->offset + entry->size) - (offset + size));
+        int64_t size_variance = ((offset + size) - (entry->offset + entry->size));
 
         if(size_variance > 0) {
-          uint8_t* new_data = kcalloc(1, entry->size + size_variance);
+          uint8_t* new_data = calloc(1, entry->size + size_variance);
 
           memcpy(new_data, old_data, entry->size);
           entry->data = new_data;
           entry->size = entry->size + size_variance;
-          kfree(old_data);
+          cache->total_size += size_variance;
+          free(old_data);
+
+          entry->file->file_ops.read(file, (char*)entry->data + old_size, old_size, size - old_size);
         }
       }
 
@@ -70,13 +84,18 @@ void vfs_cache_init(void) {
 }
 
 int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) {
-  vfs_cache_entry_t* entry = cache_find(file, offset, size);
+  vfs_cache_entry_t* entry = cache_find(file, offset, size, false);
 
   printf("VFS: Cache: read\n");
 
   if (entry) {
     // Cache hit
     printf("VFS: Cache: hit\n");
+
+    if((offset - entry->offset) + size > entry->size) {
+      size = entry->size - (offset - entry->offset);
+    }
+
     memcpy(buffer, entry->data + (offset - entry->offset), size);
     return size;
   }
@@ -87,7 +106,7 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
   entry->file = file;
   entry->offset = offset;
   entry->size = size;
-  entry->data = kmalloc(size);
+  entry->data = calloc(1, size);
   entry->dirty = false;
 
   int read = file->file_ops.read(file, (char*)entry->data, offset, size);
@@ -96,7 +115,7 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
     cache_add_entry(entry);
     cache_evict(false);
   } else {
-    kfree(entry->data);
+    free(entry->data);
     kfree(entry);
   }
 
@@ -104,7 +123,7 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
 }
 
 int vfs_cache_write(file_node_t* file, const char* buffer, size_t offset, size_t size) {
-  vfs_cache_entry_t* entry = cache_find(file, offset, size);
+  vfs_cache_entry_t* entry = cache_find(file, offset, size, true);
 
   if (entry) {
     // Cache hit, update existing entry
@@ -116,7 +135,7 @@ int vfs_cache_write(file_node_t* file, const char* buffer, size_t offset, size_t
     entry->file = file;
     entry->offset = offset;
     entry->size = size;
-    entry->data = kmalloc(size);
+    entry->data = calloc(1, size);
     memcpy(entry->data, buffer, size);
     entry->dirty = true;
     cache_add_entry(entry);

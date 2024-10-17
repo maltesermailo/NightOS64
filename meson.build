@@ -56,6 +56,7 @@ kernel_sources = [
     'kernel/fs/console.c',
     'kernel/fs/fat.c',
     'kernel/fs/ramfs.c',
+    'kernel/fs/cache.c',
     'kernel/sys/syscall.c',
     'kernel/proc/ipc.c',
     'kernel/program/elf.c',
@@ -137,7 +138,7 @@ iso_limine_target = custom_target('nightos-limine.iso',
                                'cp limine.conf isodir/boot/limine/ && ' +
                                'cp ' + kernel.full_path() + ' isodir/boot/ &&' +
                                'cd sysroot/ && ' +
-                               'tar -cvf ../rootfs.tar * .inputrc && ' +
+                               'tar -cvf ../rootfs.tar * && ' +
                                'cd .. &&' +
                                'cp rootfs.tar isodir/boot/ && ' +
                                'cp -v ../limine/bin/limine-bios.sys ../limine/bin/limine-bios-cd.bin ../limine/bin/limine-uefi-cd.bin isodir/boot/limine/ &&' +

@@ -456,18 +456,13 @@ void free(void *ptr)
             if ( (tag->real_size % l_pageSize) != 0 ) pages += 1;
             if ( pages < l_pageCount ) pages = l_pageCount;
 
-            //liballoc_free( tag, pages );
+            liballoc_free( tag, pages );
 
 #ifdef DEBUG
             l_allocated -= pages * l_pageSize;
 				printf("Resource freeing %x of %d pages\n", tag, pages );
 				dump_array();
 #endif
-            while(1) {
-                printf("LIBALLOC: TOO MUCH PAGES\n");
-                ;;
-            }
-
             liballoc_unlock();
             return;
         }
