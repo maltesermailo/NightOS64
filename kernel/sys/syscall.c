@@ -13,6 +13,7 @@
 #include "../../mlibc/options/ansi/include/bits/ansi/timespec.h"
 #include "../../mlibc/options/posix/include/bits/posix/iovec.h"
 #include "../../mlibc/options/posix/include/sys/poll.h"
+#include "../error.h"
 #include "../fs/cache.h"
 #include "../idt.h"
 #include "../memmgr.h"
@@ -48,6 +49,8 @@ int sys_read(long fd, long buffer, long size) {
     int readBytes = read(handle, (char*)buffer, size);
     handle->offset += readBytes;
 
+    clear_error();
+
     return readBytes;
 }
 
@@ -71,6 +74,8 @@ int sys_write(long fd, long buffer, long size) {
     int written = write(handle, (char*)buffer, size);
     handle->offset += written;
 
+    clear_error();
+
     return written;
 }
 
@@ -86,6 +91,10 @@ int sys_open(long ptr, long mode) {
 
     if(node == NULL) {
         return -ENOENT;
+    }
+
+    if(get_last_error()) {
+      return -clear_and_report_error();
     }
 
     int fd = process_open_fd(node, mode);
@@ -108,6 +117,10 @@ long sys_stat(long path, long statbuf) {
 
     if(node == NULL) {
         return -ENOENT;
+    }
+
+    if(get_last_error()) {
+      return -clear_and_report_error();
     }
 
     struct stat* stat_struct = (struct stat*)statbuf;
@@ -166,6 +179,10 @@ long sys_lstat(long path, long statbuf) {
 
     if(node == NULL) {
         return -ENOENT;
+    }
+
+    if(get_last_error()) {
+      return -clear_and_report_error();
     }
 
     struct stat* stat_struct = (struct stat*)statbuf;
@@ -413,6 +430,8 @@ int sys_pread64(long fd, unsigned long buffer, unsigned long size, unsigned long
 
     int readBytes = read(&tempHandle, (char*)buffer, size);
 
+    clear_error();
+
     return readBytes;
 }
 
@@ -441,6 +460,8 @@ int sys_pwrite64(long fd, unsigned long buffer, unsigned long size, unsigned lon
     };
 
     int written = write(&tempHandle, (char*)buffer, size);
+
+    clear_error();
 
     return written;
 }
@@ -539,11 +560,20 @@ long sys_readv(long fd, const struct iovec* iov, int iovcnt) {
 
     for(int i = 0; i < iovcnt; i++) {
         int readBytes = read(handle, (char*)(iov->iov_base), iov->iov_len);
+
+        if(!readBytes) {
+          clear_error();
+
+          return readBytes;
+        }
+
         handle->offset += readBytes;
         totalBytesRead += readBytes;
 
         iov++;
     }
+
+    clear_error();
 
     return totalBytesRead;
 }
@@ -569,6 +599,13 @@ long sys_writev(long fd, const struct iovec* iov, int iovcnt) {
 
     for(int i = 0; i < iovcnt; i++) {
         int written = write(handle, (char*)(iov->iov_base), iov->iov_len);
+
+        if(!written) {
+          clear_error();
+
+          return written;
+        }
+
         handle->offset += written;
         totalBytesWritten += written;
 
@@ -590,6 +627,10 @@ long sys_access(long pathPtr, long mode) {
 
     if(node == NULL) {
         return -ENOENT;
+    }
+
+    if(get_last_error()) {
+      return -clear_and_report_error();
     }
 
     process_t* process = get_current_process();

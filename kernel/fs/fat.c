@@ -2,10 +2,11 @@
 // Created by Jannik on 14.07.2024.
 //
 #include "fat.h"
+#include "../error.h"
 #include <abi-bits/fcntl.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void clean_fat_filename(char* input, char* output) {
@@ -41,6 +42,13 @@ void clean_fat_filename(char* input, char* output) {
 
 uint32_t fat_find_free_cluster(fat_fs_t *fs) {
     uint32_t *fat = malloc(fs->sectorSize);
+
+    if(!fat) {
+      set_last_error(ENOMEM);
+
+      return 0;
+    }
+
     uint32_t fat_sector = fs->fatPointer;
     uint32_t entries_per_sector = fs->sectorSize / sizeof(uint32_t);
 
@@ -61,12 +69,17 @@ uint32_t fat_find_free_cluster(fat_fs_t *fs) {
     return 0; // No free cluster found
 }
 
-void fat_update_fat(fat_fs_t *fs, uint32_t cluster, uint32_t value) {
+bool fat_update_fat(fat_fs_t *fs, uint32_t cluster, uint32_t value) {
     uint32_t fat_offset = cluster * 4; //FAT uses 32-bit addressing with the upper 4 bits reserved
     uint32_t fat_sector = fs->fatPointer + (fat_offset / fs->sectorSize);
     uint32_t entry_offset = fat_offset % fs->sectorSize;
 
     uint32_t *fat_sector_data = malloc(fs->sectorSize);
+
+    if(!fat_sector_data) {
+      set_last_error(ENOMEM);
+      return false;
+    }
 
     // Read FAT sector
     fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)fat_sector_data,
@@ -80,6 +93,8 @@ void fat_update_fat(fat_fs_t *fs, uint32_t cluster, uint32_t value) {
                                        fat_sector * fs->sectorSize, fs->sectorSize);
 
     free(fat_sector_data);
+
+    return true;
 }
 
 int fat_create_dir_entry(fat_fs_t *fs, file_node_t *dir, const char *name, uint32_t cluster, uint32_t size, uint8_t attributes) {
@@ -88,6 +103,9 @@ int fat_create_dir_entry(fat_fs_t *fs, file_node_t *dir, const char *name, uint3
     uint32_t entries_per_cluster = cluster_size / sizeof(struct fatDirEntry);
 
     struct fatDirEntry *dir_data = malloc(cluster_size);
+    if(!dir_data) {
+      return -ENOMEM;
+    }
 
     // Read directory cluster
     fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)dir_data,
@@ -124,6 +142,11 @@ uint32_t fat_get_next_cluster(fat_fs_t *fs, uint32_t cluster) {
 
     uint32_t *fat_sector_data = malloc(fs->sectorSize);
 
+    if(!fat_sector_data) {
+      set_last_error(ENOMEM);
+      return 0;
+    }
+
     // Read FAT sector
     fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)fat_sector_data,
                                       fat_sector * fs->sectorSize, fs->sectorSize);
@@ -154,14 +177,24 @@ int fat_write_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, 
             // Need another cluster
             uint32_t next_cluster = fat_get_next_cluster(fs, start_cluster);
 
+            if(next_cluster == 0 && get_last_error()) {
+              return -get_last_error();
+            }
+
             if(next_cluster >= 0x0FFFFFFF) {
                 next_cluster = fat_find_free_cluster(fs);
                 if (next_cluster == 0) {
+                    if(get_last_error()) {
+                      return -get_last_error();
+                    }
+
                     return -1; // No more free clusters
                 }
 
                 // Update FAT for current cluster
-                fat_update_fat(fs, current_cluster, next_cluster);
+                if(!fat_update_fat(fs, current_cluster, next_cluster)) {
+                  return -get_last_error();
+                }
             }
 
             current_cluster = next_cluster;
@@ -169,7 +202,9 @@ int fat_write_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, 
     }
 
     // Mark end of file in FAT
-    fat_update_fat(fs, current_cluster, 0x0FFFFFFF);
+    if(!fat_update_fat(fs, current_cluster, 0x0FFFFFFF)) {
+      return -get_last_error();
+    }
 
     return 0;
 }
@@ -267,6 +302,11 @@ int fat_read_file_data(fat_fs_t *fs, uint32_t start_cluster, const char *data, s
         if (bytes_read < size) {
             // Need another cluster
             uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+
+            if(next_cluster == 0 && get_last_error()) {
+              return -get_last_error();
+            }
+
             if (next_cluster >= 0x0FFFFFF8) {
                 return bytes_read;
             }
@@ -288,6 +328,11 @@ int fat_read(struct FILE *file, char *data, size_t offset, size_t size) {
     // Skip to the correct cluster for the offset
     while (offset >= cluster_size) {
         start_cluster = fat_get_next_cluster(fs, start_cluster);
+
+        if(start_cluster == 0 && get_last_error()) {
+          return -get_last_error();
+        }
+
         if (start_cluster >= 0x0FFFFFF8) {
             // End of file chain reached before offset
             return -1;
@@ -321,6 +366,10 @@ int fat_update_dir_entry_size(fat_fs_t *fs, file_node_t *file) {
     uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
 
     struct fatDirEntry *dir_data = malloc(cluster_size);
+
+    if(!dir_data) {
+      return -ENOMEM;
+    }
 
     // Read parent directory cluster
     fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)dir_data,
@@ -366,6 +415,10 @@ int fat_remove_dir_entry(fat_fs_t *fs, file_node_t *file) {
 
     struct fatDirEntry *dir_data = malloc(cluster_size);
 
+    if(!dir_data) {
+      return -ENOMEM;
+    }
+
     // Read parent directory cluster
     fs->physicalDevice->file_ops.read(fs->physicalDevice, (char*)dir_data,
                                       fs->dataPointer * fs->sectorSize + (parent_cluster - 2) * cluster_size, cluster_size);
@@ -399,6 +452,11 @@ int fat_write(struct FILE *file, char *data, size_t offset, size_t size) {
     // Skip to the correct cluster for the offset
     while (offset >= cluster_size) {
         uint32_t next_cluster = fat_get_next_cluster(fs, start_cluster);
+
+        if (next_cluster == 0 && get_last_error()) {
+          return -get_last_error();
+        }
+
         if (next_cluster >= 0x0FFFFFF8) {
             // End of file chain reached
             if (offset > file->size) {
@@ -406,18 +464,31 @@ int fat_write(struct FILE *file, char *data, size_t offset, size_t size) {
                 // Allocate new cluster(s) as needed
                 next_cluster = fat_find_free_cluster(fs);
                 if (next_cluster == 0) {
+                    if(get_last_error()) {
+                      return -get_last_error();
+                    }
                     return -1; // No more free clusters
                 }
 
                 char* nullBuffer = malloc(cluster_size);
+
+                if(!nullBuffer) {
+                  return -ENOMEM;
+                }
+
                 memset(nullBuffer, 0, cluster_size);
 
-                fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+                int result = fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+
+                if(!result) {
+                  return result;
+                }
 
                 free(nullBuffer);
 
-                fat_update_fat(fs, start_cluster, next_cluster);
-                fat_update_fat(fs, next_cluster, 0x0FFFFFFF); // Mark as EOF
+                if(!fat_update_fat(fs, start_cluster, next_cluster) || !fat_update_fat(fs, next_cluster, 0x0FFFFFFF)) {
+                  return -get_last_error();
+                } // Mark as EOF
             } else {
                 return -1; // Invalid offset
             }
@@ -437,7 +508,11 @@ int fat_write(struct FILE *file, char *data, size_t offset, size_t size) {
             file->size = file->size - offset + size;
         }
 
-        fat_update_dir_entry_size(fs, file);
+        int result2 = fat_update_dir_entry_size(fs, file);
+
+        if(!result2) {
+          return result2;
+        }
     }
 
     return result;
@@ -455,13 +530,23 @@ int fat_delete(struct FILE* file) {
         while (current_cluster < 0x0FFFFFF7) {
             uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
 
+            if (next_cluster == 0 && get_last_error()) {
+              return -get_last_error();
+            }
+
             // Update FAT for current cluster
-            fat_update_fat(fs, current_cluster, 0);
+            if(!fat_update_fat(fs, current_cluster, 0)) {
+              return -get_last_error();
+            }
 
             current_cluster = next_cluster;
         }
 
-        fat_update_dir_entry_size(fs, file);
+        int result = fat_update_dir_entry_size(fs, file);
+
+        if(!result) {
+          return result;
+        }
     } else if(file->type == FILE_TYPE_DIR) {
         if(fat_get_size(file) > 0) {
             return -2; //NOT EMPTY
@@ -472,16 +557,22 @@ int fat_delete(struct FILE* file) {
         while (current_cluster < 0x0FFFFFF7) {
             uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
 
+            if (next_cluster == 0 && get_last_error()) {
+              return -get_last_error();
+            }
+
             // Update FAT for current cluster
-            fat_update_fat(fs, current_cluster, 0);
+            if(!fat_update_fat(fs, current_cluster, 0)) {
+              return -get_last_error();
+            }
 
             current_cluster = next_cluster;
         }
     }
 
-    fat_remove_dir_entry(fs, file);
+    int result = fat_remove_dir_entry(fs, file);
 
-    return 0;
+    return result;
 }
 
 file_node_t* fat_find_dir(file_node_t* node, char* name) {
@@ -797,8 +888,16 @@ void fat_open(file_node_t* node, int mode) {
 
         uint32_t current_cluster = fat_get_next_cluster(fs, start_cluster);
 
+        if (current_cluster == 0 && get_last_error()) {
+          return;
+        }
+
         while (current_cluster < 0x0FFFFFF7) {
             uint32_t next_cluster = fat_get_next_cluster(fs, current_cluster);
+
+            if (next_cluster == 0 && get_last_error()) {
+              return;
+            }
 
             // Update FAT for current cluster
             fat_update_fat(fs, current_cluster, 0);
@@ -809,12 +908,29 @@ void fat_open(file_node_t* node, int mode) {
         uint32_t cluster_size = fs->clusterSize * fs->sectorSize;
 
         char* nullBuffer = malloc(cluster_size);
+
+        if(!nullBuffer) {
+          set_last_error(ENOMEM);
+          return;
+        }
+
         memset(nullBuffer, 0, cluster_size);
 
-        fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+        int result = fat_write_file_data(fs, start_cluster, nullBuffer, cluster_size);
+
+        if(!result) {
+          set_last_error(-result);
+          return;
+        }
+
         node->size = 0;
 
-        fat_update_dir_entry_size(fs, node);
+        result = fat_update_dir_entry_size(fs, node);
+
+        if(!result) {
+          set_last_error(-result);
+          return;
+        }
     }
 }
 

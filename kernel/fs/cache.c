@@ -6,6 +6,7 @@
 #include "../alloc.h"
 #include <string.h>
 #include "../terminal.h"
+#include "../../mlibc/abis/linux/errno.h"
 
 vfs_cache_t* cache;
 
@@ -67,6 +68,7 @@ static vfs_cache_entry_t* cache_find(file_node_t* file, size_t offset, size_t si
           free(old_data);
 
           entry->file->file_ops.read(file, (char*)entry->data + old_size, old_size, size - old_size);
+          cache_evict(false);
         }
       }
 
@@ -92,6 +94,7 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
     // Cache hit
     printf("VFS: Cache: hit\n");
 
+    //If the segment request is larger than our entry, decrease requested size
     if((offset - entry->offset) + size > entry->size) {
       size = entry->size - (offset - entry->offset);
     }
@@ -103,6 +106,11 @@ int vfs_cache_read(file_node_t* file, char* buffer, size_t offset, size_t size) 
   printf("VFS: Cache: miss\n");
   // Cache miss
   entry = kmalloc(sizeof(vfs_cache_entry_t));
+
+  if(!entry) {
+    return -ENOMEM;
+  }
+
   entry->file = file;
   entry->offset = offset;
   entry->size = size;
@@ -132,6 +140,11 @@ int vfs_cache_write(file_node_t* file, const char* buffer, size_t offset, size_t
   } else {
     // Cache miss, create new entry
     entry = kmalloc(sizeof(vfs_cache_entry_t));
+
+    if(!entry) {
+      return -ENOMEM;
+    }
+
     entry->file = file;
     entry->offset = offset;
     entry->size = size;

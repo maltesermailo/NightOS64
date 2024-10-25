@@ -2,15 +2,16 @@
 // Created by Jannik on 07.04.2024.
 //
 #include "vfs.h"
-#include "../proc/process.h"
-#include "../../libc/include/kernel/list.h"
-#include "../../libc/include/string.h"
-#include "../../libc/include/kernel/tree.h"
 #include "../../libc/include/fcntl.h"
-#include "../terminal.h"
-#include "../../mlibc/abis/linux/fcntl.h"
+#include "../../libc/include/kernel/list.h"
+#include "../../libc/include/kernel/tree.h"
+#include "../../libc/include/string.h"
 #include "../../mlibc/abis/linux/errno.h"
+#include "../../mlibc/abis/linux/fcntl.h"
 #include "../../mlibc/abis/linux/poll.h"
+#include "../alloc.h"
+#include "../proc/process.h"
+#include "../terminal.h"
 #include "cache.h"
 
 file_node_t* root_node;
@@ -359,6 +360,12 @@ char* get_full_path(file_node_t* node) {
     }
 
     char* path = malloc(pathSize * sizeof(char));
+
+    if(!path) {
+      OOM();
+      return NULL;
+    }
+
     char* ptr = path;
     memset(path, 0, pathSize * sizeof(char));
 
@@ -553,6 +560,10 @@ int read(file_handle_t* handle, char* buffer, size_t length) {
         return -1;
     }
 
+    if (handle->mode & O_DIRECT) {
+      return handle->fileNode->file_ops.read(handle->fileNode, buffer, length);
+    }
+
     return vfs_cache_read(node, buffer, handle->offset, length);
 }
 
@@ -561,6 +572,10 @@ int write(file_handle_t* handle, char* buffer, size_t length) {
 
     if(handle->mode & O_APPEND) {
         handle->offset = node->size;
+    }
+
+    if (handle->mode & O_DIRECT) {
+      return handle->fileNode->file_ops.write(handle->fileNode, buffer, length);
     }
 
     return vfs_cache_write(node, buffer, handle->offset, length);

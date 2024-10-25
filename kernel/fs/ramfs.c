@@ -90,6 +90,10 @@ int ramfs_write(file_node_t* node, char* buffer, size_t offset, size_t length) {
     if(offset > ramFile->size) {
         char* newBuffer = malloc(offset+length);
 
+        if(!newBuffer) {
+          return -ENOMEM;
+        }
+
         ramFile->begin = (uintptr_t)newBuffer;
         memcpy(newBuffer, file, ramFile->size);
         file = (char*)ramFile->begin;
@@ -97,6 +101,10 @@ int ramfs_write(file_node_t* node, char* buffer, size_t offset, size_t length) {
 
     if((offset + length) > ramFile->size) {
         char* newBuffer = malloc(offset+length);
+
+        if(!newBuffer) {
+          return -ENOMEM;
+        }
 
         ramFile->begin = (uintptr_t)newBuffer;
         memcpy(newBuffer, file, ramFile->size);

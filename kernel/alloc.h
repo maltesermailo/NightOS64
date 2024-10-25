@@ -49,6 +49,8 @@ struct size_class {
     struct slab* slabs;
 };
 
+#define OOM()
+
 #define MEM_BLOCK_MAGIC 0x1BAB0
 
 #endif //NIGHTOS_ALLOC_H

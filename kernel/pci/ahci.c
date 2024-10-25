@@ -6,6 +6,7 @@
 #include "../timer.h"
 #include "../idt.h"
 #include "../../libc/include/kernel/list.h"
+#include "../../mlibc/abis/linux/errno.h"
 
 #include <stdio.h>
 #include "../../libc/include/string.h"
@@ -426,6 +427,11 @@ int ahci_read(file_node_t* node, char* buf, size_t offset, size_t length) {
 
     // Cache miss
     entry = kmalloc(sizeof(disk_cache_entry_t));
+
+    if(!entry) {
+      return -ENOMEM;
+    }
+
     entry->offset = offset;
     entry->size = length;
     entry->data = calloc(1, length);
@@ -469,9 +475,21 @@ int ahci_write(file_node_t* node, char* buf, size_t offset, size_t length) {
     } else {
       // Cache miss, create new entry
       entry = kmalloc(sizeof(disk_cache_entry_t));
+
+      if(!entry) {
+        return -ENOMEM;
+      }
+
       entry->offset = offset;
       entry->size = length;
       entry->data = kmalloc(length);
+
+      if(!entry->data) {
+        kfree(entry);
+
+        return -ENOMEM;
+      }
+
       memcpy(entry->data, buf, length);
       entry->dirty = true;
       ahci_cache_add_entry(thisDevice->diskCache, entry);

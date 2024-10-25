@@ -66,6 +66,12 @@ void keyboard_handler(regs_t* regs) {
         if(!isup) {
             key_event_t* keyEvent = malloc(sizeof(key_event_t));
 
+            if(!keyEvent) {
+              OOM();
+
+              return;
+            }
+
             keyEvent->isDown = true;
             keyEvent->keyCode = keyCode;
             for(int i = 0; i < 64; i++) {

@@ -39,6 +39,10 @@ struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     struct slab* slab = malloc(sizeof(struct slab));
     memset(slab, 0, sizeof(struct slab));
 
+    if(slab == NULL) {
+      return NULL;
+    }
+
     slab->total_objects = perPage;
     slab->free_objects = perPage;
     slab->object_size = sizeClass->size;
@@ -49,6 +53,17 @@ struct slab* kmalloc_for_size(struct size_class* sizeClass) {
     } else {
       slab->memory = sbrk(sizeClass->size);
       slab->bitmap = calloc(1, bitmapSize);
+    }
+
+    if(slab->memory == NULL || slab->bitmap == NULL) {
+      if(slab->memory) {
+        munmap(slab->memory, 4096);
+      }
+
+      if(slab->bitmap) {
+        free(slab->bitmap);
+      }
+      return NULL;
     }
 
     struct slab* ptr = sizeClass->slabs;
@@ -96,8 +111,12 @@ void* kmalloc(size_t size) {
                 slab = slab->next;
             }
 
-            kmalloc_for_size(&registeredSizeClasses[i]);
-            slab = slab->next;
+            slab = kmalloc_for_size(&registeredSizeClasses[i]);
+
+            if(slab == NULL) {
+              return NULL;
+            }
+
             slab->bitmap[0] |= 1 << 0;
             slab->free_objects--;
 
@@ -149,8 +168,12 @@ void* kmalloc(size_t size) {
         slab = slab->next;
     }
 
-    kmalloc_for_size(&defaultSizeClasses[shift]);
-    slab = slab->next;
+    slab = kmalloc_for_size(&defaultSizeClasses[shift]);
+
+    if(!slab) {
+      return NULL;
+    }
+
     slab->bitmap[0] |= 1 << 0;
     slab->free_objects--;
 
@@ -217,6 +240,10 @@ void* kcalloc(int nobj, size_t size) {
     real_size = nobj * size;
 
     p = kmalloc( real_size );
+
+    if(!p) {
+      return NULL;
+    }
 
     memset( p, 0, real_size );
 

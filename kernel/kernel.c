@@ -24,6 +24,7 @@
 #include "symbol.h"
 #include "fs/ramfs.h"
 #include "proc/message.h"
+#include "../mlibc/abis/linux/fcntl.h"
 #define SSFN_CONSOLEBITMAP_TRUECOLOR        /* use the special renderer for 32 bit truecolor packed pixels */
 #define SSFN_CONSOLEBITMAP_CONTROL
 //#define SSFN_IMPLEMENTATION
@@ -773,6 +774,7 @@ void kernel_main(unsigned long magic, unsigned long header)
     //Try opening console
     file_node_t* console0 = open("/dev/tty", 0);
     file_handle_t* hConsole = create_handle(console0);
+    hConsole->mode = O_DIRECT;
     write(hConsole, "test", strlen("test")+1);
 
     process_init();

@@ -207,16 +207,30 @@ void* memmgr_get_from_physical(uintptr_t physAddr) {
     return (void*)(physAddr | KERNEL_MEMORY);
 }
 
+/**
+ * Returns the identity mapping in MMIO space for the given physical address
+ * @param physAddr
+ * @return mmio mapping address
+ */
 void* memmgr_get_mmio(uintptr_t physAddr) {
     return (void*)(physAddr | MMIO_MEMORY);
 }
 
+/**
+ * Returns the physical address for the given MMIO space mapping
+ * @param addr the virtual address
+ * @return the real physical address
+ */
 void* memmgr_get_mmio_physical(uintptr_t addr) {
   return (void*)(addr & LOW_MMIO_MEMORY);
 }
 
 extern void load_page_map0(uintptr_t pageMap);
 
+/**
+ * Loads a new page map, used by the scheduler
+ * @param pageMap the new page map
+ */
 void load_page_map(uintptr_t pageMap) {
     if(pageMap == 0) {
         pageMap = 0x1000;
