@@ -10,6 +10,7 @@
 
 vfs_cache_t* cache;
 
+//TODO: Rework to use error codes
 static void cache_remove_entry(int i, vfs_cache_entry_t* entry) {
   list_remove_by_index(&cache->entries, i);
 

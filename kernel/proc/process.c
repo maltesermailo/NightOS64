@@ -94,6 +94,7 @@ void process_init() {
     sleeping_queue = list_create();
 }
 
+//TODO: Rework to use error codes
 void process_create_task(char* path, bool is_kernel) {
     file_node_t* node = open(path, 0);
 

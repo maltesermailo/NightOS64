@@ -228,11 +228,23 @@ bool fat_create_file(struct FILE *dir, char *name, int mode) {
 
     // Create and return new file node
     file_node_t *new_file = calloc(1, sizeof(file_node_t));
+
+    if(!new_file) {
+      set_last_error(ENOMEM);
+      return false;
+    }
+
     strcpy(new_file->name, name);
     new_file->type = FILE_TYPE_FILE;
     new_file->size = 0;
 
     fat_entry_t *new_entry = calloc(1, sizeof(fat_entry_t));
+    if(!new_entry) {
+      free(new_file);
+      set_last_error(ENOMEM);
+      return false;
+    }
+
     new_entry->fatFs = fs;
     new_entry->cluster = cluster;
 
@@ -268,11 +280,24 @@ bool fat_mkdir(struct FILE *dir, char *name) {
 
     // Create and return new file node
     file_node_t *new_file = calloc(1, sizeof(file_node_t));
+
+    if(!new_file) {
+      set_last_error(ENOMEM);
+      return false;
+    }
+
     strcpy(new_file->name, name);
     new_file->type = FILE_TYPE_DIR;
     new_file->size = 0;
 
     fat_entry_t *new_entry = calloc(1, sizeof(fat_entry_t));
+
+    if(!new_entry) {
+      free(new_file);
+      set_last_error(ENOMEM);
+      return false;
+    }
+
     new_entry->fatFs = fs;
     new_entry->cluster = cluster;
 
@@ -586,6 +611,10 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
         uint64_t startPointer = fatDirectory->dataPointer * fatDirectory->sectorSize + (fatDirectory->fatEbr32.root_cluster - 2) * clusterByteSize;
 
         struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
+        if(!fatDirPointer) {
+          set_last_error(ENOMEM);
+          return NULL;
+        }
 
         fatDirectory->physicalDevice->file_ops.read(fatDirectory->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
@@ -616,12 +645,24 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
             if(strcmp(filename, name) == 0) {
                 file_node_t* newNode = calloc(1, sizeof(file_node_t));
+
+                if(!newNode) {
+                  set_last_error(ENOMEM);
+                  return NULL;
+                }
+
                 strcpy(newNode->name, filename);
 
                 newNode->type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
                 newNode->size = fatDirPointer->size;
 
                 fat_entry_t* newEntry = calloc(1, sizeof(fat_entry_t));
+                if(!newEntry) {
+                  free(newNode);
+                  set_last_error(ENOMEM);
+                  return NULL;
+                }
+
                 newEntry->fatFs = node->fs;
                 newEntry->cluster = (uint32_t)fatDirPointer->clusterHigh << 16 | fatDirPointer->clusterLow;
 
@@ -650,6 +691,10 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
     uint64_t startPointer = fatDirectory->fatFs->dataPointer + (fatDirectory->cluster - 2) * clusterByteSize;
 
     struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
+    if(!fatDirPointer) {
+      set_last_error(ENOMEM);
+      return NULL;
+    }
 
     fatDirectory->fatFs->physicalDevice->file_ops.read(fatDirectory->fatFs->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
@@ -678,12 +723,22 @@ file_node_t* fat_find_dir(file_node_t* node, char* name) {
 
         if(strcmp(filename, name) == 0) {
             file_node_t* newNode = calloc(1, sizeof(file_node_t));
+            if(!newNode) {
+              set_last_error(ENOMEM);
+              return NULL;
+            }
+
             strcpy(newNode->name, filename);
 
             newNode->type = fatDirPointer->attributes & 0x10 ? FILE_TYPE_DIR : FILE_TYPE_FILE;
             newNode->size = fatDirPointer->size;
 
             fat_entry_t* newEntry = calloc(1, sizeof(fat_entry_t));
+            if(!newEntry) {
+              free(newNode);
+              set_last_error(ENOMEM);
+              return NULL;
+            }
             newEntry->fatFs = node->fs;
             newEntry->cluster = (uint32_t)fatDirPointer->clusterHigh << 16 | fatDirPointer->clusterLow;
 
@@ -718,6 +773,10 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
         uint64_t startPointer = fatDirectory->dataPointer * fatDirectory->sectorSize + (fatDirectory->fatEbr32.root_cluster - 2) * clusterByteSize;
 
         struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
+
+        if(!fatDirPointer) {
+          return -ENOMEM;
+        }
 
         fatDirectory->physicalDevice->file_ops.read(fatDirectory->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
@@ -761,6 +820,10 @@ int fat_read_dir(file_node_t* node, list_dir_t* entries, int count) {
     uint64_t startPointer = fatDirectory->fatFs->dataPointer * fatDirectory->fatFs->sectorSize + (fatDirectory->cluster - 2) * clusterByteSize;
 
     struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
+
+    if(!fatDirPointer) {
+      return -ENOMEM;
+    }
 
     fatDirectory->fatFs->physicalDevice->file_ops.read(fatDirectory->fatFs->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
@@ -810,6 +873,10 @@ int fat_get_size(file_node_t* node) {
 
         struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
 
+        if(!fatDirPointer) {
+          return -ENOMEM;
+        }
+
         fatDirectory->physicalDevice->file_ops.read(fatDirectory->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
         int count = 0;
@@ -846,6 +913,10 @@ int fat_get_size(file_node_t* node) {
     uint64_t startPointer = fatDirectory->fatFs->dataPointer * fatDirectory->fatFs->sectorSize + (fatDirectory->cluster - 2) * clusterByteSize;
 
     struct fatDirEntry* fatDirPointer = calloc(1, clusterByteSize);
+
+    if(!fatDirPointer) {
+      return -ENOMEM;
+    }
 
     fatDirectory->fatFs->physicalDevice->file_ops.read(fatDirectory->fatFs->physicalDevice, (char*)fatDirPointer, startPointer, clusterByteSize);
 
@@ -948,9 +1019,21 @@ file_node_t* fat_mount(char* device, char* name) {
     }
 
     fat_fs_t* fatFs = calloc(1, sizeof(fat_fs_t));
+
+    if(!fatFs) {
+      set_last_error(ENOMEM);
+      return NULL;
+    }
+
     deviceNode->file_ops.read(deviceNode, (char*)&fatFs->fatBpb, 0, 512);
 
     mbr_t* mbr = calloc(1, sizeof(mbr_t));
+
+    if(!mbr) {
+      set_last_error(ENOMEM);
+      return NULL;
+    }
+
     memcpy(mbr, &fatFs->fatBpb, 512);
 
     if(mbr->signature == MBR_SIGNATURE) {
@@ -991,6 +1074,13 @@ file_node_t* fat_mount(char* device, char* name) {
     fatFs->physicalDevice = deviceNode;
 
     char* dirEntryBytes = calloc(1, fatFs->sectorSize * fatFs->clusterSize);
+
+    if(!dirEntryBytes) {
+      free(fatFs);
+      set_last_error(ENOMEM);
+      return NULL;
+    }
+
     struct fatDirEntry* fatDirPointer = (struct fatDirEntry*) dirEntryBytes;
 
     //read root cluster
@@ -1032,6 +1122,14 @@ file_node_t* fat_mount(char* device, char* name) {
 
     //TODO: Make utility function to create file_nodes
     file_node_t* fatNode = calloc(1, sizeof(file_node_t));
+
+    if(!fatNode) {
+      free(fatFs);
+      free(dirEntryBytes);
+      set_last_error(ENOMEM);
+      return NULL;
+    }
+
     fatNode->type = FILE_TYPE_MOUNT_POINT;
     fatNode->fs = fatFs;
     fatNode->size = 0;

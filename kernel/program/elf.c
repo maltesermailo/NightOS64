@@ -11,6 +11,7 @@
 
 struct hashtable* modules;
 
+//TODO: Rework to use error codes
 elf_t* load_elf(file_handle_t* handle) {
     elf_t* elf = calloc(1, sizeof(elf_t));
     elf->handle = handle;

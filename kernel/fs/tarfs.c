@@ -72,6 +72,7 @@ int read_mem(void* ptr, char* buf, int size) {
     return size;
 }
 
+//TODO: Rework with error codes
 int tarfs_read(file_node_t* node, char* buf, size_t offset, size_t length) {
     //Grab the context
     tar_context_t* context = (tar_context_t*)node->fs;

@@ -1019,6 +1019,10 @@ long sys_mkdir(long pathptr) {
 
     node = mkdir(path);
 
+    if(get_last_error()) {
+      return -get_last_error();
+    }
+
     if(node == NULL) {
         return -ENOSPC;
     }
@@ -1138,6 +1142,10 @@ long sys_futex(long pointer, long action, long val, long timeout) {
 
             char* id = long_to_string(pointer);
 
+            if(!id) {
+              return -ENOMEM;
+            }
+
             spin_lock(futex_lock);
             ht_insert(futex_queue, id, get_current_process());
             spin_unlock(futex_lock);
@@ -1154,6 +1162,10 @@ long sys_futex(long pointer, long action, long val, long timeout) {
         }
     } else if(action == FUTEX_WAKE) {
         char* id = long_to_string(pointer);
+
+        if(!id) {
+          return -ENOMEM;
+        }
 
         value_list* list = ht_get_all_values(futex_queue, id);
         if (list != NULL) {
